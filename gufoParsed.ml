@@ -27,6 +27,7 @@ exception VarError of string
 exception ExecutionError of string
 exception InternalError of string
 exception UncatchedError of string
+exception RuntimeError of string
 
 
 type mvar = {

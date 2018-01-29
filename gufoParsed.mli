@@ -27,7 +27,7 @@ exception ExecutionError of string
 exception VarError of string
 exception InternalError of string
 exception UncatchedError of string
-
+exception RuntimeError of string
 
 
 (*TYPES *)

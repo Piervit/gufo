@@ -979,6 +979,30 @@ and apply_mosimpletype_val toplevel arg2valMap aval =
         MOSimple_val (MOFun_val (onames, arglst, body))
     | MOEmpty_val -> MOSimple_val (MOEmpty_val)
 
+and apply_in_list toplevel arg2valMap ref indices =
+  let rec apply_in_list_ cur_lst indices =
+    try 
+      match cur_lst with
+        | MOSimple_val (MOList_val lst_val) -> 
+            (match indices with 
+              | [] -> assert false
+              | [idx] -> 
+                  (match idx with 
+                    | MOSimple_val (MOBase_val (MOTypeIntVal i))-> List.nth lst_val i
+                    | _ -> assert false
+                  )
+              | idx::others_idx -> 
+                  (match idx with 
+                    | MOSimple_val (MOBase_val (MOTypeIntVal i)) -> 
+                      apply_in_list_ (List.nth lst_val i) others_idx
+                    | _ -> assert false
+                  )
+            )
+        | _ -> assert false
+    with Failure _ -> raise (RuntimeError "Invalid index.\n")
+    in 
+  apply_in_list_ (find_var_in_prog ref.morv_varname arg2valMap) indices
+
 and apply_motype_val toplevel arg2valMap aval = 
   match aval with 
     | MOSimple_val sv ->
@@ -986,11 +1010,30 @@ and apply_motype_val toplevel arg2valMap aval =
     | MOComposed_val mct -> apply_composed_type toplevel arg2valMap mct 
     | MORef_val (ref, argslst) ->
       (match ref.morv_module with 
-        | None -> (apply_fun toplevel arg2valMap (find_var_in_prog ref.morv_varname arg2valMap) (List.map (apply_motype_val toplevel arg2valMap) argslst) )
+        | None -> 
+            let funvar = 
+              (match ref.morv_index with
+                | None -> 
+                    (find_var_in_prog ref.morv_varname arg2valMap)
+                | Some idx_lst -> 
+                    let idx_lst = List.map (apply_motype_val toplevel arg2valMap) idx_lst in
+                    apply_in_list toplevel arg2valMap ref idx_lst 
+              )
+            in
+            (apply_fun toplevel arg2valMap funvar (List.map (apply_motype_val toplevel arg2valMap) argslst) )
         | Some m -> 
             (match IntMap.find m (get_fullprog ()).mofp_progmodules with
               | MOUserMod modul -> 
-              (apply_fun toplevel arg2valMap (find_var_in_prog ref.morv_varname modul.mopg_topvar) (List.map (apply_motype_val toplevel arg2valMap) argslst)) 
+                let funvar = 
+                  (match ref.morv_index with
+                    | None -> 
+                        (find_var_in_prog ref.morv_varname modul.mopg_topvar)
+                    | Some idx_lst -> 
+                        let idx_lst = List.map (apply_motype_val toplevel arg2valMap) idx_lst in
+                        apply_in_list toplevel arg2valMap ref idx_lst 
+                  )
+                in
+              (apply_fun toplevel arg2valMap funvar (List.map (apply_motype_val toplevel arg2valMap) argslst)) 
               | MOSystemMod msymodule -> 
               (apply_core_fun arg2valMap (find_var_in_sysmod ref.morv_varname msymodule) (List.map (apply_motype_val toplevel arg2valMap) argslst) )
               )

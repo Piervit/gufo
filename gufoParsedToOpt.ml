@@ -665,6 +665,8 @@ and determine_refapplication_type ref_typ args_typ bd_alltype =
             | MOOr_type (_,i) -> 
                 let typ, _ = refine_bd_alltype i ref_typ bd_alltype in typ 
 *)
+            | MOUnique_type (MOList_type st) -> 
+              MOUnique_type (MOList_type st)
             | _ -> 
                 assert false; (*I put an assert false as I can't figure a case in which it happens*)
           )
@@ -1344,12 +1346,32 @@ and type_check_val fulloptiprog optiprog typScope v =
           ) 
           ctypv.mocv_fields true 
     | MORef_val (ref, args) ->
+        let check_with_lst =
+          match ref.morv_index with
+            | None -> true
+            | Some lst -> 
+                let _check_is_int =
+                  List.iter
+                  (fun v -> 
+                    let _ = 
+                      type_check_has_type fulloptiprog optiprog typScope 
+                        (MOUnique_type(MOBase_type MTypeInt) ) v in
+                    ()
+                  )
+                   lst
+                in
+                  List.fold_left 
+                    (fun b v -> type_check_val fulloptiprog optiprog typScope v)
+                    true lst
+        in
+
         (*if there is args, this is a function call, we have to check the
          * argument of the call.*)
         (match args with
-          | [] -> true
+          | [] -> check_with_lst
           | lst ->
             let check_ref reft args pos = 
+              printf "reft: %s \n" (type_to_string reft);
               (match reft with
                 | MOUnique_type (MORef_type (modul, id_ref,deep,nargs)) ->
                     (*TODO*)
@@ -1393,8 +1415,8 @@ and type_check_val fulloptiprog optiprog typScope v =
                       in res
                     )
 
+                    (*TODO*)
                 | _ -> 
-                    
                     assert false
               )
             in
@@ -1799,8 +1821,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog =
     let resolve_index ref = 
       (match ref.mrv_index with
                 | None -> None
-                | Some vlst -> Some 
-                                (List.map (parsedToOpt_expr optiprog locScope) vlst)
+                | Some vlst -> Some (List.map (parsedToOpt_expr optiprog locScope) vlst)
       ) 
     in
     match ref.mrv_module with
