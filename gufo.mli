@@ -415,7 +415,7 @@ sig
 
   (**Transformation from SimpleCore to Core **)
 
-  val simple_to_core_mtype_val: mitype_val -> motype_val
+  val simple_to_core_val: mitype_val -> motype_val
 
   val core_to_simple_mtype: motype_val -> mitype_val
 

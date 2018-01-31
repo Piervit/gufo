@@ -450,7 +450,7 @@ varassign_internal_no_bracket:
     {op}
   | OPEN_SQRBRACKET ; CLOSE_SQRBRACKET
       {GufoParsed.MSimple_val (GufoParsed.MList_val [])}
-  | OPEN_SQRBRACKET ; lst = listSetMapEl; CLOSE_SQRBRACKET
+  | OPEN_SQRBRACKET ; lst = listSetEl; CLOSE_SQRBRACKET
     {let open GufoParsed in
       MSimple_val (MList_val lst)
     }
@@ -469,9 +469,17 @@ varassign_no_bracket :
     {
       GufoParsed.MSimple_val (GufoParsed.MSet_val [])
     }
-  | MINUS_OPENING_CHEVRON; set = listSetMapEl; MINUS_CLOSING_CHEVRON
+  | MINUS_OPENING_CHEVRON; set = listSetEl; MINUS_CLOSING_CHEVRON
     {let open GufoParsed in
       MSimple_val (MSet_val set)
+    }
+  | MINUS_OPENING_CHEVRON; COLON;   MINUS_CLOSING_CHEVRON
+    {
+      GufoParsed.MSimple_val (GufoParsed.MMap_val[])
+    }
+  | MINUS_OPENING_CHEVRON; map = mapEl; MINUS_CLOSING_CHEVRON
+    {let open GufoParsed in
+      MSimple_val (MMap_val map)
     }
 
 
@@ -490,7 +498,7 @@ varassign_in_expr :
     }
   | OPEN_SQRBRACKET ; CLOSE_SQRBRACKET
       {GufoParsed.MSimple_val (GufoParsed.MList_val [])}
-  | OPEN_SQRBRACKET ; lst = listSetMapEl; CLOSE_SQRBRACKET
+  | OPEN_SQRBRACKET ; lst = listSetEl; CLOSE_SQRBRACKET
     {let open GufoParsed in
       MSimple_val (MList_val lst)
     }
@@ -752,11 +760,19 @@ lst_index:
 
 
 
-listSetMapEl:
+listSetEl:
   | el = varassign_no_bracket;
     {[el]}
-  | el = varassign_no_bracket; COMMA; lst = listSetMapEl;
+  | el = varassign_no_bracket; COMMA; lst = listSetEl;
     {el::lst}
+
+mapEl:
+  | key = varassign_no_bracket; COLON ; el = varassign_no_bracket;
+    {[key, el]}
+      | key = varassign_no_bracket; COLON ; el = varassign_no_bracket; COMMA; lst = mapEl;
+    {(key,el)::lst}
+
+
 
 modulVarOrExpr:
   | a = modulVar

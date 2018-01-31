@@ -78,7 +78,7 @@ let fold_over_obinding_val apply_fun acc expr =
               | MOTypeCmdVal cseq -> fold_over_cmd_val_from_cmdseq acc cseq 
               | MOTypeStringVal _ | MOTypeBoolVal _ | MOTypeIntVal _ | MOTypeFloatVal _ -> acc
             )
-          | MOSet_val set -> MSet.fold (fun el acc -> fold_over_obinding_val_  acc (simple_to_core_mtype_val el) ) set acc
+          | MOSet_val set -> MSet.fold (fun el acc -> fold_over_obinding_val_  acc (simple_to_core_val el) ) set acc
           | MOList_val mtypelst
           | MOTuple_val mtypelst ->
               List.fold_left fold_over_obinding_val_ acc mtypelst
@@ -88,7 +88,7 @@ let fold_over_obinding_val apply_fun acc expr =
               MMap.fold(fun key v acc  -> 
                 fold_over_obinding_val_
                   (fold_over_obinding_val_ acc v) 
-                  (simple_to_core_mtype_val key)) 
+                  (simple_to_core_val key)) 
               keyValLst acc 
           | MOEmpty_val -> acc
         )
@@ -176,7 +176,7 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
               | MOTypeCmdVal cseq -> fold_over_cmd_val_from_cmdseq acc cseq 
               | MOTypeStringVal _ | MOTypeBoolVal _ | MOTypeIntVal _ | MOTypeFloatVal _ -> acc
             )
-          | MOSet_val set -> MSet.fold (fun el acc -> fold_over_obinding_and_ofun_val_ acc (simple_to_core_mtype_val el) ) set acc
+          | MOSet_val set -> MSet.fold (fun el acc -> fold_over_obinding_and_ofun_val_ acc (simple_to_core_val el) ) set acc
           | MOList_val mtypelst
           | MOTuple_val mtypelst ->
               List.fold_left fold_over_obinding_and_ofun_val_ acc mtypelst
@@ -188,7 +188,7 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
               MMap.fold(fun key v acc  -> 
                 fold_over_obinding_and_ofun_val_
                   (fold_over_obinding_and_ofun_val_ acc v) 
-                  (simple_to_core_mtype_val key)) 
+                  (simple_to_core_val key)) 
               keyValLst acc 
           | MOEmpty_val -> acc
         )

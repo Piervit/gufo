@@ -909,7 +909,20 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   | MModulo, MOSimple_val (MOBase_val (MOTypeFloatVal el1)),
                           MOSimple_val (MOBase_val (MOTypeFloatVal el2)) -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal (mod_float el1 el2)))
-  | _ -> assert false
+  | MWith, MOSimple_val(MOList_val lst1), MOSimple_val (MOList_val lst2) ->
+      MOSimple_val(MOList_val (List.concat [lst1; lst2]))
+  | MWith, MOSimple_val(MOSet_val set1), MOSimple_val (MOSet_val set2) ->
+      MOSimple_val(MOSet_val (MSet.union set1 set2))
+  | MWith, MOSimple_val(MOMap_val map1), MOSimple_val (MOMap_val map2) ->
+      MOSimple_val(MOMap_val (MMap.merge (fun k v1 v2 -> 
+                                            match v1, v2 with
+                                              | None, Some v -> Some v
+                                              | Some v, None -> Some v
+                                              | Some v1, Some v2 -> Some v2
+                                              | None, None -> None
+                                          ) map1 map2))
+
+
 
 and apply_binding toplevel arg2valMap mbind = 
   (*we apply every tuple element to its value, and then go in the body.*)
@@ -960,7 +973,7 @@ and apply_mosimpletype_val toplevel arg2valMap aval =
     | MOSet_val set ->
         let nset = MSet.fold (fun aval nset -> 
           MSet.add (core_to_simple_mtype (apply_motype_val toplevel arg2valMap 
-                    (simple_to_core_mtype_val aval))) nset) set MSet.empty
+                    (simple_to_core_val aval))) nset) set MSet.empty
         in
         MOSimple_val (MOSet_val nset)
     | MOMap_val mmap ->
@@ -969,7 +982,7 @@ and apply_mosimpletype_val toplevel arg2valMap aval =
           (fun key value newmap ->
             MMap.add 
               (core_to_simple_mtype
-                (apply_motype_val toplevel arg2valMap (simple_to_core_mtype_val key))) 
+                (apply_motype_val toplevel arg2valMap (simple_to_core_val key))) 
             (apply_motype_val toplevel arg2valMap value) newmap
           ) mmap MMap.empty))
     | MONone_val  -> MOSimple_val (MONone_val)
