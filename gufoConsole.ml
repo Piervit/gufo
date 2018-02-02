@@ -72,10 +72,12 @@ let c_fun = lyellow
 let c_comp = lmagenta
 let c_unknown = lwhite
 let c_comment = cyan
+let c_aggregate = lblue (*list, set or map*)
 
 
 (* background color *)
-let c_option = blue
+let cb_option = blue
+
 
 (* END COLORS *)
 
@@ -91,29 +93,89 @@ let count_lines_str str =
     )
     str 1 
 
+let count_lines_rope str = 
+  Zed_rope.fold 
+    (fun achar acc -> 
+      match UChar.uint_code achar with
+        | 0x000A (* newline *) -> acc + 1
+        | _ -> acc
+    )
+    str 1 
+
+
+let prefix_len = 2
+
 let create_empty_expr () = 
   let zedit = Zed_edit.create ?editable:(Some (fun _ _ -> true)) () in
   let zcursor = Zed_edit.new_cursor zedit in
   Zed_edit.context zedit zcursor
 
+let is_empty_expr expr = Zed_rope.is_empty (Zed_edit.text (Zed_edit.edit expr))
+
 let get_edit_ expr = Zed_edit.edit expr
 
-let get_line_length expr line_num = Zed_rope.length (Zed_edit.get_line (get_edit_ expr) line_num)
+let get_line_length expr line_num = 
+  match line_num with
+    |0 -> (Zed_rope.length (Zed_edit.get_line (get_edit_ expr) line_num)) + prefix_len
+    | _ -> Zed_rope.length (Zed_edit.get_line (get_edit_ expr) line_num)
 
 
-let get_cursor_coord expr = Zed_cursor.get_coordinates (Zed_edit.cursor expr) 
+let get_cursor_coord expr = 
+  let row, col = Zed_cursor.get_coordinates (Zed_edit.cursor expr) in
+    match row with 
+      | 0 -> row , col + prefix_len
+      | _ -> row, col
 
-let get_cursor_position expr = Zed_edit.line expr,Zed_edit.column expr
+(* let get_cursor_position expr = Zed_edit.line expr,Zed_edit.column expr *)
 
-let get_lines_count expr = Zed_lines.count (Zed_edit.lines (get_edit_ expr) )
+let get_lines_count expr = (Zed_lines.count (Zed_edit.lines (get_edit_ expr) )) + 1
 
 let insert_in_expr expr achar = Zed_edit.insert expr (Zed_rope.make 1 achar); expr
 
 let delete_in_expr expr = Zed_edit.remove_prev expr 1; expr
 
-let insert_newline expr = Zed_edit.newline expr; expr
+let to_uchar achar = UChar.of_char achar
+
+let insert_newline expr = Zed_edit.newline expr; 
+                          insert_in_expr  (insert_in_expr expr (to_uchar ' ')) (to_uchar ' ')
 
 let count_lines expr = (Zed_lines.count (Zed_edit.lines (get_edit_ expr))) + 1
+
+(* The message will be splitted in such a way that it has no lines longer than
+ * max_line_size.*)
+let split_rope_message str max_line_size = 
+  let new_rop_buf = Zed_rope.Buffer.create () in
+  let  _ = 
+    Zed_rope.fold 
+      (fun uchar cur_col_num ->
+        (match UChar.uint_code uchar with
+          | 0x000A
+          | 0x000D (*newline *) ->
+              let _ = Zed_rope.Buffer.add new_rop_buf (UChar.chr 0x000A) in 0
+          | uchari -> 
+              match cur_col_num with
+                | i when i = (max_line_size - 1) ->
+                    let _ = Zed_rope.Buffer.add new_rop_buf (UChar.chr 0x000A) in
+                    let _ = Zed_rope.Buffer.add new_rop_buf uchar in
+                    1
+                | _ -> 
+                    let _ =  Zed_rope.Buffer.add new_rop_buf uchar in
+                    cur_col_num + 1
+      ))
+      str 0
+  in
+    Zed_rope.Buffer.contents new_rop_buf
+
+
+(*This console is considered to be always at least 80 collums wide. If we have
+ * message that (main expr) or error that are wider that this size, they should
+ * be splitted automatically. *)
+
+
+(* prefix printing *)
+
+
+let print_prefix term =  LTerm.fprints term (eval [B_fg c_result; S "% " ])
 
 
 
@@ -122,38 +184,52 @@ let count_lines expr = (Zed_lines.count (Zed_edit.lines (get_edit_ expr))) + 1
 let nb_lines_error = ref 0
 
 let clear_res_err term cur_expr = 
+
+  let rec recursively_clear nb_lines = 
+    match nb_lines with 
+      | 0 -> return ()
+      | i -> LTerm.clear_line term >>= 
+             (fun () -> LTerm.move term 1 0) >>= 
+             (fun () -> recursively_clear (nb_lines - 1))
+  in
+
   match (!nb_lines_error) with
     | 0 -> return ()
     | nb_error_line ->
-        let expr_cursor_row, expr_cursor_col = get_cursor_position cur_expr in
-        let expr_lines_count = get_lines_count cur_expr in
+        let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
+        let expr_lines_count = (get_lines_count cur_expr) - 1 in
         LTerm.move term (expr_lines_count - expr_cursor_row + 1) (-500) >>=
-        (fun () -> nb_lines_error:= 0; LTerm.clear_line term) (*TODO : clear as much line as in nb_lines_error and at the end go up by nb_lines_error instead of 1 *)
+        (fun () -> recursively_clear (!nb_lines_error))
         >>=
-        (fun () -> LTerm.move term 0 (-500))
+        (fun () ->  LTerm.move term 0 (-500))
         >>=
-        (fun () -> LTerm.move term (expr_cursor_row - expr_lines_count - 1 ) expr_cursor_col)
+        (fun () -> LTerm.move term (expr_cursor_row - expr_lines_count - (!nb_lines_error + 1) ) expr_cursor_col)
+        >>=
+        (fun () -> nb_lines_error:= 0; return ())
 
 let print_res_err term cur_expr str_err = 
-  let nb_error_line = count_lines_str str_err in
-  let expr_cursor_row, expr_cursor_col = get_cursor_position cur_expr in
+  (*str is splitted so it has no line longer than 80 cols. *)
+  let str_err = split_rope_message str_err 80 in 
+  let nb_error_line = count_lines_rope str_err in
+  let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
   let expr_lines_count = get_lines_count cur_expr in
 
   LTerm.fprints term (eval [B_fg c_error; S "\n"]) >>=
-  (fun () -> LTerm.move term (-1) (0)) >>=
   (fun () -> nb_lines_error:= nb_error_line;
-    LTerm.move term (expr_lines_count - expr_cursor_row + 1) (-500)) >>=
+    LTerm.move term (expr_lines_count - expr_cursor_row - 1 ) (-500)) >>=
   (fun () -> 
-  LTerm.fprints term (eval [B_fg c_error; R (Zed_rope.of_string (str_err))]))
+  LTerm.fprints term (eval [B_fg c_error; R (str_err)]))
   >>=
   (fun () -> LTerm.move term 0 (-500)) >>=
-  (fun () -> LTerm.move term (expr_cursor_row - expr_lines_count - nb_error_line  ) expr_cursor_col )
+  (fun () -> LTerm.move term (expr_cursor_row  + 1 - expr_lines_count - nb_error_line  ) (expr_cursor_col))
 
 let clear_expr term expr = 
   clear_res_err term expr >>=
   (fun () -> 
     let nb_lines = count_lines expr in
-    let curs_row, curs_col = get_cursor_coord expr in
+    let curs_row, curs_col = 
+      get_cursor_coord expr 
+    in
     let rec del_until nb_to_del = 
       match nb_to_del with
         | 0 -> 
@@ -163,15 +239,13 @@ let clear_expr term expr =
               (fun () -> LTerm.move term (-1) 0 )  >>=
               (fun () -> del_until (nb_to_del - 1))
     in
-    (*we go on the last line.*)
-    LTerm.move term 0 (nb_lines - curs_row) >>=
-      (fun () -> del_until nb_lines)
+      LTerm.move term (nb_lines - 1 - curs_row) (- curs_col)  >>=
+      (fun () -> del_until nb_lines )
   )
-
 
 let is_keyword word = 
   match word with 
-    | "let" | "in" | "if" | "then" | "else" | "fun" | "struct" -> true 
+    | "let" | "in" | "if" | "then" | "else" | "fun" | "struct" | "with" | "wout" -> true 
     | _ -> false
 
 let is_integer word = 
@@ -189,6 +263,14 @@ let is_cmd word =
   Str.string_match (Str.regexp "[a-z0-9]+")  word 0 
 
 
+  (*This function is to be called after the expr has been printed. The cursor
+   * is expected at the end of the terminal printing.*)
+let place_cursor_after_print term expr =
+  let nb_lines_expr = get_lines_count expr in
+  let curs_row, curs_col = get_cursor_coord expr in
+  let len_last_line =  get_line_length expr (nb_lines_expr - 1 ) in
+  LTerm.move term (curs_row + 1 - nb_lines_expr) (curs_col - len_last_line)
+  
 
 
 
@@ -210,6 +292,10 @@ let print_color_expr term expr optprog types =
           [ S word ; B_fg c_float]
       | MOUnique_type (MOBase_type(   MTypeCmd)) ->
           [ S word; B_fg c_cmd]
+      | MOUnique_type (MOList_type(_ )) 
+      | MOUnique_type (MOSet_type(_ )) 
+      | MOUnique_type (MOMap_type(_ )) ->
+          [ S word; B_fg c_aggregate]
       | MOUnique_type (MOFun_type _) ->
           [ S word; B_fg c_fun]
       | _  -> print_type_not_found word
@@ -330,7 +416,10 @@ let print_color_expr term expr optprog types =
           )
     )
   in
-  LTerm.move term 0 (-5000) >>=
+  (if (not (is_empty_expr expr) )
+  then (print_prefix term)
+  else (return ()))
+  >>=
   (fun () -> 
   let to_print, last_str,_,_ = 
     Zed_utf8.fold colorize (Zed_rope.to_string (Zed_edit.text (Zed_edit.edit expr))) ([], "",false,false) (*list to print,curword, and a boolean to know if we are in quote*)
@@ -338,26 +427,16 @@ let print_color_expr term expr optprog types =
   let to_print = 
     if String.length last_str > 0 then ((print_curword last_str) @ to_print) else to_print
   in
-  let curs_row, curs_col = get_cursor_coord expr in
-  let cur_row_lenght = (get_line_length expr curs_row ) in 
-(*   let nb_lines = count_lines expr in *)
-  LTerm.fprints term (eval (List.rev to_print))
-(*   LTerm.fprints term (eval [S (sprintf "%d"  (curs_row - (get_line_length expr 0 ) ))]) *)
-  >>= 
-    (*TODO: handle line change*)
-  (fun () -> LTerm.move term (0) (curs_col -  cur_row_lenght))
+  LTerm.fprints term (eval (List.rev to_print)) >>=
+    (fun () -> place_cursor_after_print term expr )
   
   ) 
-  
+
 
 let print_expr term expr = 
-  let curs_row, curs_col = Zed_cursor.get_coordinates (Zed_edit.cursor expr)  in
-  LTerm.clear_line term >>=
-  (fun () -> LTerm.move term 0 (-5000)) >>=
-  (fun () -> LTerm.fprints term (eval [B_fg c_unknown; R (Zed_edit.text (Zed_edit.edit expr))])) >>=
-  (fun () -> LTerm.move term 0 (-5000)) >>= 
-  (fun () -> LTerm.move term 0 (curs_col)) >>= 
-  (fun () -> LTerm.show_cursor term)
+  print_prefix term  >>=
+  (fun () -> LTerm.fprints term (eval [B_fg c_unknown; R (Zed_edit.text (Zed_edit.edit expr))]))  >>=
+  (fun () -> place_cursor_after_print term expr) 
 
 
 let print_res term str_res = 
@@ -395,17 +474,17 @@ let analyse_and_print term cur_expr =
                | VarError msg 
                | SyntaxError msg ->
             print_expr term cur_expr >>=
-            (fun () -> print_res_err term cur_expr msg)
+            (fun () -> print_res_err term cur_expr (Zed_rope.of_string msg))
                | Not_found -> 
             print_expr term cur_expr >>=
-            (fun () -> print_res_err term cur_expr "Not found")
+            (fun () -> print_res_err term cur_expr (Zed_rope.of_string "Not found"))
         )
       | None ->
           print_expr term cur_expr
     )
     with | SyntaxError msg ->
        print_expr term cur_expr >>=
-       (fun () -> print_res_err term cur_expr msg)
+       (fun () -> print_res_err term cur_expr (Zed_rope.of_string msg))
 
 let do_nothing term cur_expr = Lwt.return (Some cur_expr)
 
@@ -441,7 +520,8 @@ let new_line term cur_expr =
           | false -> GufoParsedToOpt.add_prog_to_optprog !fulloprog prog
         in
         fulloprog := opt_prog;
-        print_color_expr term cur_expr opt_prog types >>=
+        clear_expr term cur_expr >>=
+        (fun () -> print_color_expr term cur_expr opt_prog types) >>=
         (fun () -> LTerm.fprints term (eval [B_fg c_unknown; S "\n"])) >>=
         (fun () -> LTerm.flush term) >>=
         (fun () ->
@@ -467,7 +547,7 @@ let new_line term cur_expr =
        | Sys_error msg 
        | VarError msg 
        | SyntaxError msg ->
-              print_res_err term cur_expr msg >>=
+              print_res_err term cur_expr (Zed_rope.of_string msg) >>=
               (fun () -> return (Some (create_empty_expr ())))
 
 let delete term cur_expr =
@@ -556,6 +636,12 @@ let handle_key_event term cur_expr akey =
 
 
 let rec loop term history tmod cur_expr =
+  (if (is_empty_expr cur_expr )
+   then (print_prefix term )
+   else return ()
+  )
+  >>=
+  (fun () -> 
   Lwt.catch (fun () -> (LTerm.read_event term)
     >|= fun event -> Some event
   )
@@ -579,7 +665,7 @@ let rec loop term history tmod cur_expr =
       (** A mouse button has been pressed. *)
   | None -> 
           loop term history tmod cur_expr
- 
+ )
 
 let main () =
   LTerm_inputrc.load ()
