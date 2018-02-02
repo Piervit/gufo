@@ -209,6 +209,7 @@ and m_expr_operation =
   | MDivision
   | MModulo
   | MWith
+  | MWithout
 (*   | IntAbsolute  *)
 
 (** A scope contains types and variables*)

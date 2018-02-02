@@ -77,7 +77,7 @@ rule read =
   | "%"      { PERCENT }
   | "->"      { ARROW }
   | "with"   { WITH }
-  | "without"   { WITHOUT }
+  | "wout"   { WITHOUT }
   | "*"      { STAR }
   | "**"     { DBL_STAR }
   | "~"      { TILDE }

@@ -218,6 +218,7 @@ and m_expr_operation =
   | MDivision
   | MModulo
   | MWith
+  | MWithout
 (*   | IntAbsolute  *)
 
 (** A scope contains types and variables*)
@@ -513,6 +514,8 @@ and dump_cmd_val cmdval =
                 print_call " mod " args
             | MWith ->
                 print_call " with " args
+            | MWithout ->
+                print_call " wout " args
          )
       | MIf_val (cond, thn, els ) ->
           print_string "if {";

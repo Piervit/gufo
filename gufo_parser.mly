@@ -546,6 +546,8 @@ operation :
     {GufoParsed.MBasicFunBody_val (GufoParsed.MModulo, [i1; i2])}
   | i1 = varassign_no_bracket; WITH ; i2 = varassign_no_bracket
     {GufoParsed.MBasicFunBody_val (GufoParsed.MWith, [i1; i2])}
+  | i1 = varassign_no_bracket; WITHOUT ; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithout, [i1; i2])}
   |  cmdas = simple_cmd;
     { GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeCmdVal cmdas)) }
   | acmds = varassign_no_bracket ; SIMPLE_AND 

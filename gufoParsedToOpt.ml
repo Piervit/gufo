@@ -506,6 +506,11 @@ and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb =
         let typ_a, locScope = determine_type fulloptiprog optiprog locScope const arga in 
         let typ_b, locScope = determine_type fulloptiprog optiprog locScope const argb in
         (determine_refine_type typ_a typ_b) , locScope
+    | MWithout -> 
+        let typ_a, locScope = determine_type fulloptiprog optiprog locScope const arga in 
+        let typ_b, locScope = determine_type fulloptiprog optiprog locScope const argb in
+        (determine_refine_type typ_a typ_b) , locScope
+
 
   in 
   (*Looks uneeded*)

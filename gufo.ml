@@ -405,6 +405,7 @@ struct
           | MDivision, MDivision
           | MModulo, MModulo
           | MWith, MWith ->  comp_args 
+          | MWithout, MWithout ->  comp_args 
           | MAddition, _ -> 1
           | _, MAddition -> -1
           | MSoustraction, _ -> 1
@@ -414,7 +415,9 @@ struct
           | MModulo, _ -> 1
           | _, MModulo -> -1
           | MWith,_ -> 1
-          | _,_ -> -1
+          | _,MWith -> -1
+          | MWithout, _ -> 1 
+          | _ , _ -> -1
 
       and compare_binding bda bdb = 
         match (List.length bda.mibd_name) - (List.length bdb.mibd_name) with

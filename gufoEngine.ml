@@ -921,6 +921,17 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
                                               | Some v1, Some v2 -> Some v2
                                               | None, None -> None
                                           ) map1 map2))
+  | MWithout, MOSimple_val(MOSet_val set1), MOSimple_val (MOSet_val set2) ->
+      MOSimple_val(MOSet_val (MSet.diff set1 set2))
+  | MWithout, MOSimple_val(MOMap_val map1), MOSimple_val (MOMap_val map2) ->
+      MOSimple_val(MOMap_val (MMap.merge (fun k v1 v2 -> 
+                                            match v1, v2 with
+                                              | None, Some v -> None
+                                              | Some v, None -> Some v
+                                              | Some v1, Some v2 -> None
+                                              | None, None -> None
+                                          ) map1 map2))
+
 
 
 
