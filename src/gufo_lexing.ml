@@ -28,14 +28,10 @@ type token =
   | AFFECTATION (* = *)
   | TRUE 
   | FALSE
-  (* pattern matching *)
-  | MATCH
-  | PERCENT 
   | ARROW (* -> *)
   | WITH (* also array rilated *)
   | WITHOUT (* also array rilated *)
   (* file/dir shortcut *)
-  | DBL_STAR (* ** *)
   | TILDE(* userdir *)
   (* command rilated *)
   | PIPE
@@ -46,8 +42,6 @@ type token =
   | WRITE_ERROR_TO_STD (* 2>&1 *)
   | WRITE_ALL_TO (* >& *)
   | OPENING_CHEVRON (* < *)
-  (* file operation *)
-  | FILE_EXIST  (* exist *)
   (* mathematic *)
   | ADDITION
   | SUBSTRACTION
@@ -61,15 +55,9 @@ type token =
   | LOWER_THAN (* lt *)
   | LOWER_OR_EQUAL (* lte *)
   (* array rilated *)
-  | LIST_OPEN (* [[ *)
-  | LIST_CLOSE (* ]] *)
   | SETMAP_OPEN (* [ *)
   | SETMAP_CLOSE (* ] *)
-  | LIST_LENGTH 
-  | LIST_APPEND 
-  | LIST_PREPEND
-  | LIST_RM_LAST
-  | LIST_RM_FIRST
+
   (* condition *)
   | IF
   | THEN

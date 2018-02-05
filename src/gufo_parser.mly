@@ -28,13 +28,10 @@
 %token TRUE 
 %token FALSE
 (* pattern matching *)
-%token MATCH
-%token PERCENT 
 %token ARROW (* -> *)
 %token WITH (* also array rilated *)
 %token WITHOUT (* also array rilated *)
 (* file/dir shortcut *)
-%token DBL_STAR (* ** *)
 %token TILDE(* userdir *)
 (* command rilated *)
 %token CLOSING_CHEVRON (* > *)
@@ -55,8 +52,6 @@
 %token <string> ARG 
 %token <string> FILE
 (* %token <string> CMDARG *)
-(* file operation *)
-%token FILE_EXIST  (* exist *)
 (* mathematic *)
 %token PLUS
 %token DOUBLE_MINUS
@@ -73,16 +68,9 @@
 %token LOWER_OR_EQUAL (* lte *)
 *)
 (* array rilated *)
-%token LIST_OPEN (* [[ *)
-%token LIST_CLOSE (* ]] *)
 %token OPEN_SQRBRACKET (* [ *)
 %token OPEN_SQRIDXBRACKET (* [ *)
 %token CLOSE_SQRBRACKET  (* ] *)
-%token LIST_LENGTH 
-%token LIST_APPEND 
-%token LIST_PREPEND
-%token LIST_RM_LAST
-%token LIST_RM_FIRST
 (* condition *)
 %token IF
 %token THEN
@@ -120,7 +108,6 @@
 %token NONE
 %token SOME
 %token START
-%token END
 %token COMMA
 %token EOF
 
@@ -143,18 +130,13 @@
 
 %right ELSE
 %left DOUBLE_MINUS
-%left EQUALITY
-%left INEQUALITY
 (*
 %left LOWER_THAN
 %left LOWER_OR_EQUAL
 %left GREATER_THAN
 %left GREATER_OR_EQUAL
 *)
-%right DOUBLE_SEMICOLON
 %left TILDE
-%right OPEN_BRACKET
-%left CLOSE_BRACKET
 
 
 %start <GufoParsed.mprogram option> prog

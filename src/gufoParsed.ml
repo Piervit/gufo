@@ -338,7 +338,7 @@ let dump_mtype_field mytypefield =
     print_string " ) ";
     close_box ()
 
-let dump_mtype mytype = 
+let rec dump_mtype mytype = 
     open_hovbox 2;
       (match mytype with
         | MComposed_type mycomptype -> 
@@ -365,9 +365,22 @@ let dump_mtype mytype =
           print_newline()
         | MSimple_type MFun_type (args, ret_type) -> 
           (print_string "fun ("; 
-          List.iter (fun typ -> dump_mtype_short typ ; print_string " -> ") args; dump_mtype_short ret_type ));
+          List.iter (fun typ -> dump_mtype_short typ ; print_string " -> ") args; dump_mtype_short ret_type );
           print_string ")";
           print_newline();
+        | MSimple_type MUnit ->
+          print_string "()"
+        | MSimple_type (MTuple_type typlst) ->
+            print_string "(";
+            dump_mtype (MSimple_type (List.hd typlst));
+            List.iter (fun typ -> print_string ", "; dump_mtype (MSimple_type typ)) (List.tl typlst) ;
+            print_string ")"
+        | MSimple_type (MRef_type rval) -> 
+            print_string (ref_to_string rval)
+        | MSimple_type (MAll_type str) -> 
+            print_string str
+
+        );
     close_box ()
 
 

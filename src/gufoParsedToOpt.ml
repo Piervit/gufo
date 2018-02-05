@@ -593,6 +593,7 @@ and determine_type_ref fulloptiprog optiprog locScope ref =
 
   let rec determine_with_fields fields index = 
     match fields with 
+      | [] -> assert false
       | [field] -> 
         let tfield = get_type_field_from_field fulloptiprog optiprog field in
           tfield.motf_type
@@ -958,7 +959,7 @@ and determine_type fulloptiprog optiprog locScope const e =
 
               let expr_typ = determine_ref_with_index ref typ_ref in 
               (*update the type of typ_ref using the information from the argument*)
-              let expr_typ = determine_refapplication_type typ_ref lst_typ_args bd_alltype in
+              let expr_typ = determine_refapplication_type expr_typ lst_typ_args bd_alltype in
 
 
               let locScope = add_in_scope ref.morv_varname typ_ref locScope in
@@ -1487,7 +1488,7 @@ let type_check_prog fulloptiprog optiprog top_types =
       | MOTupEl_val _ -> ()
   )
   optiprog.mopg_topvar;
-  type_check_val fulloptiprog optiprog top_types optiprog.mopg_topcal ; ()
+  let _ = type_check_val fulloptiprog optiprog top_types optiprog.mopg_topcal in ()
 
 
 let type_check fulloptiprog top_types = 
@@ -2142,6 +2143,18 @@ let moref_to_moctype fulloptiprog optiprog =
                     | MOSystemMod sysmod -> 
                        GufoModules.sysmodctype_to_ctype (IntMap.find id sysmod.mosm_types)
             in MOUnique_type (MOComposed_type ctyp)
+
+        | MOUnique_type (MOComposed_type ctyp ) -> 
+            MOUnique_type (MOComposed_type 
+            { ctyp with 
+              moct_fields = 
+                IntMap.map (fun fd -> {fd 
+                                        with motf_type = ref_to_ctype fd.motf_type;
+                                      }
+                           ) ctyp.moct_fields;
+            })
+        | MOUnique_type (MOTupel_type (md, id, deep, args, pos )) ->
+          MOUnique_type (MOTupel_type (md, id, deep, List.map ref_to_ctype args, pos ))
         | MOOr_type (typlst,i) -> 
             let new_typlst = 
               (List.map 

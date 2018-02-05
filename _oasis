@@ -1,0 +1,29 @@
+Name: Gufo
+Version: 0.1
+Synopsis: A modern shell.
+Authors: Pierre Vittet <gufo@pvittet.com>
+License: GPL
+
+Description: Gufo is a modern shell language and console.
+Homepage: http://gufo.pvittet.com
+
+AlphaFeatures: ocamlbuild_more_args
+XOCamlbuildExtraArgs: "-tag debug -cflag -g -ocamlc 'ocamlc -g' -ocamlopt 'ocamlopt -g' -use-menhir -menhir 'menhir --dump --explain' -tag thread -use-ocamlfind -tag annot"
+
+OASISFormat: 0.4
+BuildTools: ocamlbuild
+Plugins: META (0.4), DevFiles (0.4)
+
+Executable "gufo"
+  Path: src
+  MainIs: guforun.ml
+  CompiledObject: native
+  BuildTools: menhir
+  BuildDepends: 
+    camomile,
+    react,
+    lwt,
+    lambda-term,
+    str,
+    unix
+

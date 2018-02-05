@@ -836,34 +836,6 @@ and apply_cmdseq_val toplevel to_fork (pip_write,pip_read) arg2valMap cmdseq =
         in (res, MOPipedCmd (cmda_run, cmdb_run))
 
 and apply_basic_fun toplevel arg2valMap op arga argb =
-  let asStringList redvallst = 
-    List.map (fun el -> 
-      match el with 
-        | MOSimple_val (MOBase_val (MOTypeStringVal s)) -> s
-        | _ -> assert false 
-    ) redvallst
-  in
-  let asIntList redvallst = 
-    List.map (fun el -> 
-      match el with 
-        | MOSimple_val (MOBase_val (MOTypeIntVal i )) -> i
-        | _ -> assert false 
-    ) redvallst
-  in
-  let asBoolList redvallst = 
-    List.map (fun el -> 
-      match el with 
-        | MOSimple_val (MOBase_val (MOTypeBoolVal i )) -> i
-        | _ -> assert false 
-    ) redvallst
-  in
-  let asFloatList redvallst = 
-    List.map (fun el -> 
-      match el with 
-        | MOSimple_val (MOBase_val (MOTypeFloatVal i )) -> i
-        | _ -> assert false 
-    ) redvallst
-  in
   let reduced_arga = apply_motype_val toplevel arg2valMap arga in
   let reduced_argb = apply_motype_val toplevel arg2valMap argb in
   
@@ -931,6 +903,7 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
                                               | Some v1, Some v2 -> None
                                               | None, None -> None
                                           ) map1 map2))
+  | _ -> assert false
 
 
 

@@ -252,7 +252,7 @@ let is_integer word =
   Str.string_match (Str.regexp "[0-9]+") word 0
 
 let is_float word = 
-  Str.string_match (Str.regexp "[0-9]+\.[0-9]+")  word 0 
+  Str.string_match (Str.regexp "[0-9]+\\.[0-9]+")  word 0 
 
 let is_bool word = 
   match word with 

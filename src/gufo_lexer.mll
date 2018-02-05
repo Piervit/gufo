@@ -73,13 +73,10 @@ rule read =
   | "True"   { TRUE }
   | "False"  { FALSE }
   (* pattern matching *)
-  | "match"      { MATCH }
-  | "%"      { PERCENT }
   | "->"      { ARROW }
   | "with"   { WITH }
   | "wout"   { WITHOUT }
   | "*"      { STAR }
-  | "**"     { DBL_STAR }
   | "~"      { TILDE }
   | ">"      { CLOSING_CHEVRON }
   | ">-"      { MINUS_CLOSING_CHEVRON }
@@ -94,7 +91,6 @@ rule read =
   | "|"      { PIPE }
   | "<"      { OPENING_CHEVRON }
   | "-<"      { MINUS_OPENING_CHEVRON }
-  | "exist"      { FILE_EXIST }
   | "+"     		{ PLUS }
   | "--"     		{ DOUBLE_MINUS }
   | "-"     		{ MINUS }
@@ -107,11 +103,6 @@ rule read =
   | "]"     		{ CLOSE_SQRBRACKET }
   | "("     		{ OPEN_BRACKET }
   | ")"     		{ CLOSE_BRACKET }
-  | "list_length"     	{ LIST_LENGTH }
-  | "list_append"     	{ LIST_APPEND }
-  | "list_prepend"     	{ LIST_PREPEND }
-  | "list_rm_last"     	{ LIST_RM_LAST }
-  | "list_rm_first"    	{ LIST_RM_FIRST }
   | "int" 		{ INTTYPE }
   | "float" 		{ FLOATTYPE }
   | "string" 		{ STRINGTYPE }
@@ -133,7 +124,6 @@ rule read =
   | "None"              { NONE}
   | "Some"              { SOME}
   | "**start**"              { START }
-  | "**end**"              { END }
   | ";"                 { SEMICOLON }
   | ";;"                { DOUBLE_SEMICOLON }
   | '{'                 { OPEN_BRACE }
