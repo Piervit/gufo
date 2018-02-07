@@ -23,6 +23,7 @@ Executable "gufo"
     camomile,
     react,
     lwt,
+    zed,
     lambda-term,
     str,
     unix
