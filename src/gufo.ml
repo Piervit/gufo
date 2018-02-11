@@ -796,8 +796,43 @@ struct
 
   and moprocess = GufoParsed.mprocess
 
- 
+  type shell_env={
+    mose_curdir : string;
+    mose_envvar : string StringMap.t;
+  }
+
   type t = mosimple_type_val
+
+  (*functions for shell_env *)
+
+  (*From a path, generate a shell environment (without specific environment
+   * variables. *)
+  let get_env str = 
+    {
+      mose_curdir = str;
+      mose_envvar = 
+        Array.fold_left 
+          (fun map str -> 
+            (*str has the format variable=value *)
+            let varname, value = 
+              let lst = String.split_on_char '=' str in
+              List.hd lst, (List.fold_left (fun str nstr -> str^nstr) "" (List.tl lst))
+            in
+              printf "%s\n" varname;
+              printf "v: %s\n" value;
+              StringMap.add varname value map
+          )
+          StringMap.empty (Unix.environment ());
+    }
+
+  (*set_var cur_env var value : return a new env which is the cur_env with the
+   * environment variable 'var' set to 'value'.*)
+  let set_var env var value =
+    { env with
+      mose_envvar = StringMap.add var value env.mose_envvar
+    }
+  
+  (*END functions for shell_env*)
 
 
 (** transformation from gufoParsed to gufo.core **)

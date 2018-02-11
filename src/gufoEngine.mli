@@ -35,5 +35,8 @@ val val_compare: Gufo.MCore.motype_val -> Gufo.MCore.motype_val -> int
  * *)
 val apply_fun : bool -> Gufo.MCore.topvar_val GenUtils.IntMap.t -> Gufo.MCore.motype_val -> Gufo.MCore.motype_val list -> Gufo.MCore.motype_val
 
-(* The execution of a Gufo program. *)
-val exec: Gufo.MCore.fullprogopt -> Gufo.MCore.motype_val
+(* The execution of a Gufo program.
+ *
+ * The fullprogopt returned is a reduced prog after "execution".
+ * *)
+val exec: Gufo.MCore.fullprogopt -> Gufo.MCore.shell_env -> Gufo.MCore.fullprogopt * Gufo.MCore.shell_env

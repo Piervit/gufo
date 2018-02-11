@@ -59,6 +59,7 @@ let unstack_args_with_pos arg =
 
 
 let fullprog = ref None
+let shenv_ = ref None
   
 let set_fullprog fp = 
   fullprog:= Some fp
@@ -67,6 +68,61 @@ let get_fullprog () =
   match !fullprog with
     | None -> assert false
     | Some fp -> fp
+
+let set_shenv shenv = 
+    shenv_ := Some shenv
+
+let get_shenv () = 
+  match !shenv_ with
+    | None -> assert false
+    | Some shenv -> shenv
+
+(* GUFO SPECIFIC CMD *)
+let rewrite_arg shenv arg = 
+  match String.get arg 0 with
+    | '~' -> 
+        let user_dir = StringMap.find "HOME" shenv.mose_envvar in
+        Str.replace_first (Str.regexp "~") user_dir arg
+    | _ -> arg 
+
+let play_cd cmd red_args shenv input_fd output_fd outerr_fd = 
+  (*cd will write an error and do nothing else if it has more than 1 arg.*)
+  let path, error = 
+    match red_args with
+      | [] -> "", None (*0 argument is valid but do quite nothing*)
+      | [path] -> (*1 is the standard case it give the path*)
+                  path, None
+      | _ -> "", Some (1, "Cannot call cd with more than one argument.")
+  in 
+  match error, path with
+    | Some (ecode, msg), _ -> 
+        write_substring outerr_fd (msg ^ "\n") 0 ((String.length msg)+1);
+      ecode,
+      shenv, 
+      {cmd with mocm_res = Some ecode; 
+                mocm_print_error = Some msg}
+    | None, path -> 
+        try 
+          Sys.chdir path;
+          printf "%s\n" path;
+          0,
+          {shenv with 
+            mose_curdir = path;
+          },
+          {cmd with mocm_res = Some 0;}
+        with Sys_error msg -> 
+        write_substring outerr_fd (msg ^ "\n") 0 ((String.length msg)+1);
+          1,
+          shenv ,
+          {cmd with mocm_res = Some 1;
+           mocm_print_error = Some msg}
+          
+
+
+(* END GUFO SPECIFIC CMD *)
+
+
+
 
 (* PART TYPE COMPARE *)
   let rec mlist_compare la lb = 
@@ -640,6 +696,7 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
             | MOSimple_val (MOBase_val (MOTypeStringVal s)) -> s (*result has to be a string*)
             | _ -> assert false
   in
+
   (*TODO: this is a slow and ugly way to check if the process is active, we
    * should find a new one.*)
   let is_process_active pid = 
@@ -657,6 +714,8 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
             
   in
   let red_args = List.map apply_mostringOrRef cmd.mocm_args in
+  let shenv = get_shenv () in
+  let red_args = List.map (rewrite_arg shenv) red_args in
   let input_fd = 
     match cmd.mocm_input_src, pip_read with
       | (MOCMDIStdIn, None) -> Unix.stdin
@@ -678,6 +737,13 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
       | MOCMDEFile f-> Unix.openfile (apply_mostringOrRef f) [Unix.O_WRONLY; Unix.O_CREAT] 0o640
       | MOCMDEFileAppend f-> Unix.openfile (apply_mostringOrRef f) [Unix.O_APPEND] 0o640
   in
+
+  let check_and_call_system_cmd cmd = 
+      match cmd.mocm_cmd with
+        | "cd" -> Some (play_cd cmd red_args shenv input_fd output_fd outerr_fd)
+        | _ -> None
+  in
+
 
   let play_cmd_toplevel () = 
     let pid = Unix.create_process cmd.mocm_cmd (Array.of_list (cmd.mocm_cmd::red_args)) input_fd output_fd outerr_fd in
@@ -778,15 +844,15 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
                    }
                  in
                  (res, MOSimpleCmd cmd)
-
-
-
   in
-
+  let is_system = check_and_call_system_cmd cmd in
   (* Create channel from process *)
-  match toplevel with 
-    | true -> play_cmd_toplevel ()
-    | false -> play_cmd_nottoplevel ()
+  match is_system, toplevel with 
+    | None, true -> play_cmd_toplevel ()
+    | None, false -> play_cmd_nottoplevel ()
+    | Some (res, shenv, cmd), _  -> 
+        let _ = set_shenv shenv in
+        (res, MOSimpleCmd cmd)
 
 
   (*TODO:
@@ -1048,7 +1114,9 @@ and apply_motype_val toplevel arg2valMap aval =
     | MOBody_val bodylst -> 
         apply_in_body toplevel arg2valMap bodylst
 
-let exec prog =
+
+let exec prog shenv=
+  set_shenv shenv ;
   set_fullprog prog ;
   (*play simple variable (function with 0 arguments) *)
   let prog = 
@@ -1069,4 +1137,12 @@ let exec prog =
   set_fullprog prog ;
   (*play main expr*)
   let start_expr = prog.mofp_mainprog.mopg_topcal in
-    apply_motype_val true prog.mofp_mainprog.mopg_topvar start_expr
+  let res = apply_motype_val true prog.mofp_mainprog.mopg_topvar start_expr in
+  let redprog = 
+    { 
+      prog with mofp_mainprog = 
+        {
+          prog.mofp_mainprog with mopg_topcal= res
+        }
+    } in 
+  redprog, get_shenv ()

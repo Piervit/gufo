@@ -408,6 +408,15 @@ sig
 
   and moprocess = GufoParsed.mprocess
 
+  (*the shell environment is independant from the program and is only provided
+   * at execution time.*)
+  type shell_env={
+    mose_curdir : string;
+    mose_envvar : string StringMap.t;
+  }
+
+
+
   type t = mosimple_type_val
 
 
@@ -434,6 +443,18 @@ sig
   val empty_expr : motype_val
 
   (*END EXPR *)
+
+  (*functions for shell_env *)
+
+  (*From a path, generate a shell environment (without specific environment
+   * variables. *)
+  val get_env : string -> shell_env
+
+  (*set_var cur_env var value : return a new env which is the cur_env with the
+   * environment variable 'var' set to 'value'.*)
+  val set_var: shell_env -> string -> string -> shell_env
+  
+  (*END functions for shell_env*)
 
   (**PRINTER **)
   val type_to_string: motype_or -> string

@@ -486,9 +486,9 @@ let analyse_and_print term cur_expr =
        print_expr term cur_expr >>=
        (fun () -> print_res_err term cur_expr (Zed_rope.of_string msg))
 
-let do_nothing term cur_expr = Lwt.return (Some cur_expr)
+let do_nothing term shell_env cur_expr = Lwt.return (Some (cur_expr, shell_env))
 
-let print_char term cur_expr akey = 
+let print_char term shell_env cur_expr akey = 
     clear_expr term cur_expr >>=
     (fun () ->
     let expr = 
@@ -497,18 +497,18 @@ let print_char term cur_expr akey =
         | _ -> assert false
     in
       analyse_and_print term cur_expr >>= 
-        (fun () -> return (Some expr))
+        (fun () -> return (Some (expr, shell_env)))
     )
 
-let multiline_expr term cur_expr = 
+let multiline_expr term shell_env cur_expr = 
   clear_expr term cur_expr >>= 
   (fun () ->
     let expr = insert_newline cur_expr in 
     analyse_and_print term cur_expr >>= 
-      (fun () -> return (Some expr))
+      (fun () -> return (Some (expr,shell_env)))
   )
 
-let new_line term cur_expr = 
+let new_line term shell_env cur_expr = 
   (*try to retrieve the current line*)
   try (
   match check_full_expr cur_expr with 
@@ -533,46 +533,47 @@ let new_line term cur_expr =
           in
           LTerm.leave_raw_mode term tmod) >>=
         (fun () -> 
-          let moval = (GufoEngine.exec opt_prog) in
+          let redprog ,shell_env = (GufoEngine.exec opt_prog shell_env) in
           ( LTerm.enter_raw_mode term >>= (fun tmod -> term_tmod:=Some tmod; Lwt.return () ));
-          print_res term (Gufo.MCore.moval_to_string moval))
+          fulloprog := redprog;
+          print_res term (Gufo.MCore.moval_to_string redprog.mofp_mainprog.mopg_topcal))
           >>=
-        (fun () -> return (Some (create_empty_expr ())))
+        (fun () -> return (Some (create_empty_expr (), shell_env)))
     | None ->
         let expr = insert_newline cur_expr in
         print_expr term expr >>=
-        (fun () -> return (Some (create_empty_expr ())))
+        (fun () -> return (Some (create_empty_expr (), shell_env)))
   ) with | TypeError msg 
        | InternalError msg 
        | Sys_error msg 
        | VarError msg 
        | SyntaxError msg ->
               print_res_err term cur_expr (Zed_rope.of_string msg) >>=
-              (fun () -> return (Some (create_empty_expr ())))
+              (fun () -> return (Some (create_empty_expr (), shell_env)))
 
-let delete term cur_expr =
+let delete term shell_env cur_expr =
   clear_expr term cur_expr >>=
   (fun () -> 
   let expr = delete_in_expr cur_expr in
   analyse_and_print term expr >>=
-  (fun () -> return (Some expr))
+  (fun () -> return (Some (expr, shell_env)))
   )
 
-let mv_left term cur_expr = 
+let mv_left term shell_env cur_expr = 
   clear_expr term cur_expr >>=
   (fun () -> 
   let expr =  Zed_edit.prev_char cur_expr; cur_expr in
 (*   print_expr term expr >>= *)
   analyse_and_print term expr >>=
-  (fun () -> return (Some expr))
+  (fun () -> return (Some (expr, shell_env)))
   )
 
-let mv_right term cur_expr = 
+let mv_right term shell_env cur_expr = 
   clear_expr term cur_expr >>=
   (fun () -> 
   let expr =  Zed_edit.next_char cur_expr; cur_expr in
   analyse_and_print term expr >>=
-  (fun () -> return (Some expr))
+  (fun () -> return (Some (expr, shell_env)))
   )
 
 let mv_down term cur_expr = 
@@ -590,7 +591,7 @@ let mv_up term cur_expr =
   )
 
 
-let handle_key_event term cur_expr akey = 
+let handle_key_event term shell_env cur_expr akey = 
   match akey.LTerm_key.code with
 (*   | Char uchar when (UChar.uint_code uchar) = 0x0068   *)
   (*Ugly hack, I don't know why this key match backspace. 
@@ -602,18 +603,18 @@ let handle_key_event term cur_expr akey =
   | Char uchar when ((UChar.uint_code uchar) = 0x0020) && 
         (akey.LTerm_key.control)
         ->
-      (multiline_expr term cur_expr)
+      (multiline_expr term shell_env cur_expr)
   | Backspace  
-  | Delete  -> delete term cur_expr 
-  | Char uchar -> print_char term cur_expr akey
+  | Delete  -> delete term shell_env cur_expr 
+  | Char uchar -> print_char term shell_env cur_expr akey
   | Enter -> 
-      (new_line term cur_expr)
+      (new_line term shell_env cur_expr)
 (*   | Up -> mv_up term cur_expr *)
-  | Up -> do_nothing term cur_expr
+  | Up -> do_nothing term shell_env cur_expr
 (*   | Down  -> mv_down term cur_expr *)
-  | Down  -> do_nothing term cur_expr
-  | Left  -> mv_left term cur_expr
-  | Right -> mv_right term cur_expr
+  | Down  -> do_nothing term shell_env cur_expr
+  | Left  -> mv_left term shell_env cur_expr
+  | Right -> mv_right term shell_env cur_expr
   | Escape -> return None
   | Tab 
   | F1
@@ -632,10 +633,10 @@ let handle_key_event term cur_expr akey =
   | Prev_page
   | Home
   | End
-  | Insert -> do_nothing term cur_expr
+  | Insert -> do_nothing term shell_env cur_expr
 
 
-let rec loop term history tmod cur_expr =
+let rec loop term shell_env history tmod cur_expr =
   (if (is_empty_expr cur_expr )
    then (print_prefix term )
    else return ()
@@ -651,20 +652,20 @@ let rec loop term history tmod cur_expr =
   >>= function
   | Some Key akey ->
       (** A key has been pressed. *)
-          handle_key_event term cur_expr akey
+          handle_key_event term shell_env cur_expr akey
           >>= fun res ->
             (match res with 
-              | Some expr -> loop term history tmod expr
+              | Some (expr,shell_env) -> loop term shell_env history tmod expr
               | None -> Lwt.fail (ExitTerm (term,tmod))
               )
   | Some Resize _ ->
-          loop term history tmod cur_expr
+          loop term shell_env history tmod cur_expr
       (** The terminal has been resized. *)
   | Some _ ->
-          loop term history tmod cur_expr
+          loop term shell_env history tmod cur_expr
       (** A mouse button has been pressed. *)
   | None -> 
-          loop term history tmod cur_expr
+          loop term shell_env history tmod cur_expr
  )
 
 let main () =
@@ -686,7 +687,9 @@ let main () =
                                  S "----------------------------------\n";
         ]) 
        >>=
-        (fun () -> loop term (LTerm_history.create []) tmod cur_expr)
+        (fun () -> 
+          let shell_env = Gufo.MCore.get_env (Sys.getcwd ()) in
+          loop term shell_env (LTerm_history.create []) tmod cur_expr)
     )
     (function
       | ExitTerm (term,tmod) -> Lwt.return (term,tmod)

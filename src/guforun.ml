@@ -47,9 +47,10 @@ let _run_interactive () =
       | Some p -> 
           let prog = GufoStart.handle_program p "Shell_prog" in
           let opt_prog,_ = GufoParsedToOpt.parsedToOpt prog in
-          printf "%s\n" (Gufo.MCore.moval_to_string (GufoEngine.exec opt_prog));
-
-    run_interactive_()
+          let shell_env = Gufo.MCore.get_env (Sys.getcwd ()) in
+          let red_prog, shell_env = (GufoEngine.exec opt_prog shell_env) in
+          printf "%s\n" (Gufo.MCore.moval_to_string red_prog.mofp_mainprog.mopg_topcal);
+          run_interactive_()
   in
   run_interactive_()
 
@@ -58,7 +59,9 @@ let () =
     | 2 -> 
         let prog = parse_program Sys.argv.(1) in
         let opt_prog,_ = GufoParsedToOpt.parsedToOpt prog in
-        printf "%s\n" (Gufo.MCore.moval_to_string (GufoEngine.exec opt_prog))
+        let shell_env = Gufo.MCore.get_env (Sys.getcwd ()) in
+        let red_prog, shell_env = (GufoEngine.exec opt_prog shell_env) in
+        printf "%s\n" (Gufo.MCore.moval_to_string red_prog.mofp_mainprog.mopg_topcal)
     | 1 -> 
           (*run_interactive ()*)
         GufoConsole.run ()

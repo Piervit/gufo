@@ -657,6 +657,10 @@ cmd_arg :
   | arg = ARG
   | arg = FILE
     { GufoParsed.SORString arg}
+  | arg = TILDE
+    {GufoParsed.SORString "~" }
+  | arg = DOT
+    {GufoParsed.SORString "." }
   | arg = modulVarOrExpr
     { GufoParsed.SORExpr arg}
 (*
