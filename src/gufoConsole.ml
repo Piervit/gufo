@@ -119,6 +119,12 @@ let get_line_length expr line_num =
     |0 -> (Zed_rope.length (Zed_edit.get_line (get_edit_ expr) line_num)) + prefix_len
     | _ -> Zed_rope.length (Zed_edit.get_line (get_edit_ expr) line_num)
 
+let ctx_to_string expr = (Zed_rope.to_string (Zed_edit.text (Zed_edit.edit expr)))
+
+let utf8_to_expr str = 
+  let nctx = create_empty_expr () in
+  Zed_edit.insert nctx (Zed_rope.of_string str);
+  nctx
 
 let get_cursor_coord expr = 
   let row, col = Zed_cursor.get_coordinates (Zed_edit.cursor expr) in
@@ -272,6 +278,13 @@ let place_cursor_after_print term expr =
   LTerm.move term (curs_row + 1 - nb_lines_expr) (curs_col - len_last_line)
   
 
+(*history management *)
+(*
+let reset_hist_id hist = 
+  match hist with
+    | (hist, _hist_id) -> (hist, 0)
+    | _ -> assert false
+*)
 
 
 let print_color_expr term expr optprog types = 
@@ -422,7 +435,7 @@ let print_color_expr term expr optprog types =
   >>=
   (fun () -> 
   let to_print, last_str,_,_ = 
-    Zed_utf8.fold colorize (Zed_rope.to_string (Zed_edit.text (Zed_edit.edit expr))) ([], "",false,false) (*list to print,curword, and a boolean to know if we are in quote*)
+    Zed_utf8.fold colorize (ctx_to_string expr) ([], "",false,false) (*list to print,curword, and a boolean to know if we are in quote*)
   in
   let to_print = 
     if String.length last_str > 0 then ((print_curword last_str) @ to_print) else to_print
@@ -486,9 +499,9 @@ let analyse_and_print term cur_expr =
        print_expr term cur_expr >>=
        (fun () -> print_res_err term cur_expr (Zed_rope.of_string msg))
 
-let do_nothing term shell_env cur_expr = Lwt.return (Some (cur_expr, shell_env))
+let do_nothing term shell_env hist cur_expr = Lwt.return (Some (cur_expr, shell_env, hist))
 
-let print_char term shell_env cur_expr akey = 
+let print_char term shell_env hist cur_expr akey = 
     clear_expr term cur_expr >>=
     (fun () ->
     let expr = 
@@ -497,19 +510,21 @@ let print_char term shell_env cur_expr akey =
         | _ -> assert false
     in
       analyse_and_print term cur_expr >>= 
-        (fun () -> return (Some (expr, shell_env)))
+        (fun () -> return (Some (expr, shell_env, hist)))
     )
 
-let multiline_expr term shell_env cur_expr = 
+let multiline_expr term shell_env hist cur_expr = 
   clear_expr term cur_expr >>= 
   (fun () ->
     let expr = insert_newline cur_expr in 
     analyse_and_print term cur_expr >>= 
-      (fun () -> return (Some (expr,shell_env)))
+      (fun () -> return (Some (expr,shell_env, hist)))
   )
 
-let new_line term shell_env cur_expr = 
+let new_line term shell_env (hist, hist_id) cur_expr = 
   (*try to retrieve the current line*)
+  LTerm_history.add hist (ctx_to_string cur_expr);
+  let hist_id = 0 in
   try (
   match check_full_expr cur_expr with 
     | Some p ->
@@ -538,60 +553,81 @@ let new_line term shell_env cur_expr =
           fulloprog := redprog;
           print_res term (Gufo.MCore.moval_to_string redprog.mofp_mainprog.mopg_topcal))
           >>=
-        (fun () -> return (Some (create_empty_expr (), shell_env)))
+        (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
     | None ->
         let expr = insert_newline cur_expr in
         print_expr term expr >>=
-        (fun () -> return (Some (create_empty_expr (), shell_env)))
+        (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
   ) with | TypeError msg 
        | InternalError msg 
        | Sys_error msg 
        | VarError msg 
        | SyntaxError msg ->
               print_res_err term cur_expr (Zed_rope.of_string msg) >>=
-              (fun () -> return (Some (create_empty_expr (), shell_env)))
+              (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
 
-let delete term shell_env cur_expr =
+let delete term shell_env hist cur_expr =
   clear_expr term cur_expr >>=
   (fun () -> 
   let expr = delete_in_expr cur_expr in
   analyse_and_print term expr >>=
-  (fun () -> return (Some (expr, shell_env)))
+  (fun () -> return (Some (expr, shell_env, hist)))
   )
 
-let mv_left term shell_env cur_expr = 
+let mv_left term shell_env hist cur_expr = 
   clear_expr term cur_expr >>=
   (fun () -> 
   let expr =  Zed_edit.prev_char cur_expr; cur_expr in
 (*   print_expr term expr >>= *)
   analyse_and_print term expr >>=
-  (fun () -> return (Some (expr, shell_env)))
+  (fun () -> return (Some (expr, shell_env, hist)))
   )
 
-let mv_right term shell_env cur_expr = 
+let mv_right term shell_env hist cur_expr = 
   clear_expr term cur_expr >>=
   (fun () -> 
   let expr =  Zed_edit.next_char cur_expr; cur_expr in
   analyse_and_print term expr >>=
-  (fun () -> return (Some (expr, shell_env)))
+  (fun () -> return (Some (expr, shell_env, hist)))
   )
 
-let mv_down term cur_expr = 
+let mv_down term shell_env (hist, hist_i) cur_expr = 
+  let hist_i = match hist_i with
+    | 0 -> 0 
+    | i -> i - 1 
+  in
+  let hist_lst = (LTerm_history.contents hist) in
+  let new_expr, hist_i = 
+    try (
+      match hist_i with 
+        | 0 -> create_empty_expr () , hist_i
+        | _ -> utf8_to_expr (List.nth hist_lst (hist_i - 1)) , hist_i
+    ) with _ -> cur_expr, hist_i + 1
+  in
   clear_expr term cur_expr >>=
-  (fun () -> 
-  print_expr term cur_expr >>=
-  (fun () -> return (Some cur_expr))
-  )
+    (fun () ->
+      analyse_and_print term new_expr) >>=
+      (fun () -> return (Some (new_expr, shell_env, (hist, hist_i ))))
 
-let mv_up term cur_expr = 
+
+let mv_up term shell_env (hist, hist_i) cur_expr = 
+  let hist_lst = (LTerm_history.contents hist) in
+  let new_expr, hist_i = 
+    try (
+      utf8_to_expr (List.nth hist_lst hist_i ), hist_i + 1
+    ) with _ -> 
+      (match hist_lst with 
+        | [] -> cur_expr, hist_i
+        | lst -> utf8_to_expr (List.hd (List.rev (lst))), hist_i
+      )
+  in
   clear_expr term cur_expr >>=
-  (fun () -> 
-  print_expr term cur_expr >>=
-  (fun () -> return (Some cur_expr))
+  (fun () -> analyse_and_print term new_expr >>=
+      (fun () -> return (Some (new_expr, shell_env, (hist, hist_i ))))
   )
 
 
-let handle_key_event term shell_env cur_expr akey = 
+let handle_key_event term shell_env hist cur_expr akey = 
   match akey.LTerm_key.code with
 (*   | Char uchar when (UChar.uint_code uchar) = 0x0068   *)
   (*Ugly hack, I don't know why this key match backspace. 
@@ -603,18 +639,18 @@ let handle_key_event term shell_env cur_expr akey =
   | Char uchar when ((UChar.uint_code uchar) = 0x0020) && 
         (akey.LTerm_key.control)
         ->
-      (multiline_expr term shell_env cur_expr)
+      (multiline_expr term shell_env hist cur_expr)
   | Backspace  
-  | Delete  -> delete term shell_env cur_expr 
-  | Char uchar -> print_char term shell_env cur_expr akey
+  | Delete  -> delete term shell_env hist cur_expr 
+  | Char uchar -> print_char term shell_env hist cur_expr akey
   | Enter -> 
-      (new_line term shell_env cur_expr)
-(*   | Up -> mv_up term cur_expr *)
-  | Up -> do_nothing term shell_env cur_expr
-(*   | Down  -> mv_down term cur_expr *)
-  | Down  -> do_nothing term shell_env cur_expr
-  | Left  -> mv_left term shell_env cur_expr
-  | Right -> mv_right term shell_env cur_expr
+      (new_line term shell_env hist cur_expr)
+  | Up -> mv_up term shell_env hist cur_expr 
+(*   | Up -> do_nothing term shell_env hist cur_expr *)
+  | Down  -> mv_down term shell_env hist cur_expr 
+(*   | Down  -> do_nothing term shell_env hist cur_expr *)
+  | Left  -> mv_left term shell_env hist cur_expr
+  | Right -> mv_right term shell_env hist cur_expr
   | Escape -> return None
   | Tab 
   | F1
@@ -633,7 +669,7 @@ let handle_key_event term shell_env cur_expr akey =
   | Prev_page
   | Home
   | End
-  | Insert -> do_nothing term shell_env cur_expr
+  | Insert -> do_nothing term shell_env hist cur_expr
 
 
 let rec loop term shell_env history tmod cur_expr =
@@ -652,10 +688,10 @@ let rec loop term shell_env history tmod cur_expr =
   >>= function
   | Some Key akey ->
       (** A key has been pressed. *)
-          handle_key_event term shell_env cur_expr akey
+          handle_key_event term shell_env history cur_expr akey
           >>= fun res ->
             (match res with 
-              | Some (expr,shell_env) -> loop term shell_env history tmod expr
+              | Some (expr,shell_env, hist) -> loop term shell_env hist tmod expr
               | None -> Lwt.fail (ExitTerm (term,tmod))
               )
   | Some Resize _ ->
@@ -689,7 +725,7 @@ let main () =
        >>=
         (fun () -> 
           let shell_env = Gufo.MCore.get_env (Sys.getcwd ()) in
-          loop term shell_env (LTerm_history.create []) tmod cur_expr)
+          loop term shell_env (LTerm_history.create [], 0) tmod cur_expr)
     )
     (function
       | ExitTerm (term,tmod) -> Lwt.return (term,tmod)

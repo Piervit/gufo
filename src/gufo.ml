@@ -818,8 +818,6 @@ struct
               let lst = String.split_on_char '=' str in
               List.hd lst, (List.fold_left (fun str nstr -> str^nstr) "" (List.tl lst))
             in
-              printf "%s\n" varname;
-              printf "v: %s\n" value;
               StringMap.add varname value map
           )
           StringMap.empty (Unix.environment ());
