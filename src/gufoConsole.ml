@@ -35,8 +35,11 @@ open LTerm_key
 
 exception ExitTerm of (LTerm.t * LTerm.mode Lwt.t)
 
+(*internal mod (raw mode) *)
+let term_rawmod = ref None
 
-let term_tmod = ref None
+(*state if we are in search mod or no.*)
+let term_search_mod = ref None
 
 (* COLORS *)
 (* foreground color *)
@@ -60,6 +63,7 @@ val lwhite : color
 *)
  
 let c_error = red
+let c_search = yellow
 let c_result = yellow
 
 let c_keyword = lcyan
@@ -177,11 +181,35 @@ let split_rope_message str max_line_size =
  * message that (main expr) or error that are wider that this size, they should
  * be splitted automatically. *)
 
+(* history *)
+
+let filtered_contents filter history =
+  let ctt = LTerm_history.contents history in
+    List.filter (fun str -> Zed_utf8.contains str filter) ctt
+
+  (*If search_expr doesn t match, we keep cur_expr.*)
+let find_hist_expr cur_expr (history, hist_id) search_expr =
+  try
+    let str = List.nth (filtered_contents search_expr history) hist_id in 
+    utf8_to_expr str
+  with Failure _ ->
+    create_empty_expr ()
+
+let search_prefix = "search: "
+
+let search_len search_expr = 
+  8 + String.length search_expr
+
+
+(* END history *)
+
 
 (* prefix printing *)
 
 
-let print_prefix term =  LTerm.fprints term (eval [B_fg c_result; S "% " ])
+let print_prefix term =  
+  LTerm.move term 0 (-500) >>= 
+  (fun () -> LTerm.fprints term (eval [B_fg c_result; S "% " ]))
 
 
 
@@ -268,6 +296,15 @@ let is_bool word =
 let is_cmd word = 
   Str.string_match (Str.regexp "[a-z0-9]+")  word 0 
 
+let clear_search_mod term shell_env hist cur_expr search_expr = 
+  let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
+  let expr_lines_count = get_lines_count cur_expr in 
+  term_search_mod := None;
+  LTerm.clear_line term >>=
+  (fun () -> 
+    LTerm.move term (expr_cursor_row - expr_lines_count  ) (expr_cursor_col - ( search_len search_expr )))
+    
+  
 
   (*This function is to be called after the expr has been printed. The cursor
    * is expected at the end of the terminal printing.*)
@@ -499,19 +536,57 @@ let analyse_and_print term cur_expr =
        print_expr term cur_expr >>=
        (fun () -> print_res_err term cur_expr (Zed_rope.of_string msg))
 
+
+
+  (*always reprint cur_expr because it can be a different one.*)
+let print_search term shell_env hist cur_expr search_expr new_expr = 
+  match (!term_search_mod) with 
+    | None -> (*We just entered search mod*)
+      let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
+      let expr_lines_count = get_lines_count cur_expr in 
+      LTerm.fprints term (eval [B_fg c_search; S "\n"]) >>=
+      (fun () -> 
+        LTerm.move term (expr_lines_count - expr_cursor_row - 1 ) (-500)) >>=
+      (fun () -> 
+      LTerm.fprints term (eval [B_fg c_search; S search_prefix ; S  search_expr;  ]))
+    | Some _ -> (*We already were in search mod*)
+      LTerm.clear_line term >>=
+      (fun () -> LTerm.move term (-1) (- (search_len search_expr))) >>=
+      (fun () -> clear_expr term cur_expr) >>=
+      (fun () -> analyse_and_print term new_expr) >>=
+      (fun () -> 
+        LTerm.fprints term (eval [B_fg c_search; S "\n"; S search_prefix; S  search_expr;  ]))
+
+
+
+
+
 let do_nothing term shell_env hist cur_expr = Lwt.return (Some (cur_expr, shell_env, hist))
 
 let print_char term shell_env hist cur_expr akey = 
-    clear_expr term cur_expr >>=
-    (fun () ->
-    let expr = 
-      match akey.code with 
-        | Char i  ->insert_in_expr cur_expr i
-        | _ -> assert false
-    in
-      analyse_and_print term cur_expr >>= 
-        (fun () -> return (Some (expr, shell_env, hist)))
-    )
+    match (!term_search_mod) with
+      | None -> (*standard mod*)
+        clear_expr term cur_expr >>=
+        (fun () ->
+        let expr = 
+          match akey.code with 
+            | Char i  ->insert_in_expr cur_expr i
+            | _ -> assert false
+        in
+          analyse_and_print term cur_expr >>= 
+            (fun () -> return (Some (expr, shell_env, hist)))
+        )
+      | Some search_expr -> (*search mod*)
+        let search_expr = 
+          match akey.code with 
+            | Char i  ->sprintf "%s%c" search_expr (UChar.char_of i)
+            | _ -> assert false
+        in
+          let new_expr = find_hist_expr cur_expr hist search_expr in
+          print_search term shell_env hist cur_expr search_expr new_expr >>=
+            (fun () -> 
+              term_search_mod := Some search_expr;
+              return (Some (new_expr, shell_env, hist)))
 
 let multiline_expr term shell_env hist cur_expr = 
   clear_expr term cur_expr >>= 
@@ -521,7 +596,18 @@ let multiline_expr term shell_env hist cur_expr =
       (fun () -> return (Some (expr,shell_env, hist)))
   )
 
-let new_line term shell_env (hist, hist_id) cur_expr = 
+let search_hist term shell_env hist cur_expr =
+  match !term_search_mod with
+    | None -> 
+        print_search term shell_env hist cur_expr "" (create_empty_expr ()) >>=
+      (fun () ->
+        term_search_mod := Some "";
+        return (Some (cur_expr, shell_env, hist)))
+    | Some search_expr -> 
+        clear_search_mod term shell_env hist cur_expr search_expr >>=
+        (fun () -> return (Some (cur_expr, shell_env, hist)))
+
+let new_line_normal_mod term shell_env (hist, hist_id) cur_expr = 
   (*try to retrieve the current line*)
   LTerm_history.add hist (ctx_to_string cur_expr);
   let hist_id = 0 in
@@ -542,14 +628,14 @@ let new_line term shell_env (hist, hist_id) cur_expr =
         (fun () ->
           Zed_edit.goto_eot cur_expr; 
           let tmod = 
-            match (!term_tmod) with 
+            match (!term_rawmod) with 
             | None -> assert false
             | Some tmod -> tmod
           in
           LTerm.leave_raw_mode term tmod) >>=
         (fun () -> 
           let redprog ,shell_env = (GufoEngine.exec opt_prog shell_env) in
-          ( LTerm.enter_raw_mode term >>= (fun tmod -> term_tmod:=Some tmod; Lwt.return () ));
+          ( LTerm.enter_raw_mode term >>= (fun tmod -> term_rawmod:=Some tmod; Lwt.return () ));
           fulloprog := redprog;
           print_res term (Gufo.MCore.moval_to_string redprog.mofp_mainprog.mopg_topcal))
           >>=
@@ -566,13 +652,37 @@ let new_line term shell_env (hist, hist_id) cur_expr =
               print_res_err term cur_expr (Zed_rope.of_string msg) >>=
               (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
 
+
+let new_line_search_mod term shell_env (hist, hist_id) cur_expr search_expr = 
+  clear_search_mod term shell_env (hist, hist_id) cur_expr search_expr
+
+let new_line term shell_env (hist, hist_id) cur_expr = 
+  match !term_search_mod with
+    | None -> new_line_normal_mod term shell_env (hist, hist_id) cur_expr
+    | Some search_expr -> 
+        new_line_search_mod term shell_env (hist, hist_id) cur_expr search_expr >>=
+        (fun () -> return (Some (cur_expr, shell_env, (hist, hist_id))))
+
+
 let delete term shell_env hist cur_expr =
-  clear_expr term cur_expr >>=
-  (fun () -> 
-  let expr = delete_in_expr cur_expr in
-  analyse_and_print term expr >>=
-  (fun () -> return (Some (expr, shell_env, hist)))
-  )
+  match (!term_search_mod) with
+    | None -> 
+        clear_expr term cur_expr >>=
+        (fun () -> 
+        let expr = delete_in_expr cur_expr in
+        analyse_and_print term expr >>=
+        (fun () -> return (Some (expr, shell_env, hist)))
+        )
+    | Some search_expr ->
+        let search_expr = 
+          try (Zed_utf8.sub  search_expr 0 (Zed_utf8.length search_expr -1 )) 
+          with Zed_utf8.Out_of_bounds _ -> search_expr
+        in 
+        let new_expr = find_hist_expr cur_expr hist search_expr in
+        term_search_mod := Some search_expr;
+        print_search term shell_env hist cur_expr search_expr new_expr >>=
+        (fun () -> return (Some (new_expr, shell_env, hist)))
+
 
 let mv_left term shell_env hist cur_expr = 
   clear_expr term cur_expr >>=
@@ -592,39 +702,61 @@ let mv_right term shell_env hist cur_expr =
   )
 
 let mv_down term shell_env (hist, hist_i) cur_expr = 
-  let hist_i = match hist_i with
-    | 0 -> 0 
-    | i -> i - 1 
-  in
-  let hist_lst = (LTerm_history.contents hist) in
-  let new_expr, hist_i = 
-    try (
-      match hist_i with 
-        | 0 -> create_empty_expr () , hist_i
-        | _ -> utf8_to_expr (List.nth hist_lst (hist_i - 1)) , hist_i
-    ) with _ -> cur_expr, hist_i + 1
-  in
-  clear_expr term cur_expr >>=
-    (fun () ->
-      analyse_and_print term new_expr) >>=
+  match (!term_search_mod) with 
+    | None ->
+      let hist_i = match hist_i with
+        | 0 -> 0 
+        | i -> i - 1 
+      in
+      let hist_lst = (LTerm_history.contents hist) in
+      let new_expr, hist_i = 
+        try (
+          match hist_i with 
+            | 0 -> create_empty_expr () , hist_i
+            | _ -> utf8_to_expr (List.nth hist_lst (hist_i - 1)) , hist_i
+        ) with _ -> cur_expr, hist_i + 1
+      in
+      clear_expr term cur_expr >>=
+        (fun () ->
+          analyse_and_print term new_expr) >>=
+          (fun () -> return (Some (new_expr, shell_env, (hist, hist_i ))))
+    | Some search_expr -> 
+        let hist_i = 
+          match (hist_i - 1) with
+            | i when i < 0 -> 0
+            | i -> i
+        in
+        let new_expr = find_hist_expr cur_expr (hist, hist_i) search_expr in
+        print_search term shell_env (hist, hist_i) cur_expr search_expr new_expr >>=
       (fun () -> return (Some (new_expr, shell_env, (hist, hist_i ))))
 
+    
 
 let mv_up term shell_env (hist, hist_i) cur_expr = 
-  let hist_lst = (LTerm_history.contents hist) in
-  let new_expr, hist_i = 
-    try (
-      utf8_to_expr (List.nth hist_lst hist_i ), hist_i + 1
-    ) with _ -> 
-      (match hist_lst with 
-        | [] -> cur_expr, hist_i
-        | lst -> utf8_to_expr (List.hd (List.rev (lst))), hist_i
-      )
-  in
-  clear_expr term cur_expr >>=
-  (fun () -> analyse_and_print term new_expr >>=
+  match (!term_search_mod) with 
+    | None ->
+        let hist_lst = (LTerm_history.contents hist) in
+        let new_expr, hist_i = 
+          try (
+            utf8_to_expr (List.nth hist_lst hist_i ), hist_i + 1
+          ) with _ -> 
+            (match hist_lst with 
+              | [] -> cur_expr, hist_i
+              | lst -> utf8_to_expr (List.hd (List.rev (lst))), hist_i
+            )
+        in
+        clear_expr term cur_expr >>=
+        (fun () -> analyse_and_print term new_expr) >>=
+        (fun () -> return (Some (new_expr, shell_env, (hist, hist_i ))))
+    | Some search_expr ->
+        let hist_i = hist_i + 1 in 
+        let new_expr = find_hist_expr cur_expr (hist, hist_i) search_expr in
+        print_search term shell_env (hist, hist_i) cur_expr search_expr new_expr >>=
       (fun () -> return (Some (new_expr, shell_env, (hist, hist_i ))))
-  )
+
+(*TODO *)
+let completion shell_env hist cur_expr = 
+  Lwt.return (Some (cur_expr, shell_env, hist))
 
 
 let handle_key_event term shell_env hist cur_expr akey = 
@@ -640,6 +772,10 @@ let handle_key_event term shell_env hist cur_expr akey =
         (akey.LTerm_key.control)
         ->
       (multiline_expr term shell_env hist cur_expr)
+  | Char uchar when ((UChar.uint_code uchar) = 0x0072) &&  (*CTRL-R*)
+        (akey.LTerm_key.control)
+        ->
+      (search_hist term shell_env hist cur_expr)
   | Backspace  
   | Delete  -> delete term shell_env hist cur_expr 
   | Char uchar -> print_char term shell_env hist cur_expr akey
@@ -652,8 +788,8 @@ let handle_key_event term shell_env hist cur_expr akey =
   | Left  -> mv_left term shell_env hist cur_expr
   | Right -> mv_right term shell_env hist cur_expr
   | Escape -> return None
-  | Tab 
-  | F1
+  | Tab -> completion shell_env hist cur_expr
+  | F1 
   | F2
   | F3
   | F4
@@ -673,8 +809,8 @@ let handle_key_event term shell_env hist cur_expr akey =
 
 
 let rec loop term shell_env history tmod cur_expr =
-  (if (is_empty_expr cur_expr )
-   then (print_prefix term )
+  (if ((is_empty_expr cur_expr) && ((!term_search_mod) == None))
+   then print_prefix term  
    else return ()
   )
   >>=
@@ -712,7 +848,7 @@ let main () =
        Lazy.force LTerm.stdout
        >>= fun term ->
        let tmod = (LTerm.enter_raw_mode term >>=
-         (fun tmod -> term_tmod := Some tmod; return tmod) ) in
+         (fun tmod -> term_rawmod := Some tmod; return tmod) ) in
        let cur_expr = create_empty_expr () in 
        LTerm.fprints term (eval [S "Welcome, \n";
 (*                                  S "Gufo is the Unidentified Flying Ofug.\n";  *)
