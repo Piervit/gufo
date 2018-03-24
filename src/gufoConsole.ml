@@ -761,13 +761,12 @@ let completion shell_env hist cur_expr =
 
 let handle_key_event term shell_env hist cur_expr akey = 
   match akey.LTerm_key.code with
-(*   | Char uchar when (UChar.uint_code uchar) = 0x0068   *)
-  (*Ugly hack, I don't know why this key match backspace. 
-   * I have posted on lambda-term about the issue:
+   | Char uchar when ((UChar.uint_code uchar) = 0x0068  && akey.LTerm_key.control)
+  (*It looks some conventions allows CTRL-H to del char, and some GUI Terms
+   * remap backspace to CTRL-H...
    * https://github.com/diml/lambda-term/issues/57
-   *
    * *)
-(*       -> delete term cur_expr  *)
+      -> delete term shell_env hist cur_expr 
   | Char uchar when ((UChar.uint_code uchar) = 0x0020) && 
         (akey.LTerm_key.control)
         ->
