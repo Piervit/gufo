@@ -123,7 +123,7 @@ rule read =
   | float               { FLOAT (float_of_string (Lexing.lexeme lexbuf)) }
   | "None"              { NONE}
   | "Some"              { SOME}
-  | "**start**"              { START }
+  | "**START**"              { START }
   | ";"                 { SEMICOLON }
   | ";;"                { DOUBLE_SEMICOLON }
   | '{'                 { OPEN_BRACE }
