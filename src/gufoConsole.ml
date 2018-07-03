@@ -32,6 +32,7 @@ open Gufo
 open Gufo.MCore
 open LTerm_event
 open LTerm_key
+open Sedlex_menhir
 
 exception ExitTerm of (LTerm.t * LTerm.mode Lwt.t)
 
@@ -130,8 +131,10 @@ let utf8_to_expr str =
   Zed_edit.insert nctx (Zed_rope.of_string str);
   nctx
 
+let get_coord expr = Zed_cursor.get_coordinates (Zed_edit.cursor expr)
+
 let get_cursor_coord expr = 
-  let row, col = Zed_cursor.get_coordinates (Zed_edit.cursor expr) in
+  let row, col = get_coord expr in
     match row with 
       | 0 -> row , col + prefix_len
       | _ -> row, col
@@ -150,6 +153,23 @@ let insert_newline expr = Zed_edit.newline expr;
                           insert_in_expr  (insert_in_expr expr (to_uchar ' ')) (to_uchar ' ')
 
 let count_lines expr = (Zed_lines.count (Zed_edit.lines (get_edit_ expr))) + 1
+
+let get_current_word expr = 
+  let row, col = get_coord expr in
+  let curline =  Zed_edit.get_line (Zed_edit.edit expr) row in
+  let curword = Zed_utf8.init 0 (fun i -> UChar.of_char ' ') in
+  let rec get_word rop pos curword  = 
+    match pos with 
+      | -1 -> curword
+      | _ -> 
+      (let curchar = Zed_rope.get rop pos in
+      match UChar.uint_code curchar with
+        | 32 (* space *) -> curword
+        | _ -> get_word rop 
+                 (pos - 1)(Zed_utf8.insert curword 0 (Zed_utf8.singleton curchar))
+      )
+  in
+  get_word curline (col - 1 ) curword
 
 (* The message will be splitted in such a way that it has no lines longer than
  * max_line_size.*)
@@ -532,9 +552,17 @@ let analyse_and_print term cur_expr =
       | None ->
           print_expr term cur_expr
     )
-    with | SyntaxError msg ->
+    with 
+      | ParseError(_fname, line, col, tok) -> 
        print_expr term cur_expr >>=
-       (fun () -> print_res_err term cur_expr (Zed_rope.of_string msg))
+         let err_msg = 
+           Printf.sprintf
+             "Parse error on line %i, column %i, token %s"
+             line col tok
+         in
+       (fun () -> print_res_err term cur_expr (Zed_rope.of_string err_msg))
+      | Failure msg -> 
+       print_res_err term cur_expr (Zed_rope.of_string msg)
 
 
 
@@ -754,8 +782,11 @@ let mv_up term shell_env (hist, hist_i) cur_expr =
         print_search term shell_env (hist, hist_i) cur_expr search_expr new_expr >>=
       (fun () -> return (Some (new_expr, shell_env, (hist, hist_i ))))
 
-(*TODO *)
-let completion shell_env hist cur_expr = 
+(*The completion system: always related to the cur_expr for which the cursor is
+at the end.*)
+let completion term shell_env hist cur_expr = 
+  let cur_word = get_current_word cur_expr in
+  Printf.printf "%s\n" cur_word ;
   Lwt.return (Some (cur_expr, shell_env, hist))
 
 
@@ -787,7 +818,7 @@ let handle_key_event term shell_env hist cur_expr akey =
   | Left  -> mv_left term shell_env hist cur_expr
   | Right -> mv_right term shell_env hist cur_expr
   | Escape -> return None
-  | Tab -> completion shell_env hist cur_expr
+  | Tab -> completion term shell_env hist cur_expr
   | F1 
   | F2
   | F3
