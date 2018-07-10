@@ -22,6 +22,7 @@
 
 *)
 open Sedlex_menhir
+open GufoParsed
 
 
 let ascii_min_letter = [%sedlex.regexp? ('a' .. 'z' )]
@@ -123,7 +124,14 @@ let rec read lexbuf =
   | '{'                 -> Gufo_parser.OPEN_BRACE  
   | '}'                 -> Gufo_parser.CLOSE_BRACE  
   | ','                 -> Gufo_parser.COMMA  
-  | '"'                 -> read_string (Buffer.create 17) buf 
+  | '"'                 ->
+                          (try 
+                          read_string (Buffer.create 17) buf 
+                          with 
+                           | SyntaxError msg ->
+                           raise_ParseErrorWithMsg lexbuf msg
+                           | _ -> raise_ParseError lexbuf
+                          )
   | varname             -> Gufo_parser.VARNAME (Sedlexing.Utf8.lexeme buf)
   | varfield            -> Gufo_parser.VARFIELD (Sedlexing.Utf8.lexeme buf)
   | modulVar            -> Gufo_parser.MODULVAR (Sedlexing.Utf8.lexeme buf)
@@ -132,9 +140,8 @@ let rec read lexbuf =
   | arg                 -> Gufo_parser.ARG (Sedlexing.Utf8.lexeme buf)
   | file                -> Gufo_parser.FILE (Sedlexing.Utf8.lexeme buf)
   | eof                 -> Gufo_parser.EOF 
-  | any                   -> failwith ("Unexpected character : "^ Sedlexing.Utf8.lexeme buf)
-  | _ -> failwith ("Unexpected character : "^ Sedlexing.Utf8.lexeme buf)
-
+  | any                   -> raise_ParseErrorWithMsg lexbuf "unexpected character."
+  | _ -> raise_ParseErrorWithMsg lexbuf "unexpected character."
 
 and read_string inBuf genBuf =
   match%sedlex genBuf with
@@ -149,7 +156,7 @@ and read_string inBuf genBuf =
   | Sub (any,('"' | '\\') ) ->
     Buffer.add_string inBuf (Sedlexing.Utf8.lexeme genBuf);
     read_string inBuf genBuf
-  | eof ->  failwith "String is not terminated"
-  | _ -> failwith ("Illegal string character: " ^ Sedlexing.Utf8.lexeme genBuf)
+  | eof ->  raise (SyntaxError "String is not terminated")
+  | _ -> raise (SyntaxError ("Illegal string character: " ^ Sedlexing.Utf8.lexeme genBuf))
 
 

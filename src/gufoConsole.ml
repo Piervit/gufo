@@ -18,6 +18,10 @@
 *)
 
 (* Implementation of the interactive console. *)
+(*This console is considered to be always at least 80 collums wide. If we have
+ * message that (main expr) or error that are wider that this size, they should
+ * be splitted automatically. *)
+
 
 open GufoParsed
 open CamomileLibrary
@@ -42,10 +46,12 @@ let term_rawmod = ref None
 (*state if we are in search mod or no.*)
 let term_search_mod = ref None
 
-(* COLORS *)
+(******************************* COLORS **************************************)
 (* foreground color *)
 
-(*
+(* 
+  List of colors
+
 val red : color
 val green : color
 val yellow : color
@@ -84,9 +90,22 @@ let c_aggregate = lblue (*list, set or map*)
 let cb_option = blue
 
 
-(* END COLORS *)
+(******************************* END COLORS **********************************)
 
-(*EXPR*)
+
+(******************************* PREFIX **************************************)
+(*A prefix printed at the beginning of a terminal command *)
+let prefix_len = 2
+(* prefix printing *)
+let prefix = "% "
+
+let print_prefix term =  
+  LTerm.move term 0 (-500) >>= 
+  (fun () -> LTerm.fprints term (eval [B_fg c_result; S prefix ]))
+
+(******************************* END PREFIX **********************************)
+
+(******************************* EXPR ****************************************)
 (*expression manipulation: an expression is made from a zed_edit context *)
 
 let count_lines_str str = 
@@ -98,6 +117,10 @@ let count_lines_str str =
     )
     str 1 
 
+(*
+  str: a rope
+  res: integer
+*)
 let count_lines_rope str = 
   Zed_rope.fold 
     (fun achar acc -> 
@@ -107,8 +130,6 @@ let count_lines_rope str =
     )
     str 1 
 
-
-let prefix_len = 2
 
 let create_empty_expr () = 
   let zedit = Zed_edit.create ?editable:(Some (fun _ _ -> true)) () in
@@ -131,15 +152,22 @@ let utf8_to_expr str =
   Zed_edit.insert nctx (Zed_rope.of_string str);
   nctx
 
+(*
+  Get the coordinate of the zed cursor in an expression.
+  Return a pair of integer (x,y).
+*)
 let get_coord expr = Zed_cursor.get_coordinates (Zed_edit.cursor expr)
 
+(*
+  Get the coordinate of the cursor in the terminal expression (consider prefix
+  for exemple).
+  Return a pair of integer (x,y).
+*)
 let get_cursor_coord expr = 
   let row, col = get_coord expr in
     match row with 
       | 0 -> row , col + prefix_len
       | _ -> row, col
-
-(* let get_cursor_position expr = Zed_edit.line expr,Zed_edit.column expr *)
 
 let get_lines_count expr = (Zed_lines.count (Zed_edit.lines (get_edit_ expr) )) + 1
 
@@ -154,6 +182,7 @@ let insert_newline expr = Zed_edit.newline expr;
 
 let count_lines expr = (Zed_lines.count (Zed_edit.lines (get_edit_ expr))) + 1
 
+(*Return the word on which the cursor currently is.*)
 let get_current_word expr = 
   let row, col = get_coord expr in
   let curline =  Zed_edit.get_line (Zed_edit.edit expr) row in
@@ -196,12 +225,9 @@ let split_rope_message str max_line_size =
   in
     Zed_rope.Buffer.contents new_rop_buf
 
+(******************************* END EXPR ************************************)
 
-(*This console is considered to be always at least 80 collums wide. If we have
- * message that (main expr) or error that are wider that this size, they should
- * be splitted automatically. *)
-
-(* history *)
+(******************************* HISTORY *************************************)
 
 let filtered_contents filter history =
   let ctt = LTerm_history.contents history in
@@ -221,19 +247,9 @@ let search_len search_expr =
   8 + String.length search_expr
 
 
-(* END history *)
+(******************************* END HISTORY *********************************)
 
-
-(* prefix printing *)
-
-
-let print_prefix term =  
-  LTerm.move term 0 (-500) >>= 
-  (fun () -> LTerm.fprints term (eval [B_fg c_result; S "% " ]))
-
-
-
-(* error printing *)
+(******************************* ERROR PRINTING ******************************)
 
 let nb_lines_error = ref 0
 
@@ -277,6 +293,9 @@ let print_res_err term cur_expr str_err =
   (fun () -> LTerm.move term 0 (-500)) >>=
   (fun () -> LTerm.move term (expr_cursor_row  + 1 - expr_lines_count - nb_error_line  ) (expr_cursor_col))
 
+(******************************* END ERROR PRINTING **************************)
+
+(******************************* CLEARING ************************************)
 let clear_expr term expr = 
   clear_res_err term expr >>=
   (fun () -> 
@@ -297,6 +316,27 @@ let clear_expr term expr =
       (fun () -> del_until nb_lines )
   )
 
+
+let clear_search_mod term shell_env hist cur_expr search_expr = 
+  let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
+  let expr_lines_count = get_lines_count cur_expr in 
+  term_search_mod := None;
+  LTerm.clear_line term >>=
+  (fun () -> 
+    LTerm.move term (expr_cursor_row - expr_lines_count  ) (expr_cursor_col - ( search_len search_expr )))
+    
+  
+(******************************* END CLEARING ********************************)
+
+  (*This function is to be called after the expr has been printed. The cursor
+   * is expected at the end of the terminal printing.*)
+let place_cursor_after_print term expr =
+  let nb_lines_expr = get_lines_count expr in
+  let curs_row, curs_col = get_cursor_coord expr in
+  let len_last_line =  get_line_length expr (nb_lines_expr - 1 ) in
+  LTerm.move term (curs_row + 1 - nb_lines_expr) (curs_col - len_last_line)
+  
+
 let is_keyword word = 
   match word with 
     | "let" | "in" | "if" | "then" | "else" | "fun" | "struct" | "with" | "wout" -> true 
@@ -316,34 +356,16 @@ let is_bool word =
 let is_cmd word = 
   Str.string_match (Str.regexp "[a-z0-9]+")  word 0 
 
-let clear_search_mod term shell_env hist cur_expr search_expr = 
-  let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
-  let expr_lines_count = get_lines_count cur_expr in 
-  term_search_mod := None;
-  LTerm.clear_line term >>=
-  (fun () -> 
-    LTerm.move term (expr_cursor_row - expr_lines_count  ) (expr_cursor_col - ( search_len search_expr )))
-    
-  
 
-  (*This function is to be called after the expr has been printed. The cursor
-   * is expected at the end of the terminal printing.*)
-let place_cursor_after_print term expr =
-  let nb_lines_expr = get_lines_count expr in
-  let curs_row, curs_col = get_cursor_coord expr in
-  let len_last_line =  get_line_length expr (nb_lines_expr - 1 ) in
-  LTerm.move term (curs_row + 1 - nb_lines_expr) (curs_col - len_last_line)
-  
-
-(*history management *)
-(*
-let reset_hist_id hist = 
-  match hist with
-    | (hist, _hist_id) -> (hist, 0)
-    | _ -> assert false
-*)
+(*The basic printing: no color *)
+let print_expr term expr = 
+  print_prefix term  >>=
+  (fun () -> LTerm.fprints term (eval [B_fg c_unknown; R (Zed_edit.text (Zed_edit.edit expr))]))  >>=
+  (fun () -> place_cursor_after_print term expr) 
 
 
+
+(*The advanced color printing *)
 let print_color_expr term expr optprog types = 
   let print_type_not_found word = 
     [ S word ; B_fg c_unknown]
@@ -503,31 +525,25 @@ let print_color_expr term expr optprog types =
   ) 
 
 
-let print_expr term expr = 
-  print_prefix term  >>=
-  (fun () -> LTerm.fprints term (eval [B_fg c_unknown; R (Zed_edit.text (Zed_edit.edit expr))]))  >>=
-  (fun () -> place_cursor_after_print term expr) 
-
-
+(*Print the result of a program. 
+  Simple one color output. 
+*)
 let print_res term str_res = 
   LTerm.fprints term (eval [B_fg c_result; R (Zed_rope.of_string (str_res^"\n"))])
 
-(*END EXPR*)
-
-
 let fulloprog = ref empty_ofullprog
+(******************************* EXPRESSION CHECKING *************************)
+(*Using the Gufo language to check if an expression is a valid one or not. *)
 
 let check_full_expr cur_expr = 
   let str_expr = Zed_rope.to_string (Zed_edit.text (Zed_edit.edit cur_expr)) in 
   GufoStart.parse_shell str_expr
 
-let i = ref 0
 let analyse_and_print term cur_expr = 
     try (
       match check_full_expr cur_expr with 
       | Some p ->
           (try (
-            i := (!i) + 1;
             let prog = GufoStart.handle_program p "Shell_prog" in
             let opt_prog, types = 
             match  Gufo.MCore.is_empty_ofullprog (!fulloprog) with
@@ -553,13 +569,9 @@ let analyse_and_print term cur_expr =
           print_expr term cur_expr
     )
     with 
-      | ParseError(_fname, line, col, tok) -> 
+      | ParseError(fname, line, col, tok, reason) -> 
        print_expr term cur_expr >>=
-         let err_msg = 
-           Printf.sprintf
-             "Parse error on line %i, column %i, token %s"
-             line col tok
-         in
+         let err_msg = string_of_ParseError (fname, line, col, tok, reason) in
        (fun () -> print_res_err term cur_expr (Zed_rope.of_string err_msg))
       | Failure msg -> 
        print_res_err term cur_expr (Zed_rope.of_string msg)
@@ -586,10 +598,19 @@ let print_search term shell_env hist cur_expr search_expr new_expr =
         LTerm.fprints term (eval [B_fg c_search; S "\n"; S search_prefix; S  search_expr;  ]))
 
 
-
-
-
+(*Do nothing: for non implemented function of keys. *)
 let do_nothing term shell_env hist cur_expr = Lwt.return (Some (cur_expr, shell_env, hist))
+
+let search_hist term shell_env hist cur_expr =
+  match !term_search_mod with
+    | None -> 
+        print_search term shell_env hist cur_expr "" (create_empty_expr ()) >>=
+      (fun () ->
+        term_search_mod := Some "";
+        return (Some (cur_expr, shell_env, hist)))
+    | Some search_expr -> 
+        clear_search_mod term shell_env hist cur_expr search_expr >>=
+        (fun () -> return (Some (cur_expr, shell_env, hist)))
 
 let print_char term shell_env hist cur_expr akey = 
     match (!term_search_mod) with
@@ -623,17 +644,6 @@ let multiline_expr term shell_env hist cur_expr =
     analyse_and_print term cur_expr >>= 
       (fun () -> return (Some (expr,shell_env, hist)))
   )
-
-let search_hist term shell_env hist cur_expr =
-  match !term_search_mod with
-    | None -> 
-        print_search term shell_env hist cur_expr "" (create_empty_expr ()) >>=
-      (fun () ->
-        term_search_mod := Some "";
-        return (Some (cur_expr, shell_env, hist)))
-    | Some search_expr -> 
-        clear_search_mod term shell_env hist cur_expr search_expr >>=
-        (fun () -> return (Some (cur_expr, shell_env, hist)))
 
 let new_line_normal_mod term shell_env (hist, hist_id) cur_expr = 
   (*try to retrieve the current line*)

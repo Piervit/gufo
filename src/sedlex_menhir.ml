@@ -39,19 +39,26 @@ let update lexbuf =
 let lexeme { stream } = Sedlexing.Utf8.lexeme stream
 
 
-(** [ParseError (file, line, col, token)] *)
-exception ParseError of (string * int * int * string)
+(** [ParseError (file, line, col, token, reason)] *)
+exception ParseError of (string * int * int * string * string option)
 
 
-let string_of_ParseError (file, line, cnum, tok) =
+let string_of_ParseError (file, line, cnum, tok, reason) =
   let file_to_string file =
     if file = "" then ""
     else " on file " ^ file
   in
+  match reason with
+    | None -> 
   Printf.sprintf
-    "Parse error%s line %i, column %i, token %s"
-    (file_to_string file)
-    line cnum tok
+        "Parse error%s line %i, column %i, token %s"
+        (file_to_string file)
+        line cnum tok 
+    | Some reason -> 
+        Printf.sprintf
+        "Parse error%s line %i, column %i, token %s: %s"
+        (file_to_string file)
+        line cnum tok reason
 
 let raise_ParseError lexbuf =
   let { pos } = lexbuf in
@@ -59,8 +66,16 @@ let raise_ParseError lexbuf =
   let open Lexing in
   let line = pos.pos_lnum in
   let col = pos.pos_cnum - pos.pos_bol in
-  Printf.fprintf stderr "Parse error: %s\n" (string_of_ParseError (pos.pos_fname, line, col, tok));
-  raise @@ ParseError (pos.pos_fname, line, col, tok)
+  raise @@ ParseError (pos.pos_fname, line, col, tok, None)
+
+let raise_ParseErrorWithMsg lexbuf msg =
+  let { pos } = lexbuf in
+  let tok = lexeme lexbuf in
+  let open Lexing in
+  let line = pos.pos_lnum in
+  let col = pos.pos_cnum - pos.pos_bol in
+  raise @@ ParseError (pos.pos_fname, line, col, tok, Some msg)
+
 
 
 let sedlex_with_menhir lexer parseur lexbuf =
