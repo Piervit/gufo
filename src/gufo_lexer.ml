@@ -50,7 +50,7 @@ let modul =  [%sedlex.regexp? '$', ascii_maj_letter, ascii_base_star]
 
 let word =  [%sedlex.regexp? (xml_letter | '_'),  Star (xml_letter | '0' .. '9' | '_' | '-') ]
 let arg = [%sedlex.regexp? '-', Opt('-'), Star ('-' | xml_letter ) ]
-let file = [%sedlex.regexp? xml_letter | '0' .. '9' | '_' | '.' | '-' | '/' | ':' | '*' | '.' | '~', Star ( xml_letter | '0' .. '9' | '_' | '.' | '/' | '-' | '@' | '&' | '$' | ':' | '.' | '*')  ]
+let file = [%sedlex.regexp? (xml_letter | '0' .. '9' | '_' | '.' | '-' | '/' | ':' | '*' | '.' | '~'), Star ( xml_letter | '0' .. '9' | '_' | '.' | '/' | '-' | '@' | '&' | '$' | ':' | '.' | '*')  ]
 
 let rec read lexbuf =
  let buf = lexbuf.stream in
