@@ -101,6 +101,7 @@ let fold_over_obinding_val apply_fun acc expr =
               | Some lst -> List.fold_left fold_over_obinding_val_ acc lst
           in
             List.fold_left fold_over_obinding_val_ acc mtyplst
+      | MOEnvRef_val _ -> acc
       | MOBind_val mbind -> 
           let acc = apply_fun acc mbind in 
           let acc = fold_over_obinding_val_ acc mbind.mobd_value in
@@ -201,6 +202,7 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
               | Some lst -> List.fold_left fold_over_obinding_and_ofun_val_ acc lst
           in
             List.fold_left fold_over_obinding_and_ofun_val_ acc mtyplst
+      | MOEnvRef_val _ ->  acc
       | MOBind_val mbind -> 
           let acc = apply_bind_fun acc mbind in 
           let acc = fold_over_obinding_and_ofun_val_ acc mbind.mobd_value in

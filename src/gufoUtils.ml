@@ -63,6 +63,8 @@ open GufoParsed
                 | Some lst -> List.fold_left (fold_over_cmd_val apply_fun) acc lst
               in 
               List.fold_left (fold_over_cmd_val apply_fun) acc mtyplst
+    | MEnvRef_val _ -> 
+      acc
     | MBind_val mbind -> 
         fold_over_cmd_val apply_fun (fold_over_cmd_val apply_fun acc mbind.mbd_value) mbind.mbd_body
     | MIf_val (cond, thn , els) ->
@@ -132,6 +134,8 @@ open GufoParsed
                 | Some lst -> List.fold_left (fold_over_composed_type_val apply_fun) acc lst
               in 
               List.fold_left (fold_over_composed_type_val apply_fun) acc mtyplst
+    | MEnvRef_val _ -> 
+        acc
     | MBind_val mbind -> 
         fold_over_composed_type_val apply_fun (fold_over_composed_type_val apply_fun acc mbind.mbd_value) mbind.mbd_body
     | MIf_val (cond, thn , els) ->
@@ -201,6 +205,8 @@ open GufoParsed
                 | Some lst -> List.fold_left (fold_over_mref_val apply_fun) acc lst
               in 
               List.fold_left (fold_over_mref_val apply_fun) (apply_fun acc mref) mtyplst
+    | MEnvRef_val _ -> 
+      acc
     | MBind_val mbind -> 
         fold_over_mref_val apply_fun (fold_over_mref_val apply_fun acc mbind.mbd_value) mbind.mbd_body
     | MIf_val (cond, thn , els) ->
@@ -297,6 +303,8 @@ open GufoParsed
                 | Some lst -> List.fold_left (fold_over_binding_val apply_fun) acc lst
               in 
               List.fold_left (fold_over_binding_val apply_fun) acc mtyplst
+    | MEnvRef_val _ -> 
+      acc
     | MBind_val mbind -> 
         fold_over_binding_val apply_fun 
           (fold_over_binding_val apply_fun (apply_fun acc mbind) mbind.mbd_value) 

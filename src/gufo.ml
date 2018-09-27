@@ -164,6 +164,7 @@ struct
         | MISimple_val of misimple_type_val
         | MIComposed_val of micomposed_type_val
         | MIRef_val of miref_val * mitype_val list 
+        | MIEnvRef_val of string
         | MIBasicFunBody_val of mi_expr_operation * mitype_val * mitype_val
         | MIBind_val of mibinding
         | MIIf_val of mitype_val * mitype_val * mitype_val
@@ -516,6 +517,8 @@ struct
               composedType_compare aa bb
           | MIRef_val (refa,argsa), MIRef_val (refb,argsb) ->
               mref_compare refa refb 
+          | MIEnvRef_val vara, MIEnvRef_val varb ->
+              String.compare vara varb
           | MIBasicFunBody_val (op, arg1, arg2), MIBasicFunBody_val (opp, arg1p, arg2p) ->
               compare_basicfun (op,arg1, arg2) (opp, arg1p, arg2p)
           | MIBind_val bd, MIBind_val bdp ->
@@ -527,6 +530,7 @@ struct
           | MIBody_val bd1, MIBody_val bd2 ->
               compare_body bd1 bd2
           | MISimple_val _, MIRef_val _
+          | MISimple_val _, MIEnvRef_val _
           | MISimple_val _, MIBind_val _ 
           | MISimple_val _, MIIf_val _ 
           | MISimple_val _, MIComp_val _ 
@@ -534,12 +538,14 @@ struct
           | MISimple_val _, MIBasicFunBody_val _ ->
               1
           | MIComposed_val _, MIRef_val _
+          | MIComposed_val _, MIEnvRef_val _
           | MIComposed_val _, MIBind_val _ 
           | MIComposed_val _, MIIf_val _ 
           | MIComposed_val _, MIBody_val _ 
           | MIComposed_val _, MIBasicFunBody_val _ ->
               1
           | MIRef_val _, MISimple_val _ 
+          | MIEnvRef_val _, MISimple_val _ 
           | MIBind_val _ , MISimple_val _
           | MIIf_val _ , MISimple_val _
           | MIComp_val _ , MISimple_val _
@@ -547,22 +553,37 @@ struct
           | MIBasicFunBody_val _ , MISimple_val _  ->
               -1
           | MIRef_val _, MIComposed_val _ 
+          | MIEnvRef_val _, MIComposed_val _ 
           | MIBind_val _ , MIComposed_val _
           | MIIf_val _ , MIComposed_val _
           | MIBody_val _ , MIComposed_val _
           | MIBasicFunBody_val _ , MIComposed_val _  ->
               -1
+          | MIRef_val _,  MIEnvRef_val _ 
           | MIRef_val _,  MIBasicFunBody_val _ 
           | MIRef_val _,  MIBind_val _ 
           | MIRef_val _,  MIComp_val _ 
           | MIRef_val _,  MIIf_val _ 
           | MIRef_val _,  MIBody_val _ -> 
               1
+          | MIEnvRef_val _,  MIBasicFunBody_val _ 
+          | MIEnvRef_val _,  MIBind_val _ 
+          | MIEnvRef_val _,  MIComp_val _ 
+          | MIEnvRef_val _,  MIIf_val _ 
+          | MIEnvRef_val _,  MIBody_val _ -> 
+              1
+          | MIEnvRef_val _ , MIRef_val _ 
           | MIBasicFunBody_val _ , MIRef_val _ 
           | MIIf_val _ , MIRef_val _ 
           | MIComp_val _ , MIRef_val _ 
           | MIBody_val _ , MIRef_val _ 
           | MIBind_val _, MIRef_val _  -> 
+              -1
+          | MIBasicFunBody_val _ , MIEnvRef_val _ 
+          | MIIf_val _ , MIEnvRef_val _ 
+          | MIComp_val _ , MIEnvRef_val _ 
+          | MIBody_val _ , MIEnvRef_val _ 
+          | MIBind_val _, MIEnvRef_val _  -> 
               -1
           | MIBasicFunBody_val _ , MIBind_val _ 
           | MIBasicFunBody_val _ , MIIf_val _ 
@@ -700,6 +721,7 @@ struct
     | MOSimple_val of mosimple_type_val
     | MOComposed_val of mocomposed_type_val
     | MORef_val of moref_val * motype_val list 
+    | MOEnvRef_val of string
     | MOBasicFunBody_val of mo_expr_operation * motype_val * motype_val
     | MOBind_val of mobinding
     | MOIf_val of motype_val * motype_val * motype_val
@@ -798,18 +820,31 @@ struct
 
   type shell_env={
     mose_curdir : string;
+    (*    DEPRECATED: we directly use the unix environment.
     mose_envvar : string StringMap.t;
+    *)
   }
 
   type t = mosimple_type_val
 
   (*functions for shell_env *)
 
+  (*Syntax for a gufo env var is $var while for a unix system it is VAR. 
+    This function consider $var has a valid gufo syntax.
+  *)
+  let translate_envvar gufovar =
+    String.uppercase_ascii (rm_first_char gufovar)
+  
+  (*From a unix VAR to a gufo $var*)
+  let rev_translate_envvar unixvar = 
+    Printf.sprintf "$%s" (String.lowercase_ascii unixvar)
+
   (*From a path, generate a shell environment (without specific environment
    * variables. *)
   let get_env str = 
     {
       mose_curdir = str;
+(*    DEPRECATED: we directly use the unix environment.
       mose_envvar = 
         Array.fold_left 
           (fun map str -> 
@@ -821,14 +856,27 @@ struct
               StringMap.add varname value map
           )
           StringMap.empty (Unix.environment ());
+*)
     }
 
   (*set_var cur_env var value : return a new env which is the cur_env with the
    * environment variable 'var' set to 'value'.*)
   let set_var env var value =
+    Unix.putenv (translate_envvar var) value;
+    env
+(*    DEPRECATED: we directly use the unix environment.
+(*
     { env with
       mose_envvar = StringMap.add var value env.mose_envvar
     }
+*)
+*)
+
+  let get_var env var = 
+    Printf.printf "%s\n" var;
+    let unix_var = translate_envvar var in
+    Unix.getenv unix_var
+(*     StringMap.find var env.mose_envvar  *)
   
   (*END functions for shell_env*)
 
@@ -960,6 +1008,8 @@ struct
         MOComposed_val (simple_to_core_composed_val mc)
       | MIRef_val (rf, argslst) ->
           MORef_val(simple_to_core_ref_val rf, List.map simple_to_core_val argslst)
+      | MIEnvRef_val (var) ->
+          MOEnvRef_val(var)
       | MIBasicFunBody_val (expr, v1, v2) -> 
         MOBasicFunBody_val (expr, simple_to_core_val v1, simple_to_core_val v2)
       | MIBind_val bd ->
@@ -1095,6 +1145,8 @@ struct
               core_to_simple_ref_val ref, 
               List.map core_to_simple_mtype args
             )
+        | MOEnvRef_val (var) -> 
+            MIEnvRef_val (var)
         | MOBasicFunBody_val (op, arga, argb)  ->
           MIBasicFunBody_val (op, core_to_simple_mtype arga, core_to_simple_mtype argb)
         | MOBind_val (bd) -> 
@@ -1248,6 +1300,7 @@ struct
             )
         | MOComposed_val mct -> "-composed-"
         | MORef_val (ref, args) -> "-ref-"
+        | MOEnvRef_val (var) -> var
         | MOBasicFunBody_val (op, arga, argb) -> "-basicfun-"
         | MOBind_val bd -> "-binding-"
         | MOIf_val (cond, thn, els) -> "-if-"

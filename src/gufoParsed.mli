@@ -141,6 +141,13 @@ and mref_val = {
                                     *)
 }
 
+(*
+(*environment variable *)
+and menvref_val = {
+  mrv_varname : string ;
+}
+*)
+
 and msimple_type =
   | MBase_type of mbase_type
   | MTuple_type of msimple_type list
@@ -178,6 +185,7 @@ and mtype_val =
   | MComposed_val of mcomposed_type_val
   | MSimple_val of msimple_type_val
   | MRef_val of mref_val * mtype_val list (*module, varname args*)
+  | MEnvRef_val of string (*environment variable*)
   | MBasicFunBody_val of m_expr_operation * mtype_val list
   | MBind_val of mbinding
   | MIf_val of mtype_val * mtype_val * mtype_val

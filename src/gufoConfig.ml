@@ -18,6 +18,6 @@
 *)
 
 
-let debug = ref false
+let debug = ref true
 let max_char_print_buffer = 10000
 let max_char_printerr_buffer = 10000

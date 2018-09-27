@@ -166,6 +166,17 @@ let handle_program p curMod =
         
       }
 
+
+let miniparseExpr expr pos = 
+
+        let lexbuf = create_lexbuf  (Sedlexing.Utf8.from_string expr) in
+        let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.prog lexbuf in
+        close_in inx;
+        prog
+
+ 
+
+
 (*
 let parse_shell_with_error lexbuf =
   try Gufo_parser.shell Gufo_lexer.read lexbuf with

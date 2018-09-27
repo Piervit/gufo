@@ -18,8 +18,6 @@
 *)
 
 (*This file is the new utf8 compliant lexer (sedlex) 
-  this is work in progress not used for now.
-
 *)
 open Sedlex_menhir
 open GufoParsed
@@ -29,7 +27,6 @@ let ascii_min_letter = [%sedlex.regexp? ('a' .. 'z' )]
 let ascii_maj_letter = [%sedlex.regexp? ('A' .. 'Z' )]
 let ascii_letter = [%sedlex.regexp? (ascii_min_letter | ascii_maj_letter )]
 let digit = [%sedlex.regexp? '0'..'9']
-let ascii_letter_star = [%sedlex.regexp? Star (ascii_letter)]
 let ascii_base = [%sedlex.regexp? ascii_letter | digit | '_' ]
 let ascii_base_star = [%sedlex.regexp? Star (ascii_base) ]
 
@@ -42,11 +39,12 @@ let freetype= [%sedlex.regexp? ('\'', ascii_letter )]
 let int_rep = [%sedlex.regexp? Opt '-', Plus digit]
 let float_rep = [%sedlex.regexp? Plus (digit), Opt ('.') , Opt(digit) ]
 
-let varname = [%sedlex.regexp? '$', ascii_min_letter  , ascii_base_star]
+let envvar = [%sedlex.regexp? '$', '$', ascii_min_letter , ascii_base_star]
+let varname = [%sedlex.regexp? '$',  ascii_min_letter , ascii_base_star]
 let varfield= [%sedlex.regexp? '$', ascii_min_letter, ascii_base_star , '.', ascii_letter , ascii_base_star]
-let modulVar= [%sedlex.regexp?'$', ascii_maj_letter,  ascii_base_star , '.', ascii_min_letter, ascii_base_star ]
 
 let modul =  [%sedlex.regexp? '$', ascii_maj_letter, ascii_base_star]
+let modulVar= [%sedlex.regexp? modul , '.', varname ]
 
 let word =  [%sedlex.regexp? (xml_letter | '_'),  Star (xml_letter | '0' .. '9' | '_' | '-') ]
 let arg = [%sedlex.regexp? '-', Opt('-'), Star ('-' | xml_letter ) ]
@@ -88,7 +86,7 @@ let rec read lexbuf =
   | "+"      -> Gufo_parser.PLUS  
   | "--"     -> Gufo_parser.DOUBLE_MINUS  
   | "-"      -> Gufo_parser.MINUS  
-  | "/"      -> Gufo_parser.DIVISION  
+  | "%"      -> Gufo_parser.DIVISION  
   | "mod"    -> Gufo_parser.MODULO  
   | "=="     -> Gufo_parser.EQUALITY  
   | "!="     -> Gufo_parser.INEQUALITY  
@@ -133,6 +131,8 @@ let rec read lexbuf =
                            | _ -> raise_ParseError lexbuf
                           )
   | varname             -> Gufo_parser.VARNAME (Sedlexing.Utf8.lexeme buf)
+  | envvar              -> Gufo_parser.ENVVAR (Sedlexing.Utf8.lexeme buf)
+
   | varfield            -> Gufo_parser.VARFIELD (Sedlexing.Utf8.lexeme buf)
   | modulVar            -> Gufo_parser.MODULVAR (Sedlexing.Utf8.lexeme buf)
   | modul               -> Gufo_parser.MODUL (Sedlexing.Utf8.lexeme buf)

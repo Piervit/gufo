@@ -175,6 +175,7 @@ and mtype_val =
   | MComposed_val of mcomposed_type_val
   | MSimple_val of msimple_type_val
   | MRef_val of mref_val * mtype_val list (*module, varname args*)
+  | MEnvRef_val of string (*environment variable*)
   | MBasicFunBody_val of m_expr_operation * mtype_val list
   | MBind_val of mbinding
   | MIf_val of mtype_val * mtype_val * mtype_val
@@ -506,6 +507,8 @@ and dump_cmd_val cmdval =
             print_string " ref "; print_string (ref_to_string var)
           | args -> print_call (ref_to_string var) args
           )
+     |  MEnvRef_val (var) ->
+            print_string " ref "; print_string var
      | MBind_val bd ->
          print_string "let ";
          dump_var_decl bd.mbd_name;

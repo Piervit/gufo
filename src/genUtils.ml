@@ -19,8 +19,25 @@
 
 
 open GufoConfig
+type position = {
+  pos_fname : string;
+  pos_lnum : int;
+  pos_bol : int;
+  pos_cnum : int;
+}
+
+(*We don't use the pos_fname to compare pos because we expect every position to
+come from the same filename and we don't want to lose time comparing string .*)
+let comparePos pos1 pos2 = 
+  match (compare pos1.pos_lnum pos2.pos_lnum) with
+    | 0 ->
+        compare pos1.pos_bol pos2.pos_bol
+    | i -> i 
+
+
 module IntSet = Set.Make(struct type t = int let compare = compare end)
 module IntMap = Map.Make(struct type t = int let compare = compare end)
+module PositionMap = Map.Make(struct type t = Lexing.position let compare = comparePos end)
 module StringMap = Map.Make(String)
 
 
@@ -100,6 +117,11 @@ let rm_first_char str =
 
 
 let start_with_uppercase str = 
-  let first_char = String.get str 0 in
+  let first_char_code = Char.code (String.get str 0) in
+  (first_char_code >= 65) && (first_char_code < 91)
+
+
+(*
   let up_char = Char.uppercase_ascii first_char in
   Char.equal first_char up_char
+*)

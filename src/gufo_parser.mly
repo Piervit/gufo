@@ -99,6 +99,7 @@
 %token DOUBLE_SEMICOLON (* ;; *)
 %token <string> FREETYPE
 %token <string> VARNAME 
+%token <string> ENVVAR
 %token <string> VARFIELD
 %token <string> MODULVAR
 %token <string> MODUL
@@ -142,7 +143,12 @@
 
 %start <GufoParsed.mprogram option> prog
 %start <GufoParsed.mprogram option> shell
+%start <GufoParsed.mprogram option> completionParser
 %%
+
+(**
+ ##################### MAIN LANGUAGE PARSER #####################
+*)
 
 shell:
     |  EOF
@@ -427,6 +433,8 @@ varassign_internal_no_bracket:
     }
   | comp = comp_expr; 
     {comp}
+  |  envvar = ENVVAR; 
+     {GufoParsed.MEnvRef_val (GenUtils.rm_first_char envvar)}
   |  funcall = modulVar; funargs = funcallargs ; 
      {GufoParsed.MRef_val (funcall, funargs)}
   | op = operation ; 
@@ -724,8 +732,7 @@ modulVar:
     {
       let open GenUtils in 
       GufoParsed.{mrv_module = None; mrv_varname= [(rm_first_char var)]; mrv_index = idx}}
-    |  varfield = VARFIELD; idx = lst_index; 
-
+  |  varfield = VARFIELD; idx = lst_index; 
     {
      let open GenUtils in 
      let lst = Str.split (Str.regexp "\\.") (rm_first_char varfield)  in
@@ -764,7 +771,16 @@ mapEl:
 
 
 modulVarOrExpr:
+  | a = ENVVAR
+    {GufoParsed.MEnvRef_val (GenUtils.rm_first_char a)}
   | a = modulVar
     {GufoParsed.MRef_val (a,[])}
   | OPEN_BRACKET ; varassign = varassign_no_bracket; CLOSE_BRACKET;
     { varassign }
+
+
+(**
+ ##################### END MAIN LANGUAGE PARSER #####################
+*)
+
+

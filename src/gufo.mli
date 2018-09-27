@@ -203,6 +203,13 @@ sig
     mova_value: motype_val;
   }
 
+(*
+  (* environment variable. *)
+  and movar_env = {
+    movae: string;
+  }
+*)
+
   and moref_val = {
     morv_module : int option; (* None if defined in current module.*)
     morv_varname : int * (int option * int) list; (*varname * (fieldmoduleid * fieldsid *)
@@ -301,6 +308,7 @@ sig
     | MOSimple_val of mosimple_type_val
     | MOComposed_val of mocomposed_type_val
     | MORef_val of moref_val * motype_val list (*module, varname args*)
+    | MOEnvRef_val of string
     | MOBasicFunBody_val of mo_expr_operation * motype_val * motype_val
     | MOBind_val of mobinding
     | MOIf_val of motype_val * motype_val * motype_val
@@ -409,10 +417,12 @@ sig
   and moprocess = GufoParsed.mprocess
 
   (*the shell environment is independant from the program and is only provided
-   * at execution time.*)
+   * at execution time.
+   * In Gufo, an environnement variable is a normal variable but which has been saved in the .guforc file. It has a specific syntax, using $$var instead of $var.
+*)
   type shell_env={
     mose_curdir : string;
-    mose_envvar : string StringMap.t;
+(*     mose_envvar : string StringMap.t;  *)
   }
 
 
@@ -453,7 +463,11 @@ sig
   (*set_var cur_env var value : return a new env which is the cur_env with the
    * environment variable 'var' set to 'value'.*)
   val set_var: shell_env -> string -> string -> shell_env
-  
+ 
+  (*get_var env var : Return the value of the environment variable 'var' in the
+environment 'env'. Raise NotFould if not found.*)
+  val get_var: shell_env -> string -> string 
+ 
   (*END functions for shell_env*)
 
   (**PRINTER **)

@@ -966,6 +966,8 @@ and determine_type fulloptiprog optiprog locScope const e =
               expr_typ, locScope
               )
           )
+      | MOEnvRef_val _ -> 
+        MOUnique_type (MOBase_type (MTypeString)), locScope
       | MOBasicFunBody_val (op, arga, argb)
         ->
           determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb
@@ -1449,6 +1451,8 @@ and type_check_val fulloptiprog optiprog typScope v =
             let ftyp = get_type_from_ref fulloptiprog optiprog typScope ref in 
             check_ref ftyp args 0
          )
+    | MOEnvRef_val (_) -> 
+      true
     | MOBasicFunBody_val (op, a, b) -> 
 (*
         let typ =  determine_type_basic_fun fulloptiprog optiprog progScope None op a b in
@@ -1957,6 +1961,8 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
       | MRef_val (ref, args) -> 
           let oref = parsedToOpt_ref ~topvar optiprog locScope ref  in
           MORef_val (oref, List.map (parsedToOpt_expr ~topvar optiprog locScope) args)
+      | MEnvRef_val (var) -> 
+          MOEnvRef_val var
       | MBasicFunBody_val (op, args) ->
           (match args with 
           |  [a;b] -> 
@@ -2309,7 +2315,12 @@ let parsedToOpt_type fulloptiprog oldprog optiprog =
 
   (* END PART 1: TRANSFORMATION OF TYPE *)
 
-
+(*
+  This is the main analysing function.
+  It returns:
+    - a full parsed opt prog.
+    - a map of type for every variable of every module (type intMap intMap).
+*)
 let parsedToOpt fullprog = 
   let open Format in
   let fulloptiprog = empty_ofullprog in 

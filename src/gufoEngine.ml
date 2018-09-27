@@ -81,7 +81,7 @@ let get_shenv () =
 let rewrite_arg shenv arg = 
   match String.get arg 0 with
     | '~' -> 
-        let user_dir = StringMap.find "HOME" shenv.mose_envvar in
+        let user_dir = get_var shenv "HOME" in
         Str.replace_first (Str.regexp "~") user_dir arg
     | _ -> arg 
 
@@ -320,6 +320,8 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
           composedType_compare aa bb
       | MORef_val (refa,argsa), MORef_val (refb,argsb) ->
           mref_compare refa refb 
+      | MOEnvRef_val (vara), MOEnvRef_val (varb) ->
+          String.compare vara varb
 
 
 
@@ -1101,6 +1103,8 @@ and apply_motype_val toplevel arg2valMap aval =
               (apply_core_fun arg2valMap (find_var_in_sysmod ref.morv_varname msymodule) (List.map (apply_motype_val toplevel arg2valMap) argslst) )
               )
       )
+    | MOEnvRef_val (var) ->
+      MOSimple_val (MOBase_val (MOTypeStringVal (get_var (get_shenv ()) var)))
     | MOBasicFunBody_val (op, arga, argb) -> apply_basic_fun toplevel arg2valMap op arga argb
     | MOBind_val mbind ->
         apply_binding toplevel arg2valMap mbind

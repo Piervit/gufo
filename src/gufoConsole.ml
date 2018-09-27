@@ -792,6 +792,28 @@ let mv_up term shell_env (hist, hist_i) cur_expr =
         print_search term shell_env (hist, hist_i) cur_expr search_expr new_expr >>=
       (fun () -> return (Some (new_expr, shell_env, (hist, hist_i ))))
 
+let analyser expr pos cur_word = 
+  (*les règles sont les suivantes: 
+      - Si cur_word commence par $ suivi d'une minuscule -> on veut compléter une variable.
+      - Si cur_word commence par $ suivi d'une majuscule -> on veut compléter un nom de module.
+      - Si cur_word commence par "./" , il s'agit d'un fichier. 
+      - Si cur_word commence par "-" suivi d'un autre caractère, il s'agit d'un arguemnt. 
+      - soit red_expr, la reduction de expr au scope courant pour une position donné.
+        Par exemple pour l'expression "let $res = (fun $a $b -> ls -l $a $b ) in $res" et la position "l" de "ls", red_expr, serait "ls -l $a $b)
+      - Si cur_word est le premier mot de red_expr, il s'agit soit d'une commande soit d'un mot clef.
+      - si cur_word est précédé dans son expression réduite par une commande ou par un nom de fichier, il s'agit d'un nom de fichier.
+  *)
+
+
+(*This function 
+  takes an expression and a position.
+  returns the GufoParsed.mtype of the token at pos *)
+let get_function cur_expr pos =
+  (*I will have to decide if I want to consider only the current expr for parsing or to provide complete program analysis with it. *)
+  (*TODO*)
+  GufoStart.miniparseExpr expr pos 
+
+
 (*The completion system: always related to the cur_expr for which the cursor is
 at the end.*)
 let completion term shell_env hist cur_expr = 
