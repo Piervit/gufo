@@ -143,7 +143,6 @@
 
 %start <GufoParsed.mprogram option> prog
 %start <GufoParsed.mprogram option> shell
-%start <GufoParsed.mprogram option> completionParser
 %%
 
 (**
