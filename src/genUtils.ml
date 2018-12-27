@@ -37,7 +37,7 @@ let comparePos pos1 pos2 =
 
 module IntSet = Set.Make(struct type t = int let compare = compare end)
 module IntMap = Map.Make(struct type t = int let compare = compare end)
-module PositionMap = Map.Make(struct type t = Lexing.position let compare = comparePos end)
+module PositionMap = Map.Make(struct type t = position let compare = comparePos end)
 module StringMap = Map.Make(String)
 
 
@@ -119,6 +119,11 @@ let rm_first_char str =
 let start_with_uppercase str = 
   let first_char_code = Char.code (String.get str 0) in
   (first_char_code >= 65) && (first_char_code < 91)
+
+let is_lowercase achar = 
+  let char_code = Char.code achar in
+  (char_code >= 97) && (char_code < 123)
+
 
 
 (*

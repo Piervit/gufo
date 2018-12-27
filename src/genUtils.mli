@@ -182,4 +182,6 @@ val rm_first_char : string -> string
 
 val start_with_uppercase: string -> bool
 
+val is_lowercase: char -> bool
+
 (** END STRING UTILTIES **)
