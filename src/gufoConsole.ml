@@ -200,6 +200,34 @@ let get_current_word expr =
   in
   get_word curline (col - 1 ) curword
 
+(*transform a multilie expr into a 1 line one by removing the line return.
+  it emphasize at letting the cursor on the same position.
+*)
+let to_one_line_expr expr =
+  let row, col = get_coord expr in
+  let new_rop_buf = Zed_rope.Buffer.create () in
+  let (_,_, new_curs_col) = 
+    Zed_rope.fold
+      (fun uchar (curs_row, curs_col, new_curs_col) ->
+        (match UChar.uint_code uchar with
+          | 0x000A
+          | 0x000D (*newline *) ->
+            (curs_row - 1, curs_col, new_curs_col)
+          | uchari -> 
+              let _ =  Zed_rope.Buffer.add new_rop_buf uchar in
+              match curs_row, curs_col with 
+                | 0, 0 -> (0, 0, new_curs_col)
+                | 0, i ->
+                  (0, curs_col - 1, new_curs_col + 1)
+                | _, _ ->
+                  (curs_row , curs_col , new_curs_col + 1)
+      ))
+      (Zed_edit.text (Zed_edit.edit expr)) (row, col, 0)
+  in
+    Zed_rope.to_string (Zed_rope.Buffer.contents new_rop_buf), new_curs_col
+
+
+
 (* The message will be splitted in such a way that it has no lines longer than
  * max_line_size.*)
 let split_rope_message str max_line_size = 
@@ -327,6 +355,7 @@ let clear_search_mod term shell_env hist cur_expr search_expr =
     
   
 (******************************* END CLEARING ********************************)
+(******************************* PRINTING ************************************)
 
   (*This function is to be called after the expr has been printed. The cursor
    * is expected at the end of the terminal printing.*)
@@ -531,9 +560,12 @@ let print_color_expr term expr optprog types =
 let print_res term str_res = 
   LTerm.fprints term (eval [B_fg c_result; R (Zed_rope.of_string (str_res^"\n"))])
 
-let fulloprog = ref empty_ofullprog
+(******************************* END PRINTING ********************************)
+
 (******************************* EXPRESSION CHECKING *************************)
 (*Using the Gufo language to check if an expression is a valid one or not. *)
+
+let fulloprog = ref empty_ofullprog
 
 let check_full_expr cur_expr = 
   let str_expr = Zed_rope.to_string (Zed_edit.text (Zed_edit.edit cur_expr)) in 
@@ -792,33 +824,15 @@ let mv_up term shell_env (hist, hist_i) cur_expr =
         print_search term shell_env (hist, hist_i) cur_expr search_expr new_expr >>=
       (fun () -> return (Some (new_expr, shell_env, (hist, hist_i ))))
 
-let analyser expr pos cur_word = 
-  (*les règles sont les suivantes: 
-      - Si cur_word commence par $ suivi d'une minuscule -> on veut compléter une variable.
-      - Si cur_word commence par $ suivi d'une majuscule -> on veut compléter un nom de module.
-      - Si cur_word commence par "./" , il s'agit d'un fichier. 
-      - Si cur_word commence par "-" suivi d'un autre caractère, il s'agit d'un arguemnt. 
-      - soit red_expr, la reduction de expr au scope courant pour une position donné.
-        Par exemple pour l'expression "let $res = (fun $a $b -> ls -l $a $b ) in $res" et la position "l" de "ls", red_expr, serait "ls -l $a $b)
-      - Si cur_word est le premier mot de red_expr, il s'agit soit d'une commande soit d'un mot clef.
-      - si cur_word est précédé dans son expression réduite par une commande ou par un nom de fichier, il s'agit d'un nom de fichier.
-  *)
-
-
-(*This function 
-  takes an expression and a position.
-  returns the GufoParsed.mtype of the token at pos *)
-let get_function cur_expr pos =
-  (*I will have to decide if I want to consider only the current expr for parsing or to provide complete program analysis with it. *)
-  (*TODO*)
-  GufoStart.miniparseExpr expr pos 
-
 
 (*The completion system: always related to the cur_expr for which the cursor is
 at the end.*)
 let completion term shell_env hist cur_expr = 
+  (*we first want to have a 1 line representation of the expression.*)
+  let one_line_expr, pos = to_one_line_expr cur_expr in
   let cur_word = get_current_word cur_expr in
-  Printf.printf "%s\n" cur_word ;
+  let expr_type, str_start = GufoCompletion.analyser one_line_expr pos cur_word in
+  Printf.printf "%s with type %s \n" cur_word (GufoCompletion.comp_type_to_string expr_type);
   Lwt.return (Some (cur_expr, shell_env, hist))
 
 
