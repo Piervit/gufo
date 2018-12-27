@@ -36,6 +36,7 @@ let comparePos pos1 pos2 =
 
 
 module IntSet = Set.Make(struct type t = int let compare = compare end)
+module StringSet = Set.Make(struct type t = string let compare = compare end)
 module IntMap = Map.Make(struct type t = int let compare = compare end)
 module PositionMap = Map.Make(struct type t = position let compare = comparePos end)
 module StringMap = Map.Make(String)

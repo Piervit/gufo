@@ -30,3 +30,9 @@ val fold_over_mref_val : ('a -> GufoParsed.mref_val -> 'a) -> 'a -> GufoParsed.m
 val fold_over_mref_type :('a -> GufoParsed.mref_val -> 'a) -> 'a -> GufoParsed.mtype -> 'a
 
 val fold_over_binding_val : ('a -> GufoParsed.mbinding -> 'a) -> 'a -> GufoParsed.mtype_val -> 'a
+
+(* The set of every Gufo keyword. *)
+val gufoKeywords: GenUtils.StringSet.t
+
+(* is_keyword word -> return true if work is a gufoKeywords*)
+val is_keyword: string -> bool

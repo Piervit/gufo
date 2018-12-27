@@ -17,6 +17,7 @@
     Author: Pierre Vittet
 *)
 
+open GenUtils
 open GufoParsed 
 
 
@@ -321,3 +322,32 @@ open GufoParsed
     mtyp1
 
 
+let gufoKeywords = 
+ List.fold_right StringSet.add 
+  ["struct"; 
+   "let";
+   "fun"; 
+   "mod";
+   "with";
+   "wout";
+   "if";
+   "then";
+   "else";
+   "int";
+   "float";
+   "string";
+   "list";
+   "set";
+   "map";
+   "option";
+   "bool";
+   "cmd";
+   "extends";
+   "in";
+   "None";
+   "Some";
+   "$$START**";
+  ] StringSet.empty
+
+let is_keyword word = 
+  StringSet.mem word gufoKeywords
