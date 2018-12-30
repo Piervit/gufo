@@ -1,17 +1,13 @@
 NEEDED FOR A FIRST USABLE RELEASE
 ===================================
 
-Provide shell navigation (at least cd).
-Provide shell history (and ability to search in it).
 Add non-regression tests system
 Character '\*' as file wildcard, '.' as curdir, '..' as upper dir, '~' as home dir.
-Release source code in GPL.
 Provide documentation.
-Replace the lexer by a UTF8 compliant lexer.
 Add standard libraries (type transformations, iterator, various utility functions).
 Test advanced functionalities (structure,list, set, map, tuple).
-Add shell completion (we could have a nice smart one -> able to complete according to type of variable ).
-Use a small parser (yacc) to improve coloration (allow to know if we are at toplevel or no).
+Improve shell completion.
+improve coloration.
 Debug and improve the console(user interface): multiline commands and errors.
 Test the module system
 

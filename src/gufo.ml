@@ -1247,10 +1247,10 @@ struct
                   (match cmdseq with
                     | MOSimpleCmd cmd -> 
                         (match cmd.mocm_print with
-                          | None -> "-cmd-"
+                          | None -> ""
                           | Some res -> sprintf "%s\n" res
                         )
-                    | _ -> sprintf "-cmd-" 
+                    | _ -> sprintf "" 
                   )
               | MOTuple_val tuplst ->
                   sprintf " ( %s) " 
@@ -1296,7 +1296,7 @@ struct
                     (List.tl lst))
 
               | MOFun_val (_,funargs, body) -> "-fun-"
-              | MOEmpty_val -> "()"
+              | MOEmpty_val -> ""
             )
         | MOComposed_val mct -> "-composed-"
         | MORef_val (ref, args) -> "-ref-"
