@@ -198,7 +198,7 @@ let get_current_word expr =
                  (pos - 1)(Zed_utf8.insert curword 0 (Zed_utf8.singleton curchar))
       )
   in
-  get_word curline (col - 1 ) curword
+  get_word curline (col - 1 ) curword, (row, col)
 
 (*transform a multilie expr into a 1 line one by removing the line return.
   it emphasize at letting the cursor on the same position.
@@ -222,7 +222,7 @@ let to_one_line_expr expr =
                 | _, _ ->
                   (curs_row , curs_col , new_curs_col + 1)
       ))
-      (Zed_edit.text (Zed_edit.edit expr)) (row, col, 0)
+      (Zed_edit.text (Zed_edit.edit expr)) (row, col, -1)
   in
     Zed_rope.to_string (Zed_rope.Buffer.contents new_rop_buf), new_curs_col
 
@@ -280,9 +280,10 @@ let search_len search_expr =
 (******************************* ERROR PRINTING ******************************)
 
 let nb_lines_error = ref 0
+let nb_lines_completion = ref 0
 
-let clear_res_err term cur_expr = 
-
+(*used to clear error or completion display *)
+let clear_res_generic term cur_expr nb_lines_to_del = 
   let rec recursively_clear nb_lines = 
     match nb_lines with 
       | 0 -> return ()
@@ -291,21 +292,46 @@ let clear_res_err term cur_expr =
              (fun () -> recursively_clear (nb_lines - 1))
   in
 
-  match (!nb_lines_error) with
+  match (nb_lines_to_del) with
     | 0 -> return ()
     | nb_error_line ->
         let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
         let expr_lines_count = (get_lines_count cur_expr) - 1 in
         LTerm.move term (expr_lines_count - expr_cursor_row + 1) (-500) >>=
-        (fun () -> recursively_clear (!nb_lines_error))
+        (fun () -> recursively_clear (nb_lines_to_del))
         >>=
         (fun () ->  LTerm.move term 0 (-500))
         >>=
-        (fun () -> LTerm.move term (expr_cursor_row - expr_lines_count - (!nb_lines_error + 1) ) expr_cursor_col)
-        >>=
-        (fun () -> nb_lines_error:= 0; return ())
+        (fun () -> LTerm.move term (expr_cursor_row - expr_lines_count - (nb_lines_to_del + 1) ) expr_cursor_col)
 
-let print_res_err term cur_expr str_err = 
+(*clear error display*)
+let clear_res_err term cur_expr = 
+  (clear_res_generic term cur_expr !nb_lines_error)
+  >>=
+  (fun () -> nb_lines_error:= 0; return ())
+
+(*clear completion display*)
+let clear_res_completion term cur_expr = 
+  match !nb_lines_completion with
+  | 0 -> (*do nothing *) return ()
+  | _ -> 
+    (clear_res_generic term cur_expr !nb_lines_completion)
+    >>=
+    (fun () -> nb_lines_completion:= 0; return ())
+
+(*clear completion display*)
+let clear_res_err_and_comple term cur_expr = 
+  (clear_res_generic term cur_expr (!nb_lines_error + !nb_lines_completion) )
+  >>=
+  (fun () -> nb_lines_error:= 0; nb_lines_completion:= 0;  return ())
+let clear_extra_infos term cur_expr = 
+  match !nb_lines_error, !nb_lines_completion with
+    | 0, 0 -> return ()
+    | 0, i -> clear_res_completion term cur_expr
+    | i, 0 -> clear_res_err term cur_expr 
+    | i, y -> clear_res_err_and_comple term cur_expr 
+
+let print_err term cur_expr str_err = 
   (*str is splitted so it has no line longer than 80 cols. *)
   let str_err = split_rope_message str_err 80 in 
   let nb_error_line = count_lines_rope str_err in
@@ -325,7 +351,7 @@ let print_res_err term cur_expr str_err =
 
 (******************************* CLEARING ************************************)
 let clear_expr term expr = 
-  clear_res_err term expr >>=
+  clear_res_err_and_comple term expr >>=
   (fun () -> 
     let nb_lines = count_lines expr in
     let curs_row, curs_col = 
@@ -365,11 +391,6 @@ let place_cursor_after_print term expr =
   let len_last_line =  get_line_length expr (nb_lines_expr - 1 ) in
   LTerm.move term (curs_row + 1 - nb_lines_expr) (curs_col - len_last_line)
   
-
-let is_keyword word = 
-  match word with 
-    | "let" | "in" | "if" | "then" | "else" | "fun" | "struct" | "with" | "wout" -> true 
-    | _ -> false
 
 let is_integer word = 
   Str.string_match (Str.regexp "[0-9]+") word 0
@@ -474,7 +495,7 @@ let print_color_expr term expr optprog types =
                   [ S word ; B_fg c_unknown ]
           )
       | _ ->
-        (match is_keyword word, is_integer word, is_float word, is_bool word, is_cmd word with
+        (match GufoUtils.is_keyword word, is_integer word, is_float word, is_bool word, is_cmd word with
           | true,_,_,_,_ -> (*keyword*)
               [S word ; B_fg c_keyword ]
           | _,_,true,_,_ -> (*float*)
@@ -592,10 +613,10 @@ let analyse_and_print term cur_expr =
                | VarError msg 
                | SyntaxError msg ->
             print_expr term cur_expr >>=
-            (fun () -> print_res_err term cur_expr (Zed_rope.of_string msg))
+            (fun () -> print_err term cur_expr (Zed_rope.of_string msg))
                | Not_found -> 
             print_expr term cur_expr >>=
-            (fun () -> print_res_err term cur_expr (Zed_rope.of_string "Not found"))
+            (fun () -> print_err term cur_expr (Zed_rope.of_string "Not found"))
         )
       | None ->
           print_expr term cur_expr
@@ -604,9 +625,41 @@ let analyse_and_print term cur_expr =
       | ParseError(fname, line, col, tok, reason) -> 
        print_expr term cur_expr >>=
          let err_msg = string_of_ParseError (fname, line, col, tok, reason) in
-       (fun () -> print_res_err term cur_expr (Zed_rope.of_string err_msg))
+       (fun () -> print_err term cur_expr (Zed_rope.of_string err_msg))
       | Failure msg -> 
-       print_res_err term cur_expr (Zed_rope.of_string msg)
+       print_err term cur_expr (Zed_rope.of_string msg)
+
+
+let print_completion term shell_env hist cur_expr possibles_expr = 
+      let possibles_as_rope = 
+        let possibles_as_str = 
+          (List.fold_left
+          (fun str expr -> str ^ expr ^ "\t")
+          "" possibles_expr 
+          )
+        in
+        Zed_rope.of_string 
+          (
+            match String.length possibles_as_str with
+            | 0 -> ""
+            | i -> String.sub possibles_as_str 0 (i -1))
+      in
+      let str_possibles = split_rope_message possibles_as_rope 80 in 
+      let nb_poss_line = count_lines_rope str_possibles in
+      let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
+      let expr_lines_count = get_lines_count cur_expr in 
+      (*if there is already a completion displayed, we clear it. *)
+(*       clear_res_err_and_comple term cur_expr >>=  *)
+(*       (fun () ->  *)
+        LTerm.fprints term (eval [B_fg c_search; S "\n"]) >>=
+      (fun () -> 
+        LTerm.move term (expr_lines_count + !nb_lines_error - expr_cursor_row - 1 ) (-500)) >>=
+      (fun () -> 
+      LTerm.fprints term (eval [B_fg c_search; R  str_possibles;  ])) >>=
+  (fun () -> 
+      nb_lines_completion := nb_poss_line;
+      LTerm.move term 0 (-500)) >>=
+  (fun () -> LTerm.move term (expr_cursor_row  + 1 - expr_lines_count - !nb_lines_error - nb_poss_line) (expr_cursor_col))
 
 
 
@@ -628,6 +681,8 @@ let print_search term shell_env hist cur_expr search_expr new_expr =
       (fun () -> analyse_and_print term new_expr) >>=
       (fun () -> 
         LTerm.fprints term (eval [B_fg c_search; S "\n"; S search_prefix; S  search_expr;  ]))
+
+
 
 
 (*Do nothing: for non implemented function of keys. *)
@@ -719,7 +774,7 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
        | Sys_error msg 
        | VarError msg 
        | SyntaxError msg ->
-              print_res_err term cur_expr (Zed_rope.of_string msg) >>=
+              print_err term cur_expr (Zed_rope.of_string msg) >>=
               (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
 
 
@@ -828,12 +883,29 @@ let mv_up term shell_env (hist, hist_i) cur_expr =
 (*The completion system: always related to the cur_expr for which the cursor is
 at the end.*)
 let completion term shell_env hist cur_expr = 
+
+  (*return a new expr witch is cur_expr but with the word at position cur_pos
+  replaced by the word better_word.*)
+  let improve_expr cur_expr cur_pos cur_word better_word =
+    Zed_edit.remove_prev cur_expr (String.length cur_word);
+    Zed_edit.insert cur_expr (Zed_rope.of_string better_word);
+    cur_expr
+  in 
   (*we first want to have a 1 line representation of the expression.*)
-  let one_line_expr, pos = to_one_line_expr cur_expr in
-  let cur_word = get_current_word cur_expr in
-  let expr_type, str_start = GufoCompletion.analyser one_line_expr pos cur_word in
-  Printf.printf "%s with type %s \n" cur_word (GufoCompletion.comp_type_to_string expr_type);
-  Lwt.return (Some (cur_expr, shell_env, hist))
+  let one_line_expr, pos_in_one_line_expr = to_one_line_expr cur_expr in
+  let cur_word, cur_pos = get_current_word cur_expr in
+  let expr_type, _str_start = 
+    GufoCompletion.analyser one_line_expr pos_in_one_line_expr cur_word 
+  in
+  let posibilities, better_word = GufoCompletion.completion !fulloprog expr_type cur_word in
+  (*we improve the expression with better_word *)
+  let cur_expr = improve_expr cur_expr cur_pos cur_word better_word in 
+  clear_res_err_and_comple term cur_expr >>=  
+    (fun () -> analyse_and_print term cur_expr ) >>=
+    (fun () -> 
+    print_completion term shell_env hist cur_expr posibilities;
+    Lwt.return (Some (cur_expr, shell_env, hist))
+    )
 
 
 let handle_key_event term shell_env hist cur_expr akey = 

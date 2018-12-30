@@ -90,6 +90,5 @@ type token =
 
 
 
-(** FROM OCAML, might be usefull *)
 
 
