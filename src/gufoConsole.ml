@@ -897,7 +897,9 @@ let completion term shell_env hist cur_expr =
   let expr_type, _str_start = 
     GufoCompletion.analyser one_line_expr pos_in_one_line_expr cur_word 
   in
-  let posibilities, better_word = GufoCompletion.completion !fulloprog expr_type cur_word in
+  let posibilities, better_word = 
+    GufoCompletion.completion shell_env !fulloprog expr_type cur_word 
+  in
   (*we improve the expression with better_word *)
   let cur_expr = improve_expr cur_expr cur_pos cur_word better_word in 
   clear_res_err_and_comple term cur_expr >>=  

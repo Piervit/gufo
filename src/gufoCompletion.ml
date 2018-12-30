@@ -157,7 +157,14 @@ let analyser expr pos cur_word =
       (*cur_word has only a single char*)
       get_type_single_char first_char
   with Invalid_argument _ ->
-    CompNone, cur_word
+    (*TODO*)
+    (*for now, if cur_char is empty, we consider that we are completing a file
+(so it show the files of the current dir. 
+    In the futur, we want this choice to depend of the predecessing word:
+      - if nothing: a command
+      - else a file
+     *)
+    CompFile, ""
 
 (*utility function:
   return true if word start like cur_word, else return false. 
@@ -223,14 +230,49 @@ let module_completion fulloprog cur_word =
   (*TODO*)
   StringSet.empty
 
-let file_completion cur_word =
+let file_completion shell_env cur_word =
   (*we complete relatively to the file present in the current dir.*)
-  (*TODO*)
-  StringSet.empty
+  let syntaxic_dir_part, syntaxic_file_part = 
+    match String.rindex_from_opt cur_word ((String.length cur_word)-1) '/' with
+      | None -> None, cur_word
+      | Some idx ->
+          Some (String.sub cur_word 0 (idx+1) ),
+          String.sub cur_word (idx+1) (String.length cur_word - (idx+1))
+  in 
+  let dir_of_cur_word = 
+    match syntaxic_dir_part with
+      | None -> 
+        (* cur_dir is current working directory *)
+        shell_env.Gufo.MCore.mose_curdir 
+      | Some dir_part -> dir_part
+  in 
+  try 
+    match (Sys.is_directory dir_of_cur_word) with
+      | true ->
+          (*a valid dir, we can explore completion possiblities*)
+          Array.fold_left
+          (fun possibles file -> 
+            match comp_word_to_cur_word syntaxic_file_part file with
+            | true -> 
+              (match syntaxic_dir_part with
+                | None -> StringSet.add file possibles 
+                | Some dir_part -> StringSet.add (dir_part ^ file) possibles 
+              )
+            | false -> possibles
+          )
+          StringSet.empty (Sys.readdir dir_of_cur_word)
+
+      | false ->
+          (*a file, not a dir, no completion posibilities*)
+          StringSet.empty
+  with Sys_error _ -> 
+        (*we are not in a valid file, no completion*)
+        StringSet.empty
+  
 
 (*for a comp_type and a word to complete, return the set of possible
 completion and the minimal extension of cur_word.*)
-let completion fulloprog cmp_type cur_word =
+let completion shell_env fulloprog cmp_type cur_word =
   (*string_common_start : string -> string -> int -> string 
     return a string containing the 'base' first char of str1 and then the
     common chars with str2.
@@ -259,9 +301,9 @@ let completion fulloprog cmp_type cur_word =
     | CompModul -> module_completion fulloprog cur_word (*TODO*)
     | CompVarOrModul -> 
         let possibles_vars = var_completion fulloprog cur_word in
-        let possibles_completion = modules_completion fulloprog cur_word in
+        let possibles_completion = module_completion fulloprog cur_word in
         StringSet.union possibles_vars possibles_completion
-    | CompFile -> StringSet.empty (*TODO*)
+    | CompFile -> file_completion shell_env cur_word 
     | CompArg -> StringSet.empty (*TODO*)
     | CompCmdOrKeyword -> cmd_or_keyword_completion cur_word
     | CompInt -> StringSet.empty (*TODO*)
