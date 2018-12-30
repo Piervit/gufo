@@ -760,11 +760,12 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
           LTerm.leave_raw_mode term tmod) >>=
         (fun () -> 
           let redprog ,shell_env = (GufoEngine.exec opt_prog shell_env) in
+          debugPrint (Printf.sprintf "env: %s\n" shell_env.Gufo.MCore.mose_curdir);
           ( LTerm.enter_raw_mode term >>= (fun tmod -> term_rawmod:=Some tmod; Lwt.return () ));
           fulloprog := redprog;
-          print_res term (Gufo.MCore.moval_to_string redprog.mofp_mainprog.mopg_topcal))
+          print_res term (Gufo.MCore.moval_to_string redprog.mofp_mainprog.mopg_topcal)
           >>=
-        (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
+        (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id)))))
     | None ->
         let expr = insert_newline cur_expr in
         print_expr term expr >>=

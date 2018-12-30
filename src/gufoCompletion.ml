@@ -146,7 +146,20 @@ let analyser expr pos cur_word =
       | '$' -> CompVarOrModul, ""
       | '.' -> CompFile, "."
       | '-' -> CompArg, ""
-      | _ -> CompCmdOrKeyword, cur_word
+      | _ -> 
+        let red_expr, red_expr_offset = get_red_expr expr pos in
+        let first_space_pos = String.rindex_from_opt red_expr (pos - red_expr_offset) ' ' in
+        (match first_space_pos with
+          | None -> (*this is first word*)
+              CompCmdOrKeyword , cur_word
+          | Some i -> 
+              (*for this to be a cmd or keyword, 
+               * there should be only spaces in the i first chars *)
+              (match String.length (String.trim (String.sub red_expr 0 i)) with
+                | 0 -> CompCmdOrKeyword, cur_word
+                | _ -> CompFile, cur_word
+              )
+        )  
   in
   try 
     let first_char = String.get cur_word 0 in

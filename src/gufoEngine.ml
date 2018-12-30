@@ -104,10 +104,9 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
     | None, path -> 
         try 
           Sys.chdir path;
-          printf "%s\n" path;
           0,
           {shenv with 
-            mose_curdir = path;
+            mose_curdir = Sys.getcwd ();
           },
           {cmd with mocm_res = Some 0;}
         with Sys_error msg -> 
