@@ -21,6 +21,7 @@
 
 
 open GenUtils
+open GufoExpression
 
 (*a comp_type is a type for a kind of completion.
 For exemple, a file will not be completed on the same way than a var.
@@ -50,6 +51,7 @@ let comp_type_to_string cmp_typ =
   | CompFloat -> "float"
   | CompNone -> "none type"
 
+
 let analyser expr pos cur_word = 
   (*les règles sont les suivantes: 
       - Si cur_word commence par $ suivi d'une minuscule -> on veut compléter une variable.
@@ -66,44 +68,7 @@ let analyser expr pos cur_word =
       Cette fonction retourne donc un type (expr_type * string) . la chaine étant le début du nom (de variable, module, fichier...).
   *)
 
-  (*get_red_expr: string -> int -> (string, int) 
-   * for an expression and a position in this expression, return a reduced expr
-   * and the offset at which the reduced expr starts within the initial
-   * expression.
-   *)
-  let get_red_expr expr pos_expr =
-    (*we first exploit parenthesis*)
-    let end_parenthesis_pos = String.index_from_opt expr pos_expr ')' in 
-    let first_parenthesis_pos = String.rindex_from_opt expr pos_expr '(' in 
-    let new_expr,pos_expr = 
-      match end_parenthesis_pos, first_parenthesis_pos with
-        | Some end_pos, Some first_pos -> 
-            String.sub expr first_pos (end_pos - first_pos), first_pos
-        | None, _ 
-        | _, None -> expr, pos_expr
-    in
-    (*we check if we are within a function or affectation scope*)
-    let first_fun_scope = 
-      try Str.search_backward (Str.regexp "->") new_expr pos_expr
-      with Not_found -> -1
-    in
-    let first_affectation_scope = 
-      try Str.search_backward (Str.regexp "=") new_expr pos_expr
-      with Not_found -> -1 
-    in
-    match first_fun_scope, first_affectation_scope with
-      | -1, -1 
-      | 0, 0 ->  expr, 0
-      | -1, i ->
-        String.sub new_expr (first_affectation_scope + 1) (String.length new_expr - first_affectation_scope - 1), pos_expr - first_affectation_scope
-      | j, i when i > j ->
-        String.sub new_expr (first_affectation_scope + 1) (String.length new_expr - first_affectation_scope - 1), pos_expr - first_affectation_scope
-      | i, -1 ->
-        String.sub new_expr (first_fun_scope + 1) (String.length new_expr - first_fun_scope - 1), pos_expr - first_fun_scope
-      | i, j when i > j ->
-        String.sub new_expr (first_fun_scope + 1) (String.length new_expr - first_fun_scope - 1), pos_expr - first_fun_scope 
-      | _ -> assert false
-  in
+
   (*function to find the completion type using the two first char of cur_word*)
   let get_type_using_two_chars first_char second_char = 
   match first_char , second_char with
@@ -124,7 +89,7 @@ let analyser expr pos cur_word =
     | '"', _ ->
       CompString, String.sub cur_word 1 ((String.length cur_word) - 1)
     | _, _ -> 
-      let red_expr, red_expr_offset = get_red_expr expr pos in
+      let red_expr, red_expr_offset = get_partial_expr expr pos in
       let first_space_pos = String.rindex_from_opt red_expr (pos - red_expr_offset) ' ' in
       (match first_space_pos with
         | None -> (*this is first word*)
@@ -147,7 +112,7 @@ let analyser expr pos cur_word =
       | '.' -> CompFile, "."
       | '-' -> CompArg, ""
       | _ -> 
-        let red_expr, red_expr_offset = get_red_expr expr pos in
+        let red_expr, red_expr_offset = get_partial_expr expr pos in
         let first_space_pos = String.rindex_from_opt red_expr (pos - red_expr_offset) ' ' in
         (match first_space_pos with
           | None -> (*this is first word*)

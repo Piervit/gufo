@@ -24,6 +24,7 @@
 
 
 open GufoParsed
+open GufoExpression
 open CamomileLibrary
 open React
 open Lwt
@@ -104,59 +105,12 @@ let print_prefix term =
   (fun () -> LTerm.fprints term (eval [B_fg c_result; S prefix ]))
 
 (******************************* END PREFIX **********************************)
-
 (******************************* EXPR ****************************************)
-(*expression manipulation: an expression is made from a zed_edit context *)
-
-let count_lines_str str = 
-  Zed_utf8.fold 
-    (fun achar acc -> 
-      match UChar.uint_code achar with
-        | 0x000A (* newline *) -> acc + 1
-        | _ -> acc
-    )
-    str 1 
-
-(*
-  str: a rope
-  res: integer
-*)
-let count_lines_rope str = 
-  Zed_rope.fold 
-    (fun achar acc -> 
-      match UChar.uint_code achar with
-        | 0x000A (* newline *) -> acc + 1
-        | _ -> acc
-    )
-    str 1 
-
-
-let create_empty_expr () = 
-  let zedit = Zed_edit.create ?editable:(Some (fun _ _ -> true)) () in
-  let zcursor = Zed_edit.new_cursor zedit in
-  Zed_edit.context zedit zcursor
-
-let is_empty_expr expr = Zed_rope.is_empty (Zed_edit.text (Zed_edit.edit expr))
-
-let get_edit_ expr = Zed_edit.edit expr
 
 let get_line_length expr line_num = 
   match line_num with
-    |0 -> (Zed_rope.length (Zed_edit.get_line (get_edit_ expr) line_num)) + prefix_len
+    | 0 -> (Zed_rope.length (Zed_edit.get_line (get_edit_ expr) line_num)) + prefix_len
     | _ -> Zed_rope.length (Zed_edit.get_line (get_edit_ expr) line_num)
-
-let ctx_to_string expr = (Zed_rope.to_string (Zed_edit.text (Zed_edit.edit expr)))
-
-let utf8_to_expr str = 
-  let nctx = create_empty_expr () in
-  Zed_edit.insert nctx (Zed_rope.of_string str);
-  nctx
-
-(*
-  Get the coordinate of the zed cursor in an expression.
-  Return a pair of integer (x,y).
-*)
-let get_coord expr = Zed_cursor.get_coordinates (Zed_edit.cursor expr)
 
 (*
   Get the coordinate of the cursor in the terminal expression (consider prefix
@@ -169,92 +123,9 @@ let get_cursor_coord expr =
       | 0 -> row , col + prefix_len
       | _ -> row, col
 
-let get_lines_count expr = (Zed_lines.count (Zed_edit.lines (get_edit_ expr) )) + 1
 
-let insert_in_expr expr achar = Zed_edit.insert expr (Zed_rope.make 1 achar); expr
-
-let delete_in_expr expr = Zed_edit.remove_prev expr 1; expr
-
-let to_uchar achar = UChar.of_char achar
-
-let insert_newline expr = Zed_edit.newline expr; 
-                          insert_in_expr  (insert_in_expr expr (to_uchar ' ')) (to_uchar ' ')
-
-let count_lines expr = (Zed_lines.count (Zed_edit.lines (get_edit_ expr))) + 1
-
-(*Return the word on which the cursor currently is.*)
-let get_current_word expr = 
-  let row, col = get_coord expr in
-  let curline =  Zed_edit.get_line (Zed_edit.edit expr) row in
-  let curword = Zed_utf8.init 0 (fun i -> UChar.of_char ' ') in
-  let rec get_word rop pos curword  = 
-    match pos with 
-      | -1 -> curword
-      | _ -> 
-      (let curchar = Zed_rope.get rop pos in
-      match UChar.uint_code curchar with
-        | 32 (* space *) -> curword
-        | _ -> get_word rop 
-                 (pos - 1)(Zed_utf8.insert curword 0 (Zed_utf8.singleton curchar))
-      )
-  in
-  get_word curline (col - 1 ) curword, (row, col)
-
-(*transform a multilie expr into a 1 line one by removing the line return.
-  it emphasize at letting the cursor on the same position.
-*)
-let to_one_line_expr expr =
-  let row, col = get_coord expr in
-  let new_rop_buf = Zed_rope.Buffer.create () in
-  let (_,_, new_curs_col) = 
-    Zed_rope.fold
-      (fun uchar (curs_row, curs_col, new_curs_col) ->
-        (match UChar.uint_code uchar with
-          | 0x000A
-          | 0x000D (*newline *) ->
-            (curs_row - 1, curs_col, new_curs_col)
-          | uchari -> 
-              let _ =  Zed_rope.Buffer.add new_rop_buf uchar in
-              match curs_row, curs_col with 
-                | 0, 0 -> (0, 0, new_curs_col)
-                | 0, i ->
-                  (0, curs_col - 1, new_curs_col + 1)
-                | _, _ ->
-                  (curs_row , curs_col , new_curs_col + 1)
-      ))
-      (Zed_edit.text (Zed_edit.edit expr)) (row, col, -1)
-  in
-    Zed_rope.to_string (Zed_rope.Buffer.contents new_rop_buf), new_curs_col
-
-
-
-(* The message will be splitted in such a way that it has no lines longer than
- * max_line_size.*)
-let split_rope_message str max_line_size = 
-  let new_rop_buf = Zed_rope.Buffer.create () in
-  let  _ = 
-    Zed_rope.fold 
-      (fun uchar cur_col_num ->
-        (match UChar.uint_code uchar with
-          | 0x000A
-          | 0x000D (*newline *) ->
-              let _ = Zed_rope.Buffer.add new_rop_buf (UChar.chr 0x000A) in 0
-          | uchari -> 
-              match cur_col_num with
-                | i when i = (max_line_size - 1) ->
-                    let _ = Zed_rope.Buffer.add new_rop_buf (UChar.chr 0x000A) in
-                    let _ = Zed_rope.Buffer.add new_rop_buf uchar in
-                    1
-                | _ -> 
-                    let _ =  Zed_rope.Buffer.add new_rop_buf uchar in
-                    cur_col_num + 1
-      ))
-      str 0
-  in
-    Zed_rope.Buffer.contents new_rop_buf
 
 (******************************* END EXPR ************************************)
-
 (******************************* HISTORY *************************************)
 
 let filtered_contents filter history =
@@ -459,40 +330,54 @@ let print_color_expr term expr optprog types =
              * word is a topvar or a binding var inside a topvar.
           *)
           (let var = String.sub word 1 ((String.length word) - 1) in
-          try (
-              match StringMap.find_opt var optprog.mofp_mainprog.mopg_topvar2int with
-                | None -> 
-                    let bind_in_topvars = 
-                      match (IntMap.is_empty optprog.mofp_mainprog.mopg_topvar_bind_vars)
-                      with 
-                        | false -> 
-                            let _, bind_in_topvars = 
-                              IntMap.max_binding optprog.mofp_mainprog.mopg_topvar_bind_vars 
-                            in 
-                            bind_in_topvars
-                        | true -> 
-                            optprog.mofp_mainprog.mopg_topcal_bind_vars
-                    in
-                    let ids = StringMap.find var bind_in_topvars in
-                    let b_type = (IntMap.find (IntSet.choose ids) (IntMap.find 0 types)) in
-                    (*TODO: we should check b_type is the same for every type, else, no color.
-                     *This require a good type_compare function.
-                     * *)
-                    (
-                    match IntSet.for_all 
-                      (fun id -> true ) ids
-                    with
-                      | true -> print_type b_type word
-                      | false -> print_type_not_found word
-                    )
-                | Some id_var -> 
-                    let typ = IntMap.find id_var (IntMap.find 0 types) in
-                    print_type typ word
-            
-            
-          )
-          with | _ -> 
-                  [ S word ; B_fg c_unknown ]
+          let search_topvar2int () = 
+                (match StringMap.find_opt var optprog.mofp_mainprog.mopg_topvar2int with
+                  | None -> 
+                      None
+                  | Some id_var -> 
+                      let typ = IntMap.find id_var (IntMap.find 0 types) in
+                      Some typ
+                )
+          in
+          let search_bind_var () = 
+            try (
+              let bind_in_topvars = 
+                match (IntMap.is_empty optprog.mofp_mainprog.mopg_topvar_bind_vars)
+                with 
+                | false -> 
+                    let _, bind_in_topvars = 
+                      IntMap.max_binding optprog.mofp_mainprog.mopg_topvar_bind_vars 
+                    in 
+                    bind_in_topvars
+                | true -> 
+                    optprog.mofp_mainprog.mopg_topcal_bind_vars
+            in
+              let ids = StringMap.find var bind_in_topvars in
+              let b_type = (IntMap.find (IntSet.choose ids) (IntMap.find 0 types)) in
+              (*TODO: we should check b_type is the same for every type, else, no color.
+               *This require a good type_compare function.
+               * *)
+              (
+                match IntSet.for_all (fun id -> true ) ids
+              with
+                | true -> 
+                    Some b_type 
+                | false -> None
+                )
+              )
+                with | _ -> 
+                  None
+            in
+              (match search_topvar2int (), search_bind_var () with
+                | Some typ, None -> print_type typ word
+                | None, Some typ -> print_type typ word
+                | Some _ , Some _ -> print_type_not_found word
+                | None, None ->
+                  (match search_bind_var () with
+                    | Some typ -> print_type typ word
+                    | None -> print_type_not_found word
+                  )
+              )
           )
       | _ ->
         (match GufoUtils.is_keyword word, is_integer word, is_float word, is_bool word, is_cmd word with

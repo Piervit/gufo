@@ -125,7 +125,36 @@ let is_lowercase achar =
   let char_code = Char.code achar in
   (char_code >= 97) && (char_code < 123)
 
+let split_in_two str pos =
+  ((String.sub str 0 pos),
+   (String.sub str (pos+ 1) ((String.length str) - (pos+1))))
 
+
+let compare_first_chars str1 str2 = 
+  try 
+    (String.compare str1 (String.sub str2 0 (String.length str1) ) ) = 0
+  with _ -> false
+
+(*compare_last_chars str1 str2
+  return true if str2 finish as str1 (but can be longer).
+  return false if str2 is smaller than str1 or if id doesn't finish by it.
+  *)
+let compare_last_chars str1 str2 = 
+  try 
+    (String.compare str1 (String.sub str2 ((String.length str2) - (String.length str1)) (String.length str1) ) ) = 0
+  with _ -> false
+
+
+
+(*Lets say that we are in the dir cwd and we ask for a path "str_path"
+(absolute or relative), return the absolute path asked. *)
+let get_abs_path cwd str_path =
+  let trimmed_str_path = (String.trim str_path) in
+  match String.get trimmed_str_path 0 with
+    | '/' -> (*absolute path*)
+      trimmed_str_path
+    | _ -> (*relative path*)
+        cwd ^ trimmed_str_path
 
 (*
   let up_char = Char.uppercase_ascii first_char in

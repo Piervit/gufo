@@ -79,11 +79,83 @@ let get_shenv () =
 
 (* GUFO SPECIFIC CMD *)
 let rewrite_arg shenv arg = 
-  match String.get arg 0 with
-    | '~' -> 
-        let user_dir = get_var shenv "HOME" in
-        Str.replace_first (Str.regexp "~") user_dir arg
-    | _ -> arg 
+
+  (**)
+  let check_star_pattern name pattern = 
+    let pattern = (String.concat ".*" (String.split_on_char '*' pattern )) in
+    let pattern = Str.regexp ("^" ^ pattern ^ "$") in
+    Str.string_match pattern name 0
+  in
+    
+
+  (*transform the '*' into the expected list of file. *)
+  let apply_star_pattern str = 
+(*     let full_path = GenUtils.get_abs_path (Sys.getcwd() ) str in *)
+    let rec _apply_star_pattern pathSet =
+      (*Return a stringset of path*)
+      let get_pathSet_from_star path_before_star path_after_star = 
+        let get_root_dir, file_part = 
+          match String.rindex_opt path_before_star '/' with
+            | None -> ".", path_before_star
+            | Some pos -> split_in_two path_before_star pos
+        in
+
+        let after_file_part, after_path = 
+          match String.index_opt path_after_star '/' with
+            | None -> path_after_star, ""
+            | Some pos -> split_in_two path_after_star pos
+        in
+
+        let files = Sys.readdir get_root_dir in
+        let completions_files = 
+        Array.fold_left
+          (fun completions_files file -> 
+(*
+            match (GenUtils.compare_first_chars file_part file &&
+                   GenUtils.compare_last_chars after_file_part file
+                  )
+*)
+            match (check_star_pattern file (file_part ^"*" ^ after_file_part)) 
+            with
+              | true -> 
+                  (match after_path with
+                  | "" -> StringSet.add (get_root_dir ^ "/" ^ file) completions_files 
+                  | _ -> StringSet.add (get_root_dir ^ "/" ^ file ^ "/" ^ after_path) completions_files 
+                  )
+              | false -> completions_files
+          )
+          StringSet.empty files
+        in completions_files
+      in
+      StringSet.fold  
+        (fun curpath new_pathSet ->
+          match String.index_opt curpath '*' with
+            | None -> StringSet.add curpath new_pathSet
+            | Some pos_star -> 
+              let before_star, after_star =
+                GenUtils.split_in_two curpath pos_star 
+              in
+              let new_pathSet = 
+                  StringSet.union (get_pathSet_from_star before_star after_star)
+                                  new_pathSet
+              in _apply_star_pattern new_pathSet
+        )
+        pathSet StringSet.empty
+    in 
+    let file_set = _apply_star_pattern (StringSet.singleton str) in
+    (*instead of a set I want a list, alphabetically ordered *)
+    let els = StringSet.elements file_set in
+    match els with
+      | [] -> [str]
+      | _ -> els
+  in
+  let str_arg  = 
+    match String.get arg 0 with
+      | '~' -> 
+          let user_dir = get_var shenv "HOME" in
+          Str.replace_first (Str.regexp "~") user_dir arg
+      | _ -> arg 
+  in apply_star_pattern str_arg
 
 let play_cd cmd red_args shenv input_fd output_fd outerr_fd = 
   (*cd will write an error and do nothing else if it has more than 1 arg.*)
@@ -694,7 +766,9 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
       | MOSORString str -> str
       | MOSORExpr expr -> 
           match apply_motype_val toplevel arg2valMap expr with
-            | MOSimple_val (MOBase_val (MOTypeStringVal s)) -> s (*result has to be a string*)
+            | MOSimple_val (MOBase_val (MOTypeStringVal s)) -> 
+              (*result has to be a string*)
+               s 
             | _ -> assert false
   in
 
@@ -716,7 +790,13 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
   in
   let red_args = List.map apply_mostringOrRef cmd.mocm_args in
   let shenv = get_shenv () in
-  let red_args = List.map (rewrite_arg shenv) red_args in
+  let red_args = 
+    List.fold_left
+      (fun red_args arg -> 
+        List.append red_args (rewrite_arg shenv arg)
+      )
+      [] red_args 
+  in
   let input_fd = 
     match cmd.mocm_input_src, pip_read with
       | (MOCMDIStdIn, None) -> Unix.stdin

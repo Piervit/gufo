@@ -227,4 +227,30 @@ val start_with_uppercase: string -> bool
 
 val is_lowercase: char -> bool
 
+(*compare_first_chars str1 str2
+  return true if str2 start as str1 (but can be longer).
+  return false if str2 is smaller than str1 or if id doesn't start by it.
+  *)
+val compare_first_chars : string -> string -> bool
+
+(*compare_last_chars str1 str2
+  return true if str2 finish as str1 (but can be longer).
+  return false if str2 is smaller than str1 or if id doesn't finish by it.
+  *)
+val compare_last_chars : string -> string -> bool
+
+(*split_in_two str pos 
+  for str = "12345,678" and for pos =5, return ("12345","678") 
+  The caracter at pos dissapear.
+*)
+val split_in_two: string -> int -> (string * string)
 (** END STRING UTILTIES **)
+
+(** FILE UTILITIES **)
+
+(* get_path : cwd -> str_path -> path
+Lets say that we are in the dir cwd and we ask for a path "str_path"
+(absolute or relative), return the absolute path asked. *)
+val get_abs_path : string -> string -> string
+
+(** END FILE UTILITIES **)
