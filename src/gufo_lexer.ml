@@ -41,7 +41,9 @@ let float_rep = [%sedlex.regexp? Plus (digit), Opt ('.') , Opt(digit) ]
 
 let envvar = [%sedlex.regexp? '$', '$', ascii_min_letter , ascii_base_star]
 let varname = [%sedlex.regexp? '$',  ascii_min_letter , ascii_base_star]
-let varfield= [%sedlex.regexp? '$', ascii_min_letter, ascii_base_star , '.', ascii_letter , ascii_base_star]
+
+let ascii_base_star_with_dot = [%sedlex.regexp? Star (ascii_base | '.') ]
+let varfield= [%sedlex.regexp? '$', ascii_min_letter, ascii_base_star , '.', ascii_letter , ascii_base_star_with_dot ]
 
 let modul =  [%sedlex.regexp? '$', ascii_maj_letter, ascii_base_star]
 let modulVar= [%sedlex.regexp? modul , '.', varname ]
