@@ -30,6 +30,8 @@ let digit = [%sedlex.regexp? '0'..'9']
 let ascii_base = [%sedlex.regexp? ascii_letter | digit | '_' ]
 let ascii_base_star = [%sedlex.regexp? Star (ascii_base) ]
 
+let ascii_min_then_star = [%sedlex.regexp? ascii_min_letter, ascii_base_star]
+
 let newline = [%sedlex.regexp? ('\r' | '\n' | "\r\n")]
 
  let comment = [%sedlex.regexp? '#', Star( Compl( '\r' | '\n' ))] 
@@ -46,7 +48,7 @@ let ascii_base_star_with_dot = [%sedlex.regexp? Star (ascii_base | '.') ]
 let varfield= [%sedlex.regexp? '$', ascii_min_letter, ascii_base_star , '.', ascii_letter , ascii_base_star_with_dot ]
 
 let modul =  [%sedlex.regexp? '$', ascii_maj_letter, ascii_base_star]
-let modulVar= [%sedlex.regexp? modul , '.', varname ]
+let modulVar= [%sedlex.regexp? modul , '.', ascii_min_then_star ]
 
 let word =  [%sedlex.regexp? (xml_letter | '_'),  Star (xml_letter | '0' .. '9' | '_' | '-') ]
 let arg = [%sedlex.regexp? '-', Opt('-'), Star ('-' | xml_letter ) ]
