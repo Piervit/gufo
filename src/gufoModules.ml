@@ -30,6 +30,7 @@ let is_system_module filename =
     | "cmd.ma" -> true
     | "string.ma" -> true
     | "set.ma" -> true
+    | "int.ma" -> true
     | _ -> false
 
 let parse_system_module filename = 
@@ -38,6 +39,7 @@ let parse_system_module filename =
     | "cmd.ma" -> GufoCmdMod.mosysmodule
     | "string.ma" -> GufoStringMod.mosysmodule
     | "set.ma" -> GufoSetMod.mosysmodule
+    | "int.ma" -> GufoIntMod.mosysmodule
     | _ -> assert false
 
 
