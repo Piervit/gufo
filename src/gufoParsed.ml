@@ -295,7 +295,7 @@ let mval_to_cmd sv =
   match sv with 
     | MSimple_val (MBase_val (MTypeCmdVal cmdseq))
       -> cmdseq
-    | _ -> assert false
+    | _ -> raise (TypeError "Expecting a command.")
 
 
 let rec dump_mtype_short mytype = 
