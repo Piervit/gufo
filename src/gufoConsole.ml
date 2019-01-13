@@ -507,6 +507,9 @@ let analyse_and_print term cur_expr =
           print_expr term cur_expr
     )
     with 
+      | TypeError (reason) -> 
+         print_expr term cur_expr >>=
+            (fun () -> print_err term cur_expr (Zed_rope.of_string reason))
       | ParseError(fname, line, col, tok, reason) -> 
        print_expr term cur_expr >>=
          let err_msg = string_of_ParseError (fname, line, col, tok, reason) in
