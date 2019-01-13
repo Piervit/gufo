@@ -576,6 +576,22 @@ let print_search term shell_env hist cur_expr search_expr new_expr =
 (*Do nothing: for non implemented function of keys. *)
 let do_nothing term shell_env hist cur_expr = Lwt.return (Some (cur_expr, shell_env, hist))
 
+(*Handle command fail:
+  - or a bad action from the user
+  - or a gufo execution issue.*)
+let do_fail term shell_env hist cur_expr = 
+  (*TODO*)
+   clear_res_err_and_comple term cur_expr >>=
+   (fun () -> print_err term cur_expr (Zed_rope.of_string "Unable to execute the previous line")) >>=
+        (fun () -> LTerm.fprints term (eval [B_fg c_unknown; S "\n\n"])) >>=
+        (fun () -> LTerm.flush term) >>=
+   (fun () -> 
+      let expr = insert_newline cur_expr in
+        print_expr term expr )>>=
+   (fun () -> return (Some (create_empty_expr (), shell_env, hist)))
+
+
+
 let search_hist term shell_env hist cur_expr =
   match !term_search_mod with
     | None -> 
@@ -800,51 +816,54 @@ let completion term shell_env hist cur_expr =
 
 
 let handle_key_event term shell_env hist cur_expr akey = 
-  match akey.LTerm_key.code with
-   | Char uchar when ((UChar.uint_code uchar) = 0x0068  && akey.LTerm_key.control)
-  (*It looks some conventions allows CTRL-H to del char, and some GUI Terms
-   * remap backspace to CTRL-H...
-   * https://github.com/diml/lambda-term/issues/57
-   * *)
-      -> delete term shell_env hist cur_expr 
-  | Char uchar when ((UChar.uint_code uchar) = 0x0020) && 
-        (akey.LTerm_key.control)
-        ->
-      (multiline_expr term shell_env hist cur_expr)
-  | Char uchar when ((UChar.uint_code uchar) = 0x0072) &&  (*CTRL-R*)
-        (akey.LTerm_key.control)
-        ->
-      (search_hist term shell_env hist cur_expr)
-  | Backspace  
-  | Delete  -> delete term shell_env hist cur_expr 
-  | Char uchar -> print_char term shell_env hist cur_expr akey
-  | Enter -> 
-      (new_line term shell_env hist cur_expr)
-  | Up -> mv_up term shell_env hist cur_expr 
-(*   | Up -> do_nothing term shell_env hist cur_expr *)
-  | Down  -> mv_down term shell_env hist cur_expr 
-(*   | Down  -> do_nothing term shell_env hist cur_expr *)
-  | Left  -> mv_left term shell_env hist cur_expr
-  | Right -> mv_right term shell_env hist cur_expr
-  | Escape -> return None
-  | Tab -> completion term shell_env hist cur_expr
-  | F1 
-  | F2
-  | F3
-  | F4
-  | F5
-  | F6
-  | F7
-  | F8
-  | F9
-  | F10
-  | F11
-  | F12 
-  | Next_page
-  | Prev_page
-  | Home
-  | End
-  | Insert -> do_nothing term shell_env hist cur_expr
+  try
+    (match akey.LTerm_key.code with
+     | Char uchar when ((UChar.uint_code uchar) = 0x0068  && akey.LTerm_key.control)
+    (*It looks some conventions allows CTRL-H to del char, and some GUI Terms
+     * remap backspace to CTRL-H...
+     * https://github.com/diml/lambda-term/issues/57
+     * *)
+        -> delete term shell_env hist cur_expr 
+    | Char uchar when ((UChar.uint_code uchar) = 0x0020) && 
+          (akey.LTerm_key.control)
+          ->
+        (multiline_expr term shell_env hist cur_expr)
+    | Char uchar when ((UChar.uint_code uchar) = 0x0072) &&  (*CTRL-R*)
+          (akey.LTerm_key.control)
+          ->
+        (search_hist term shell_env hist cur_expr)
+    | Backspace  
+    | Delete  -> delete term shell_env hist cur_expr 
+    | Char uchar -> print_char term shell_env hist cur_expr akey
+    | Enter -> 
+        (new_line term shell_env hist cur_expr)
+    | Up -> mv_up term shell_env hist cur_expr 
+(*     | Up -> do_nothing term shell_env hist cur_expr *)
+    | Down  -> mv_down term shell_env hist cur_expr 
+(*     | Down  -> do_nothing term shell_env hist cur_expr *)
+    | Left  -> mv_left term shell_env hist cur_expr
+    | Right -> mv_right term shell_env hist cur_expr
+    | Escape -> return None
+    | Tab -> completion term shell_env hist cur_expr
+    | F1 
+    | F2
+    | F3
+    | F4
+    | F5
+    | F6
+    | F7
+    | F8
+    | F9
+    | F10
+    | F11
+    | F12 
+    | Next_page
+    | Prev_page
+    | Home
+    | End
+    | Insert -> do_nothing term shell_env hist cur_expr
+  )
+  with _ -> do_fail term shell_env hist cur_expr
 
 
 let rec loop term shell_env history tmod cur_expr =
