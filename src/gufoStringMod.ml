@@ -34,11 +34,12 @@ let asList args scope =
         in MOSimple_val (MOList_val res)
     | _ -> assert false 
 
-
 let topvars = 
   [
     {
+      (*split a string into a list *)
       mosmv_name = "asList";
+      mosmv_description = "Split each line of the given string into a list.";
       mosmv_intname = 1;
       mosmv_type = 
         MOUnique_type (MOFun_type
