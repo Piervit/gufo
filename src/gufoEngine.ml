@@ -722,14 +722,14 @@ and _play_cmd_simple toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
       | MOCMDOStdOut, None -> Unix.stdout
       | MOCMDOStdOut, Some fd -> fd
       | MOCMDOStdErr,_ -> Unix.stderr
-      | MOCMDOFile f,_ -> Unix.openfile (apply_mostringOrRef f) [Unix.O_WRONLY; Unix.O_CREAT] 0o640 
+      | MOCMDOFile f,_ -> Unix.openfile (apply_mostringOrRef f) [Unix.O_WRONLY; Unix.O_CREAT; O_TRUNC] 0o640 
       | MOCMDOFileAppend f,_ -> Unix.openfile (apply_mostringOrRef f) [Unix.O_APPEND] 0o640 
   in
   let outerr_fd = 
     match cmd.mocm_outputerr with
       | MOCMDEStdErr -> Unix.stderr
       | MOCMDEStdOut -> Unix.stdout
-      | MOCMDEFile f-> Unix.openfile (apply_mostringOrRef f) [Unix.O_WRONLY; Unix.O_CREAT] 0o640
+      | MOCMDEFile f-> Unix.openfile (apply_mostringOrRef f) [Unix.O_WRONLY; Unix.O_CREAT; O_TRUNC] 0o640
       | MOCMDEFileAppend f-> Unix.openfile (apply_mostringOrRef f) [Unix.O_APPEND] 0o640
   in
   let pid = Unix.create_process cmd.mocm_cmd (Array.of_list (cmd.mocm_cmd::red_args)) input_fd output_fd outerr_fd 
@@ -808,14 +808,14 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
       | MOCMDOStdOut, None -> Unix.stdout
       | MOCMDOStdOut, Some fd -> fd
       | MOCMDOStdErr,_ -> Unix.stderr
-      | MOCMDOFile f,_ -> Unix.openfile (apply_mostringOrRef f) [Unix.O_WRONLY; Unix.O_CREAT] 0o640 
+      | MOCMDOFile f,_ -> Unix.openfile (apply_mostringOrRef f) [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC] 0o640 
       | MOCMDOFileAppend f,_ -> Unix.openfile (apply_mostringOrRef f) [Unix.O_APPEND] 0o640 
   in
   let outerr_fd = 
     match cmd.mocm_outputerr with
       | MOCMDEStdErr -> Unix.stderr
       | MOCMDEStdOut -> Unix.stdout
-      | MOCMDEFile f-> Unix.openfile (apply_mostringOrRef f) [Unix.O_WRONLY; Unix.O_CREAT] 0o640
+      | MOCMDEFile f-> Unix.openfile (apply_mostringOrRef f) [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC] 0o640
       | MOCMDEFileAppend f-> Unix.openfile (apply_mostringOrRef f) [Unix.O_APPEND] 0o640
   in
 
