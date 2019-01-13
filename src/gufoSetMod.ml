@@ -38,6 +38,7 @@ let topvars =
   [
     {
       mosmv_name = "is_in";
+      mosmv_description = "Return true if the element is in the set. Else, return false.";
       mosmv_intname = 1;
       mosmv_type = 
         MOUnique_type (MOFun_type

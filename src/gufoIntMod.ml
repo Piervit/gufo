@@ -31,12 +31,21 @@ let toString args scope =
        MOSimple_val (MOBase_val (MOTypeStringVal (string_of_int i)))
     | _ -> assert false 
 
-
+(*TODO
+It should return an option type (None if not parsable as an integer) or Gufo
+should have an exception system.
+*)
+let fromString args scope = 
+  match args with
+    |  [MOSimple_val (MOBase_val (MOTypeStringVal i)) ] ->
+       MOSimple_val (MOBase_val (MOTypeIntVal (int_of_string (List.hd (String.split_on_char '\n' i)))))
+    | _ -> assert false 
 
 let topvars = 
   [
     {
       mosmv_name = "toString";
+      mosmv_description = "Return the int argument as a string.";
       mosmv_intname = 1;
       mosmv_type = 
         MOUnique_type (MOFun_type
@@ -45,6 +54,19 @@ let topvars =
         )
         ;
       mosmv_action= toString;
+    };
+    {
+      mosmv_name = "fromString";
+      (*TODO: explains the exception cases.*)
+      mosmv_description = "Inspect the first line of the string and try to return it as an integer.";
+      mosmv_intname = 2;
+      mosmv_type = 
+        MOUnique_type (MOFun_type
+        ([ MOUnique_type (MOBase_type (MTypeString)) ;]
+        , MOUnique_type (MOBase_type (MTypeInt)))
+        )
+        ;
+      mosmv_action= fromString;
     };
   ]
 

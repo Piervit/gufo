@@ -43,6 +43,7 @@ let topvars =
   [
     {
       mosmv_name = "iter";
+      mosmv_description = "Iterate over the elements of the list.";
       mosmv_intname = 1;
       mosmv_type = 
         MOUnique_type (MOFun_type

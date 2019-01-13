@@ -755,6 +755,7 @@ struct
   
   and mosysmodulemvar = {
     mosmv_name: string;
+    mosmv_description: string; (*A comment associated to the function or variable.*)
     mosmv_intname: int;
     mosmv_type: motype_or; 
     mosmv_action: (motype_val list -> topvar_val IntMap.t -> motype_val); 
