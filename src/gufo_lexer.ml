@@ -34,7 +34,7 @@ let ascii_min_then_star = [%sedlex.regexp? ascii_min_letter, ascii_base_star]
 
 let newline = [%sedlex.regexp? ('\r' | '\n' | "\r\n")]
 
- let comment = [%sedlex.regexp? '#', Star( Compl( '\r' | '\n' ))] 
+let comment = [%sedlex.regexp? '#', Star( Compl( '\r' | '\n' ))] 
 
 let freetype= [%sedlex.regexp? ('\'', ascii_letter )]
 
@@ -42,7 +42,9 @@ let int_rep = [%sedlex.regexp? Opt '-', Plus digit]
 let float_rep = [%sedlex.regexp? Plus (digit), Opt ('.') , Opt(digit) ]
 
 let envvar = [%sedlex.regexp? '$', '$', ascii_min_letter , ascii_base_star]
-let varname = [%sedlex.regexp? '$',  ascii_min_letter , ascii_base_star]
+
+(*varname: a 'normal variable name, or the 'JOKER' pattern. *)
+let varname = [%sedlex.regexp? ('$',  ascii_min_letter , ascii_base_star | '_' )]
 
 let ascii_base_star_with_dot = [%sedlex.regexp? Star (ascii_base | '.') ]
 let varfield= [%sedlex.regexp? '$', ascii_min_letter, ascii_base_star , '.', ascii_letter , ascii_base_star_with_dot ]
@@ -63,7 +65,7 @@ let rec read lexbuf =
   | "struct" -> Gufo_parser.STRUCT 
   | "let"    -> Gufo_parser.LET  
   | "fun"    -> Gufo_parser.FUN  
-  | "_"      -> Gufo_parser.JOKER  
+(*   | "_"      -> Gufo_parser.JOKER   *)
   | ":"      -> Gufo_parser.COLON  
   | "="      -> Gufo_parser.AFFECTATION  
   | "True"   -> Gufo_parser.TRUE  

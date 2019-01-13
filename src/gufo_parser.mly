@@ -22,7 +22,7 @@
 %token STRUCT 
 %token LET
 %token FUN
-%token JOKER (*_*)
+(* %token JOKER (*_*) *)
 %token COLON (* : *)
 %token AFFECTATION (* = *)
 %token TRUE 
@@ -670,11 +670,13 @@ cmd_arg :
     {GufoParsed.SORString "." }
   | arg = modulVarOrExpr
     { GufoParsed.SORExpr arg}
+
 (*
-  | arg = DOT
-    {GufoParsed.SORString "." }
   | arg = STAR
     {GufoParsed.SORString "*" }
+  | arg = DOT
+    {GufoParsed.SORString "." }
+
 *)
 
 redirs :
