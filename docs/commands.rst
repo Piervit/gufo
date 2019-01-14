@@ -58,5 +58,7 @@ You can have a look at this ssh function::
 
     % let $ssh $user $addr = ssh ($user + "@" + $addr)
     
-Or at this one::
-    % let $ssh $user $addr = ssh ($user + "@" + $addr)
+Or you can use the joker pattern ('_') in case you just want the command call to be
+run from the function without real arguments.::
+
+    % let $lshome _ = ls -a -l /home

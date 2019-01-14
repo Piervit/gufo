@@ -9,7 +9,7 @@ Gufo’s types are implicitely infered.
 basic types:
 ------------
 
-  * int
+  * int 
   * string
   * bool : standard true/false boolean
   * float
@@ -24,8 +24,38 @@ Aggregation types:
 
 List, set and maps can only contains element of same type.
 
+How to use a list
+-----------------
+
+List creation::
+
+    % let $myList = [ 1 , 2 ]
+
+This create a list of 2 elements: 1 and then 2.
+
+Access an element::
+
+    % $myList.[0] #Acess the first element
+
+Concatenate a list with another one::
+
+    % let $myList = $myList with [ 3, 4 ]
+
+So if you want to add only a single element::
+    
+    % let $myList = $myList with [ 3 ]
+
+Struct type
+-----------
+
 Gufo has ‘struct’ composite types: a struct defines a type with determined and statically typed fields.
 Operators
+
+
+
+
+Operators
+---------
 
 Gufo has predefined operators: every operator takes two arguments, here denoted by ‘a’ and ‘b’:
 
