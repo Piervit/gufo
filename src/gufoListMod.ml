@@ -38,13 +38,19 @@ let iter args scope =
         in MOSimple_val (MOEmpty_val)
     | _ -> assert false 
 
+let length args scope =
+  match args with
+    | [MOSimple_val (MOList_val mtvlist);] ->
+      MOSimple_val (MOBase_val (MOTypeIntVal (List.length mtvlist)))
+    | _ -> assert false
+
 
 let topvars = 
   [
     {
       mosmv_name = "iter";
       mosmv_description = "Iterate over the elements of the list.";
-      mosmv_intname = 1;
+      mosmv_intname = 2;
       mosmv_type = 
         MOUnique_type (MOFun_type
         ([ MOUnique_type (MOFun_type([MOUnique_type (MOAll_type 1)], MOUnique_type (MOUnit_type))) ; 
@@ -54,6 +60,18 @@ let topvars =
         ;
       mosmv_action= iter;
     };
+    {
+      mosmv_name = "length";
+      mosmv_description = "Return the size of the given list.";
+      mosmv_intname = 1;
+      mosmv_type = 
+        MOUnique_type (MOFun_type
+        ([ MOUnique_type (MOList_type( MOUnique_type (MOAll_type 1 )))], MOUnique_type (MOBase_type (MTypeInt)))
+        )
+        ;
+      mosmv_action= length;
+    };
+
   ]
 
 let mosysmodule =
