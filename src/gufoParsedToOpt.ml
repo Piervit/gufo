@@ -185,6 +185,7 @@ let rec determine_refine_unique_type ?id_var:(id_var = None) e1 e2 =
         MOFun_type (lst_args, ret)
     | _,_ -> raise (TypeError "Cannot infer correct type")
 
+(*Try to refines the expr into a reduced set of compatible types. *)
 and determine_refine_type ?id_var:(id_var = None) e1 e2 = 
   debugPrint (sprintf "refining %s with %s \n" (type_to_string e1) (type_to_string e2));
   let elst1, i1, elst2, i2 = 
@@ -510,8 +511,28 @@ and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb =
         let typ_a, locScope = determine_type fulloptiprog optiprog locScope const arga in 
         let typ_b, locScope = determine_type fulloptiprog optiprog locScope const argb in
         (determine_refine_type typ_a typ_b) , locScope
-
-
+    | MHas -> 
+        let typ_a, locScope = determine_type fulloptiprog optiprog locScope const arga in 
+        (*typ_a must be a set or a map*)
+        match typ_a with
+          | MOUnique_type (MOMap_type (keytype, _) ) 
+          | MOUnique_type (MOSet_type keytype ) ->
+            let typ_b, locScope = determine_type fulloptiprog optiprog locScope (Some keytype) argb in
+            MOUnique_type (MOBase_type(MTypeBool)), locScope
+          | MOUnique_type (MOAll_type _)  
+          | MOOr_type _  ->
+            let typ_b, locScope = determine_type fulloptiprog optiprog locScope const argb in
+            let possible_types = (MOOr_type ([
+                      MOSet_type typ_b; 
+                      MOMap_type (typ_b, MOUnique_type(MOAll_type (get_fresh_int ()))); 
+                      ], get_fresh_int ())) in
+            (*this line is just to check there is a compatibity*)
+            let _ = determine_refine_type  possible_types typ_a in
+            MOUnique_type (MOBase_type (MTypeBool)), locScope
+          | _ ->
+            let typ_a, locScope = determine_type fulloptiprog optiprog locScope const arga in
+            let typ_b, locScope = determine_type fulloptiprog optiprog locScope const argb in
+                  raise (TypeError (sprintf "Type %s cannot be used as a set of a map of %s. " (type_to_string typ_a) (type_to_string typ_b)))
   in 
   (*Looks uneeded*)
 (*
@@ -1172,8 +1193,10 @@ let get_type_from_topvar_types optiprog topvar_types (imod, idref, deep) args =
 (*Full type checking step *)
 
 
-
+(*expr should have a type copatible with required_typ, else we would throw a
+TypeError exception.*)
 let type_check_has_type fulloptiprog optiprog topvar_types required_typ expr =
+  debugPrint (sprintf "checking expr '%s' has type '%s'\n" (moval_to_string expr) (type_to_string required_typ));
   let rec has_type required found = 
     let has_unique_type required found = 
     match required, found with
@@ -1495,6 +1518,8 @@ let type_check_prog fulloptiprog optiprog top_types =
   let _ = type_check_val fulloptiprog optiprog top_types optiprog.mopg_topcal in ()
 
 
+(*For every user module, valid correct typing or throw a TypeError exception.
+*)
 let type_check fulloptiprog top_types = 
   let _ = 
     (*check every modules*)
@@ -2188,7 +2213,7 @@ let moref_to_moctype fulloptiprog optiprog =
 
   (* PART 1: TRANSFORMATION OF TYPE *)
 
-(*for every prog, i just fill mopg_ctype2int only checking that is has not already been added.*)
+(*for every prog, it just fill mopg_ctype2int only checking that is has not already been added.*)
 let provide_type_id oldprog optiprog = 
   let typestr2int = 
     StringMap.fold 

@@ -1040,6 +1040,10 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
                                               | Some v1, Some v2 -> Some v2
                                               | None, None -> None
                                           ) map1 map2))
+  | MHas, MOSimple_val(MOSet_val set1), possibleEl ->
+    MOSimple_val( MOBase_val (MOTypeBoolVal (MSet.mem (core_to_simple_mtype possibleEl) set1)))
+  | MHas, MOSimple_val(MOMap_val map1), possibleEl ->
+    MOSimple_val( MOBase_val (MOTypeBoolVal (MMap.mem (core_to_simple_mtype possibleEl) map1)))
   | MWithout, MOSimple_val(MOSet_val set1), MOSimple_val (MOSet_val set2) ->
       MOSimple_val(MOSet_val (MSet.diff set1 set2))
   | MWithout, MOSimple_val(MOMap_val map1), MOSimple_val (MOMap_val map2) ->

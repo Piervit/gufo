@@ -108,7 +108,6 @@ sig
     *
     * This module is the solution I got.
     *
-    * PS: as of 25/01/2018: Set and Map have not been tested.
     *
     * *)
   module SimpleCore : 

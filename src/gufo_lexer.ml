@@ -54,7 +54,7 @@ let modulVar= [%sedlex.regexp? modul , '.', ascii_min_then_star ]
 
 let word =  [%sedlex.regexp? (xml_letter | '_'),  Star (xml_letter | '0' .. '9' | '_' | '-') ]
 let arg = [%sedlex.regexp? '-', Opt('-'), Star ('-' | xml_letter ) ]
-let file = [%sedlex.regexp? (xml_letter | '0' .. '9' | '_' | '.' | '-' | '/' | ':' | '*' | '.' | '~'), Star ( xml_letter | '0' .. '9' | '_' | '.' | '/' | '-' | '@' | '&' | '$' | ':' | '.' | '*')  ]
+let file = [%sedlex.regexp? (xml_letter | '0' .. '9' | '_' | '.' | '-' | '/' | '*' | '.' | '~'), Star ( xml_letter | '0' .. '9' | '_' | '.' | '/' | '-' | '@' | '&' | '$' | '.' | '*')  ]
 
 let rec read lexbuf =
  let buf = lexbuf.stream in
@@ -113,6 +113,7 @@ let rec read lexbuf =
 
   | freetype            -> Gufo_parser.FREETYPE (Sedlexing.Utf8.lexeme buf)
   | "extends"           -> Gufo_parser.EXTENDS  
+  | "has?"                -> Gufo_parser.HAS
   | "in"                -> Gufo_parser.IN  
   | "if"                -> Gufo_parser.IF  
   | "then"              -> Gufo_parser.THEN  

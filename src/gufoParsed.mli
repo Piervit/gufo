@@ -218,6 +218,7 @@ and m_expr_operation =
   | MModulo
   | MWith
   | MWithout
+  | MHas (*$a has? $b ->return true if $b if in the set or map $a.*)
 (*   | IntAbsolute  *)
 
 (** A scope contains types and variables*)

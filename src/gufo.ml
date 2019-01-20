@@ -406,6 +406,7 @@ struct
           | MDivision, MDivision
           | MModulo, MModulo
           | MWith, MWith ->  comp_args 
+          | MHas, MHas ->  comp_args 
           | MWithout, MWithout ->  comp_args 
           | MAddition, _ -> 1
           | _, MAddition -> -1
@@ -417,6 +418,8 @@ struct
           | _, MModulo -> -1
           | MWith,_ -> 1
           | _,MWith -> -1
+          | MHas, _ -> 1
+          | _, MHas -> -1
           | MWithout, _ -> 1 
           | _ , _ -> -1
 
