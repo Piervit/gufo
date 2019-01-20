@@ -579,10 +579,10 @@ let do_nothing term shell_env hist cur_expr = Lwt.return (Some (cur_expr, shell_
 (*Handle command fail:
   - or a bad action from the user
   - or a gufo execution issue.*)
-let do_fail term shell_env hist cur_expr = 
+let do_fail term shell_env hist cur_expr exc = 
   (*TODO*)
    clear_res_err_and_comple term cur_expr >>=
-   (fun () -> print_err term cur_expr (Zed_rope.of_string "Unable to execute the previous line")) >>=
+   (fun () -> print_err term cur_expr (Zed_rope.of_string ("Unable to execute the previous line: " ^ (Printexc.to_string exc)))) >>=
         (fun () -> LTerm.fprints term (eval [B_fg c_unknown; S "\n\n"])) >>=
         (fun () -> LTerm.flush term) >>=
    (fun () -> 
@@ -863,7 +863,7 @@ let handle_key_event term shell_env hist cur_expr akey =
     | End
     | Insert -> do_nothing term shell_env hist cur_expr
   )
-  with _ -> do_fail term shell_env hist cur_expr
+  with exc -> do_fail term shell_env hist cur_expr exc
 
 
 let rec loop term shell_env history tmod cur_expr =
