@@ -27,6 +27,9 @@ List, set and maps can only contains element of same type.
 How to use a list
 -----------------
 
+A list is a structure where the new elements are added at the end of the
+elements already present.
+
 List creation::
 
     % let $myList = [ 1 , 2 ]
@@ -44,6 +47,71 @@ Concatenate a list with another one::
 So if you want to add only a single element::
     
     % let $myList = $myList with [ 3 ]
+
+You can use the list module for a deeper uses (length, iterator, map...)::
+
+    % $List.length $myList 
+    5
+
+How to use a set
+-----------------
+
+A set contains elements without order. For a set of type T, a value T is
+present or absent from it. It cannot be present several times.
+
+Similarly to a list::
+
+    % let $mySet = -< 1 , 2 >-
+
+Check if an element is in a set::
+
+    % $mySet has? 1
+    True
+
+Concatenate a set with another one::
+
+    % let $mySet = $mySet with -< 3, 4 >-
+
+So if you want to add only a single element::
+    
+    % let $mySet = $mySet with [ 5 ]
+
+You can use the set module for a deeper uses (length, iterator ...)::
+
+    % $Set.length $mySet 
+    5
+
+How to use a map
+----------------
+
+A map is a set of key, with each key element beiing mapped to a given value.
+Each key have same type, and each value have same type.
+
+Similarly to a list::
+
+    % let $myMap = -< 1: "Toto" , 2 : "Tata" >-
+
+Check if an element has a key in the map::
+
+    % $myMap has? 1
+    True
+
+Concatenate a list with another one::
+
+    % let $myMap = $myMap with -< 3: "Titi", 4 : "Tutu">-
+
+So if you want to add only a single element::
+    
+    % let $myMap = $myMap with -< 3: "Tyty" >-
+
+You can use the list module for a deeper uses (length, iterator, map...)::
+
+    % $Map.length $myMap 
+    5
+
+
+
+  
 
 Struct type
 -----------

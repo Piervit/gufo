@@ -62,3 +62,15 @@ Or you can use the joker pattern ('_') in case you just want the command call to
 run from the function without real arguments.::
 
     % let $lshome _ = ls -a -l /home
+
+restrictions
+------------
+
+Gufo is quite sensitive with unusual caracters in commands and filenames. The
+general uses is that a command or filename should not contains caracters having
+specific meaning inside Gufo: caracters like ':', ';', '&' might be diversely
+appreciated. When the first stable version of Gufo will be released, there will
+be an escaping system to manipulate correctly commands and filenames with such
+constraints but for now (alpha version), it might raise issues.
+
+
