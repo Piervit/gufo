@@ -512,7 +512,7 @@ let val_from_cmd_field field cmdseq =
     | 2 (*res*) -> 
         (match cmd.mocm_res with
           | None -> MOSimple_val (MOEmpty_val)
-          | Some i -> MOSimple_val (MOBase_val (MOTypeIntVal i))
+          | Some i -> MOSimple_val (MOSome_val (MOSimple_val (MOBase_val (MOTypeIntVal i))))
         )
     | 3 (*print*) -> 
         (match cmd.mocm_res, cmd.mocm_print_std with
