@@ -121,6 +121,7 @@
 %left MODULO
 %left WITH
 %left WITHOUT
+%left HAS
 
 
 
