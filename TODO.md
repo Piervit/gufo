@@ -1,3 +1,9 @@
+CAN BE DONE QUICKLY
+===================================
+the 'has?' operator has been added to the low level structure -> it should be
+added to the main engine.
+
+
 NEEDED FOR A FIRST USABLE RELEASE
 ===================================
 
