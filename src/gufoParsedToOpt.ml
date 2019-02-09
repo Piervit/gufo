@@ -81,7 +81,6 @@ let search_modules mprogram =
   in module2int
 
   (* PART 3: FULL TYPE CHECKING *)
-  (*TODO: we want it from the opt representation, not from the parsed one*)
   (* We will have 3 parts in the type checking part:
     * - determine_type_* : is the main folding in the whole code, it try to
     *    dive in the code to give type to the result of topval. From the value
@@ -666,7 +665,8 @@ and precise_with_args ref_typ args_typ =
               ref_typ
         )
  
-  
+(*bd all type is a map containing the reduction of an 'alltype' into a more
+precise type.*)
 and refine_bd_alltype i typ bd_alltype = 
   let cur_typ = IntMap.find_opt i bd_alltype in
   match cur_typ with
@@ -690,12 +690,10 @@ and determine_refapplication_type ref_typ args_typ bd_alltype =
             | MOUnique_type (MORef_type (modi,i,deep,args)) -> 
                 apply (MOUnique_type (MORef_type (modi,i,deep,(List.rev (typ::(List.rev args)))))) args_typ
                 (*TODO: there might be a better solution to find.*)
-(*
             | MOUnique_type (MOAll_type i) ->
                 let typ, _ = refine_bd_alltype i ref_typ bd_alltype in typ 
             | MOOr_type (_,i) -> 
                 let typ, _ = refine_bd_alltype i ref_typ bd_alltype in typ 
-*)
             | MOUnique_type (MOList_type st) -> 
               MOUnique_type (MOList_type st)
             | _ -> 
@@ -1083,7 +1081,12 @@ let top_level_types fulloptiprog =
   let toptypes_modules = IntMap.add 0 (prog_get_types fulloptiprog fulloptiprog.mofp_mainprog) toptypes_modules in
 
   toptypes_modules
-
+(*
+   * past_var_map is set to None when we are not in the console interactive. In
+   * console interactive mode it contains a map which contains as key a new int
+   * id for topvar and as value, the previous id value for the "same string"
+   * var.
+*)
 let top_level_types_no_ref topvar_types past_var_map =
 
   let refine_bd_alltype req_typ real_typ bd_alltype = 
@@ -1093,31 +1096,53 @@ let top_level_types_no_ref topvar_types past_var_map =
           let cur_typ = IntMap.find_opt i bd_alltype in
           (match cur_typ with
               | None -> 
-                  real_typ , IntMap.add i real_typ bd_alltype
+                  debugPrint (sprintf "refining 'a to : %s \n"  (type_to_string real_typ));
+                  IntMap.add i real_typ bd_alltype, real_typ  
               | Some cur_typ ->
                   let real_typ = (determine_refine_type cur_typ real_typ) in
-                  real_typ, IntMap.add i real_typ bd_alltype
+                  debugPrint (sprintf "refined 'a to : %s \n"  (type_to_string real_typ));
+                  IntMap.add i real_typ bd_alltype, real_typ
           )
-        | _ -> real_typ, bd_alltype
+        | _ -> bd_alltype, real_typ
   in
     
-
+  (*The function refine the rettyp of ref_typ according to the types of its arguments.*)
   let rec apply ref_typ args_typ bd_alltype = 
     match args_typ with
       | [] -> 
-         let ret_typ, bd_alltype = refine_bd_alltype ref_typ ref_typ bd_alltype in
-          ret_typ
+         (debugPrint (sprintf "apply with : %s\n" (type_to_string ref_typ)));
+         let bd_alltype, ret_typ = refine_bd_alltype ref_typ ref_typ bd_alltype in
+         (debugPrint (sprintf "apply ending with : %s\n" (type_to_string ret_typ)));
+          bd_alltype, ret_typ 
       | typ :: args_typ -> 
           (match ref_typ with 
             | MOUnique_type (MOFun_type ([refarg], refret)) ->
-                let _, bd_alltype = refine_bd_alltype refarg typ bd_alltype in
+                let bd_alltype, _ = refine_bd_alltype typ refarg bd_alltype in
+                (debugPrint (sprintf "apply arg with : %s\n" (type_to_string typ)));
+                (debugPrint (sprintf "apply arg with : %s\n" (type_to_string refarg)));
                 apply refret args_typ bd_alltype
             | MOUnique_type (MOFun_type (refarg:: refargs , refret)) ->
-                let _, bd_alltype = refine_bd_alltype refarg typ bd_alltype in
+                let bd_alltype, _  = refine_bd_alltype refarg typ bd_alltype in
                 apply (MOUnique_type (MOFun_type (refargs, refret))) args_typ bd_alltype
             | _ -> 
-                MOUnique_type (MOAll_type (get_fresh_int () ))
+                bd_alltype, MOUnique_type (MOAll_type (get_fresh_int () ))
           )
+  in
+
+  let refine_with_bd_alltyp args_typ bd_alltype =
+    List.map
+      (fun arg ->
+       ( match arg with
+        | MOUnique_type (MOAll_type(i)) 
+        | MOOr_type (_,i) -> 
+          (match IntMap.find_opt i bd_alltype with
+            | None -> arg
+            | Some typ  -> typ
+          )
+        | _ -> arg
+       )
+      )
+      args_typ
   in
 
   let get_module curmodulei refmodulei = 
@@ -1125,7 +1150,7 @@ let top_level_types_no_ref topvar_types past_var_map =
       | None -> curmodulei 
       | Some mi -> mi
   in
-  let rec find_and_get_type modi i deep = 
+  let rec find_and_get_type modi i deep bd_alltype = 
     let modtopvar_map = IntMap.find modi topvar_types in
     let typ = IntMap.find i modtopvar_map in
     let typ_with_deep = get_type_at_deep typ deep in 
@@ -1135,43 +1160,139 @@ let top_level_types_no_ref topvar_types past_var_map =
             | Some inmodi, modi, ni, i when (inmodi = modi && ni = i ) ->
                 let past_i = IntMap.find i past_map in
                 let modi = get_module modi nmodi in
-                let typ = find_and_get_type modi past_i ndeep in
-                apply typ args IntMap.empty
+                let bd_alltype, typ = find_and_get_type modi past_i ndeep bd_alltype in
+                apply typ args bd_alltype
 
             | None, modi, ni, i when (0 = modi && ni = i ) ->  
                 let past_i = IntMap.find i past_map in
                 let modi = get_module modi nmodi in
-                let typ = find_and_get_type modi past_i ndeep in
-                apply typ args IntMap.empty 
+                let bd_alltype,typ  = find_and_get_type modi past_i ndeep bd_alltype in
+                apply typ args bd_alltype
             | _ -> 
                 let modi = get_module modi nmodi in
-                let typ = find_and_get_type modi ni ndeep in
-                apply typ args IntMap.empty
+                let bd_alltype, typ = find_and_get_type modi ni ndeep bd_alltype in
+                apply typ args bd_alltype
           )
       | MOUnique_type (MORef_type (nmodi, ni, ndeep, args)), _  -> 
           let modi = get_module modi nmodi in
-          let typ = find_and_get_type modi ni ndeep in
-          apply typ args IntMap.empty
-      | _,_ -> typ_with_deep
+          let bd_alltype, typ = find_and_get_type modi ni ndeep bd_alltype in
+          apply typ args bd_alltype
+      | _,_ -> bd_alltype, typ_with_deep
   in
-  IntMap.mapi
-    (fun modi topvar_map ->
-      IntMap.map 
-      (fun typ -> 
-        match typ with 
-          | MOUnique_type (MORef_type (refmodi, i , deep, args)) -> 
-             let modi = get_module modi refmodi in
-             let typ = find_and_get_type modi i deep in
-                apply typ args IntMap.empty
-          | MOUnique_type (MOTupel_type (refmodi , i , deep , _args,  position)) -> 
-              let modi = get_module modi refmodi in
-              let typ = find_and_get_type modi i deep in
-              get_type_from_tuple_el typ position
-          | _ -> typ
+
+  let rec _recRemoveRef bd_alltype modi typ = 
+    match typ with 
+      | MOUnique_type (MOComposed_type ctyp) ->
+        let bd_alltype, new_moct_fields = 
+            IntMap.fold
+              (fun i tfield (bd_alltype, newtypmap) -> 
+                let bd_alltype, motf_typ = 
+                  _recRemoveRef bd_alltype modi tfield.motf_type 
+                in
+                bd_alltype, IntMap.add i {tfield with motf_type = motf_typ } newtypmap ) 
+              ctyp.moct_fields (bd_alltype, IntMap.empty)
+        in 
+        bd_alltype, 
+        MOUnique_type (MOComposed_type {ctyp with moct_fields = new_moct_fields})
+      | MOUnique_type (MOBase_type _) -> bd_alltype, typ
+      | MOUnique_type (MOTuple_type ttyp) -> 
+        let bd_alltype, tup_typ = 
+          List.fold_left
+          (fun (bd_alltype, newlst) typ ->
+            let bd_alltype, el = _recRemoveRef bd_alltype modi typ in
+            bd_alltype, el::newlst
+           )
+          (bd_alltype, []) ttyp 
+        in bd_alltype, MOUnique_type (MOTuple_type (List.rev tup_typ))
+      | MOUnique_type (MOList_type typ) -> 
+        let bd_alltype, typ = _recRemoveRef bd_alltype modi typ in
+        bd_alltype, MOUnique_type (MOList_type typ)
+      | MOUnique_type (MOOption_type typ) -> 
+        let bd_alltype, typ = _recRemoveRef bd_alltype modi typ in
+        bd_alltype, MOUnique_type (MOOption_type typ)
+      | MOUnique_type (MOSet_type typ) -> 
+        let bd_alltype, typ = _recRemoveRef bd_alltype modi typ in
+        bd_alltype, MOUnique_type (MOSet_type typ)
+      | MOUnique_type (MOMap_type (typk, typv)) -> 
+          let bd_alltype, typk = _recRemoveRef bd_alltype modi typk in
+          let bd_alltype, typv = _recRemoveRef bd_alltype modi typv in
+          bd_alltype, MOUnique_type (MOMap_type (typk, typv))
+      | MOUnique_type (MOFun_type (argst, rett)) -> 
+        let bd_alltype, new_lst_args = 
+        List.fold_left
+          (fun (bd_alltype, newlst) arg ->
+            let bd_alltype, newel = _recRemoveRef bd_alltype modi arg in
+            bd_alltype, newel::newlst
+          )
+          (bd_alltype, []) argst
+        in
+        
+        debugPrint (sprintf "tmpdurdur : %s\n" (type_to_string rett));
+        let bd_alltype, newrett = _recRemoveRef bd_alltype modi rett in
+        debugPrint (sprintf "tmpdurdur newret: %s\n" (type_to_string newrett));
+        (*we can need to refine args type using the ret type.
+          As in the following exemple
+              let $af $i = $Int.toString $i
+          For $af, rett is ref 1[0], for newrett, it is (fun int -> string) 
+        *)
+       let new_lst_args =  
+          refine_with_bd_alltyp (List.rev new_lst_args) bd_alltype 
+        in 
+        bd_alltype, MOUnique_type (MOFun_type (new_lst_args, newrett))
+      | MOUnique_type (MOAll_type _)  -> bd_alltype , typ 
+      | MOUnique_type MOUnit_type  -> bd_alltype, typ 
+      
+      | MOUnique_type (MORef_type (refmodi, i , deep, args)) -> 
+         let modi = get_module modi refmodi in
+         let bd_alltype, typ = find_and_get_type modi i deep bd_alltype in
+            (debugPrint (sprintf "typ while norefing : %s\n " (type_to_string typ)));
+            let bd_alltype, typ = apply typ args bd_alltype in
+            (debugPrint (sprintf "typ while norefing2 : %s\n " (type_to_string typ)));
+            bd_alltype, typ
+      | MOUnique_type (MOTupel_type (refmodi , i , deep , _args,  position)) -> 
+          let modi = get_module modi refmodi in
+          let bd_alltype, typ = find_and_get_type modi i deep bd_alltype in
+          bd_alltype, get_type_from_tuple_el typ position
+      | MOOr_type (typlst, i) -> 
+        let bd_alltype, newTypList = 
+          List.fold_left
+            (fun (bd_alltype, newTypList) typ -> 
+              let bd_alltype, newtyp = _recRemoveRef bd_alltype modi (MOUnique_type typ) 
+              in
+              match newtyp with
+                | MOUnique_type newt -> bd_alltype, newt::newTypList
+                | _ -> assert false
+            )
+            (bd_alltype, []) typlst
+          in bd_alltype, MOOr_type ((List.rev newTypList), i)
+    in
+
+    (*IntMap.mapi
+      (fun modi topvar_map ->
+        IntMap.map (_recRemoveRef bd_alltype modi) topvar_map
       )
-      topvar_map
-    )
-    topvar_types
+      topvar_types
+    *)
+
+    let bd_alltype, new_topvar_types = 
+    IntMap.fold
+      (fun modi topvar_map (bd_alltype, newtopvar_map) ->
+        let bd_alltype, newMap = 
+        IntMap.fold
+          (fun i el (bd_alltype, newMap )-> 
+            let bd_alltype, newtyp = _recRemoveRef bd_alltype modi el in
+            bd_alltype, IntMap.add i newtyp newMap
+          )
+          topvar_map (bd_alltype, IntMap.empty)
+        in 
+        bd_alltype, IntMap.add modi newMap newtopvar_map
+      )
+      topvar_types (IntMap.empty , IntMap.empty)
+      in 
+      IntMap.iter 
+        (fun i el -> (debugPrint (sprintf "allmap : %d: %s \n" i (type_to_string el)))) bd_alltype;
+      new_topvar_types
+
 
 
 let get_type_from_topvar_types optiprog topvar_types (imod, idref, deep) args = 
@@ -1225,8 +1346,8 @@ let type_check_has_type fulloptiprog optiprog topvar_types required_typ expr =
       | MOUnit_type, _ -> true (*TODO : this should be discussed. *)
       | MOAll_type i, _ -> true
       | _, MOAll_type i2 -> true
-      | MORef_type (_,_,_,_), _ -> assert false
-      | _, MORef_type(_,_,_,_) -> assert false
+      | MORef_type (_,_,_,_), _ -> assert false (*because we should have no more ref at this point *)
+      | _, MORef_type(_,_,_,_) -> assert false (*because we should have no more ref at this point *)
       | MOTupel_type (_,_,_,_,_), _ -> assert false
       | _, MOTupel_type (_,_,_,_,_) -> assert false
       | _, _ -> raise (TypeError (sprintf "Incompatible type: %s found while type %s required" 
@@ -1428,6 +1549,7 @@ and type_check_val fulloptiprog optiprog typScope v =
                     (*TODO*)
                     true
                 | MOUnique_type (MOFun_type(args_type, ret)) ->
+                    (debugPrint (sprintf "ref is a fun\n"));
                     (*This is possible that there are more args than there
                       * are required argument. In that case the nth
                       * outbounds. 
@@ -1455,6 +1577,8 @@ and type_check_val fulloptiprog optiprog typScope v =
                             let arg_req_type = List.nth args_type pos in
                             let typ = type_check_has_type fulloptiprog optiprog typScope arg_req_type arg
                             in
+                            (debugPrint (sprintf "arg should have type %s \n" (type_to_string arg_req_type)));
+                            (debugPrint (sprintf "arg has type %s \n" (type_to_string typ)));
                             let bd_alltype =
                               match arg_req_type with
                                 | MOOr_type (_,i) -> refine_bd_alltype i typ bd_alltype
@@ -2669,7 +2793,8 @@ let add_prog_to_optprog fulloptiprog fullprog =
   (*for mainprog*)
   let nfulloptiprog = 
     {nfulloptiprog with 
-      mofp_mainprog = add_main_prog_step2_intmap nfulloptiprog nfulloptiprog.mofp_mainprog fullprog.mfp_mainprog past_var_map
+      mofp_mainprog = add_main_prog_step2_intmap nfulloptiprog
+                        nfulloptiprog.mofp_mainprog fullprog.mfp_mainprog past_var_map
     }
   in
   let step2_moref_to_moctype nfulloptiprog imod strmod = 
