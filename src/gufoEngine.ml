@@ -157,6 +157,11 @@ let rewrite_arg shenv arg =
       | _ -> arg 
   in apply_star_pattern str_arg
 
+(*what happen on the execution of the exit command. *)
+let play_exit cmd red_args shenv input_fd output_fd outerr_fd = 
+  (exit 0)
+
+
 let play_cd cmd red_args shenv input_fd output_fd outerr_fd = 
   (*cd will write an error and do nothing else if it has more than 1 arg.*)
   let path, error = 
@@ -822,6 +827,7 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
   let check_and_call_system_cmd cmd = 
       match cmd.mocm_cmd with
         | "cd" -> Some (play_cd cmd red_args shenv input_fd output_fd outerr_fd)
+        | "exit" -> Some (play_exit cmd red_args shenv input_fd output_fd outerr_fd)
         | _ -> None
   in
 
