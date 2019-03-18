@@ -27,6 +27,7 @@ Main website is here: http://gufo.pvittet.com
    types
    variables
    commands
+   syntax
    functions
    dive_into_technic
    thanks
