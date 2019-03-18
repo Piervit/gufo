@@ -1963,6 +1963,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
   
   
   and parsedToOpt_ref ?topvar:(topvar = None) optiprog locScope ref  = 
+
     let resolve_fd prog fdname = 
       match StringMap.find_opt fdname prog.mopg_field2int with
         | None -> raise (TypeError (sprintf "field %s does not belong to a known field." fdname ))
@@ -2005,7 +2006,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
         match topvar with
           | Some (topvar, past_var_map) when (topvar - ires = 0) -> 
               (match IntMap.find_opt topvar past_var_map with
-                | None -> ires
+                | None -> raise (VarError (sprintf "Trying to use undefined variable %s ." vname))
                 | Some i -> i 
               )
           | _ -> ires
@@ -2094,7 +2095,20 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
     {
       mobd_name = bindList;
       mobd_debugnames = debugnames;
-      mobd_value = parsedToOpt_expr ~topvar optiprog locScope bd.mbd_value;
+      mobd_value = 
+        (*the idea is the when
+         * the var is a function, we want it to be potientially
+         * recursive and so it can use reference to itself to be
+         * recursive.
+         * 
+         * When working on something other than a function, we want the a
+         * previous definition of the variable to be usable (if there was
+         * one).
+         * *)
+        (match bd.mbd_value with 
+                | MSimple_val (MFun_val (_, _)) -> parsedToOpt_expr ~topvar optiprog newlocScope bd.mbd_value;
+                | _  -> parsedToOpt_expr ~topvar optiprog locScope bd.mbd_value
+        );
       mobd_body = parsedToOpt_expr ~topvar optiprog newlocScope bd.mbd_body;
     }
 
@@ -2143,17 +2157,16 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
               let iname = (StringMap.find aname optiprog.mopg_topvar2int) in
               let res_expr = 
               match mvar.mva_value with
-              (*I am sorry it appears such as a hack but the idea is the when
-               * the topvar is a function, we want it to be potientially
-               * recursive and so it can use reference to itself to be
-               * recursive.
-               * 
-               * When working on something other than a function, we want the a
-               * previous definition of the variable to be usable (if there was
-               * one).
-               * *)
+              (*the idea is that when the topvar is a function, we want it to
+                 be potientially recursive and so it can use reference to
+                itself to be recursive.
+
+                When working on something other than a function, we want the a
+                previous definition of the variable to be usable (if there was
+                one).
+                *)
                 | MSimple_val (MFun_val (_, _)) ->
-                  (parsedToOpt_expr  ~topvar:(None) optiprog StringMap.empty mvar.mva_value)
+                  (parsedToOpt_expr  ~topvar:(None) optiprog (StringMap.add aname iname StringMap.empty) mvar.mva_value)
                 | _  ->
                     (match past_var_map with 
                       | None -> parsedToOpt_expr ~topvar:(None) optiprog StringMap.empty mvar.mva_value 
