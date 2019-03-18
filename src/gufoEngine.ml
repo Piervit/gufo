@@ -89,7 +89,7 @@ let rewrite_arg shenv arg =
     
 
   (*transform the '*' into the expected list of file. *)
-  let apply_star_pattern str = 
+  let apply_star_pattern_ str = 
 (*     let full_path = GenUtils.get_abs_path (Sys.getcwd() ) str in *)
     let rec _apply_star_pattern pathSet =
       (*Return a stringset of path*)
@@ -148,6 +148,11 @@ let rewrite_arg shenv arg =
     match els with
       | [] -> [str]
       | _ -> els
+  in
+  let apply_star_pattern str_arg = 
+    (*in case an exception is throwed, return the empty set*)
+    try apply_star_pattern_ str_arg
+    with  _ -> [str_arg]
   in
   let str_arg  = 
     match String.get arg 0 with
