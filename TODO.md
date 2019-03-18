@@ -1,8 +1,5 @@
 CAN BE DONE QUICKLY
 ===================================
-the 'has?' operator has been added to the low level structure -> it should be
-added to the main engine.
-
 
 NEEDED FOR A FIRST USABLE RELEASE
 ===================================
@@ -22,6 +19,7 @@ NEEDED FOR A STABLE RELEASE
 
 Engine: improve performance of piped command (in exemple "c1 | c2", c2 wait c1 to finish to start.... ).
 Improve coloration rules.
+Provide line of the errors found during the typechecking 
 Provide easy configuration though a config file.
 Improvement or rewriting of the type-checker.
 Improvement of the error messages (precision)

@@ -57,4 +57,15 @@ BUG 8: this is not really a bug, but a strong interogation
 % let $echofun $a = echo ("hello " + $a)
 % $echofun "Alain"; echo "toto"
 
+BUG 9:
+
+% let $afunction $i = $i
+% $afunction 3 4
+
+BUG 10:
+
+% let $af = echo "toto"
+% let $a = ($af) ;; (echo "tata")
+% $a.Cmd.print 
+  tata
 
