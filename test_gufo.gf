@@ -53,4 +53,5 @@ let $run_tests_until_end $file =
 
 #$run_test 2
 ($run_tests_until_end "tests/basic_affectations.gf") ;;
-($run_tests_until_end "tests/valid_exprs.gf")
+($run_tests_until_end "tests/valid_exprs.gf");;
+($run_tests_until_end "tests/valid_commands.gf")

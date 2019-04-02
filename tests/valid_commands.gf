@@ -78,5 +78,21 @@ sed "s/e/a/g" < tmp
 (echo "toto") ;; (echo "tata"; echo "titi") 
 
 #END PROGRAM 
+#PROGRAM 8
+#file redirection
+**START**
+
+ls *
+
+
+#END PROGRAM 
+#PROGRAM 9
+#file redirection
+**START**
+
+ls .
+
+
+#END PROGRAM 
 
 
