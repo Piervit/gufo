@@ -32,4 +32,7 @@ Way to export a function coded in the console to a file ( <- might be a dynamic 
 
 Imperative functionalities (sequel of expression)
 Add inheritance system for the struct.
-
+We could have a + operand over cmd.
+  echo "toto" + echo "tata"
+  the cmd code will be 0 if both command code are 0
+  The cmd string is the concatenation of the two commands.
