@@ -676,7 +676,9 @@ and refine_bd_alltype i typ bd_alltype =
         let typ = (determine_refine_type cur_typ typ) in
         typ , IntMap.add i typ bd_alltype
 
-
+(*
+ * 
+*)
 and determine_refapplication_type ref_typ args_typ bd_alltype = 
   let rec apply ref_typ args_typ = 
     match args_typ with
@@ -693,11 +695,15 @@ and determine_refapplication_type ref_typ args_typ bd_alltype =
             | MOUnique_type (MOAll_type i) ->
                 let typ, _ = refine_bd_alltype i ref_typ bd_alltype in typ 
             | MOOr_type (_,i) -> 
-                let typ, _ = refine_bd_alltype i ref_typ bd_alltype in typ 
+                raise (TypeError "Too many arguments given.")
+(*                 let typ, _ = refine_bd_alltype i ref_typ bd_alltype in typ  *)
             | MOUnique_type (MOList_type st) -> 
-              MOUnique_type (MOList_type st)
+               MOUnique_type (MOList_type st) 
             | _ -> 
-                assert false; (*I put an assert false as I can't figure a case in which it happens*)
+                (*If we are reaching this part, it means that _ref_typ has been
+resolved to something else than a function or something accepting argument, but still there are new arguments provided ..*)
+                (debugPrint (Printf.sprintf "TOO EASY : %s\n " (type_to_string typ)));
+                raise (TypeError "Too many arguments given.")
           )
   in
   match args_typ with
@@ -944,6 +950,8 @@ and determine_type fulloptiprog optiprog locScope const e =
                       add_in_scope ref.morv_varname refined_typ locScope
                 )
             | args -> 
+              (*args_const is the list of the constrained argument.
+                ret_const is the constrained return type.*)
               (let args_const, ret_const = 
                 (match const with 
                   | None 
@@ -955,6 +963,7 @@ and determine_type fulloptiprog optiprog locScope const e =
                 )
               in
 
+              (*lst_typ_args is the refination of the args with the constrained args.*)
               let lst_typ_args, locScope, bd_alltype = 
                 List.fold_left2 
                 (fun (lst_typ_args,locScope, bd_alltype) arg const -> 
@@ -1589,10 +1598,8 @@ and type_check_val fulloptiprog optiprog typScope v =
                         ) (true,pos,bd_alltype) args 
                       in res
                     )
-
-                    (*TODO*)
                 | _ -> 
-                    assert false
+                    raise (TypeError "Invalid function call")
               )
             in
             let ftyp = get_type_from_ref fulloptiprog optiprog typScope ref in 

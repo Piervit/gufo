@@ -19,6 +19,23 @@
 
 (* The main language parser. *)
 
+(*The compilation give a few conflicts:
+
+Warning: 3 states have shift/reduce conflicts.
+Warning: one state has reduce/reduce conflicts.
+Warning: 3 shift/reduce conflicts were arbitrarily resolved.
+Warning: 47 reduce/reduce conflicts were arbitrarily resolved.
+
+They should be all about the '*' and '.' symbol.
+
+This is because '*' is used for both '5 * 5' and 'ls *'.
+And because '.' is used for variables/modules separation and for 'ls .''
+
+Commenting the cmd_arg usage of STAR and DOT will solve the conflict but create
+issue for commands such as 'ls *'.
+
+*)
+
 %token STRUCT 
 %token LET
 %token FUN
@@ -674,14 +691,12 @@ cmd_arg :
     {GufoParsed.SORString "." }
   | arg = modulVarOrExpr
     { GufoParsed.SORExpr arg}
-
-(*
+(** Commenting the STAR and DOT here will solve the states conflicts of * and .
+but will make commands such as ls * to fail. *)
   | arg = STAR
     {GufoParsed.SORString "*" }
   | arg = DOT
     {GufoParsed.SORString "." }
-
-*)
 
 redirs :
   | {[]}
