@@ -419,6 +419,23 @@ varassign_one_term:
     {GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeBoolVal true))}
   | f = FLOAT
     {GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeFloatVal f))}
+  | MINUS_OPENING_CHEVRON; set = listSetEl; MINUS_CLOSING_CHEVRON
+    {let open GufoParsed in
+      MSimple_val (MSet_val set)
+    }
+  | MINUS_OPENING_CHEVRON;  MINUS_CLOSING_CHEVRON
+    {
+      GufoParsed.MSimple_val (GufoParsed.MSet_val [])
+    }
+
+  | MINUS_OPENING_CHEVRON; COLON;   MINUS_CLOSING_CHEVRON
+    {
+      GufoParsed.MSimple_val (GufoParsed.MMap_val[])
+    }
+  | MINUS_OPENING_CHEVRON; map = mapEl; MINUS_CLOSING_CHEVRON
+    {let open GufoParsed in
+      MSimple_val (MMap_val map)
+    }
   |  anonf = anonymousfun ; 
     {anonf}
 
@@ -474,23 +491,6 @@ varassign_no_bracket :
     { GufoParsed.MSimple_val (GufoParsed.MTuple_val  (var1 :: seq)) }
   | assign1 = varassign_in_expr; DOUBLE_SEMICOLON ;assign2 = exprseqeassign; 
     { GufoParsed.MBody_val (assign1 ::assign2) }
-  | MINUS_OPENING_CHEVRON;  MINUS_CLOSING_CHEVRON
-    {
-      GufoParsed.MSimple_val (GufoParsed.MSet_val [])
-    }
-  | MINUS_OPENING_CHEVRON; set = listSetEl; MINUS_CLOSING_CHEVRON
-    {let open GufoParsed in
-      MSimple_val (MSet_val set)
-    }
-  | MINUS_OPENING_CHEVRON; COLON;   MINUS_CLOSING_CHEVRON
-    {
-      GufoParsed.MSimple_val (GufoParsed.MMap_val[])
-    }
-  | MINUS_OPENING_CHEVRON; map = mapEl; MINUS_CLOSING_CHEVRON
-    {let open GufoParsed in
-      MSimple_val (MMap_val map)
-    }
-
 
 varassign_in_expr : 
   | a = varassign_one_term
