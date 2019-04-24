@@ -503,13 +503,26 @@ and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb =
                       MOBase_type MTypeFloat;], get_fresh_int ()))
         in for_basic_op full_or_type "modulo" [arga; argb]
     | MWith -> 
+        let full_or_type = 
+          (MOOr_type ([
+                      MOSet_type (MOUnique_type (MOAll_type (get_fresh_int ()))); 
+                      MOMap_type (MOUnique_type (MOAll_type (get_fresh_int ())),(MOUnique_type (MOAll_type (get_fresh_int ())))) ; 
+                      MOList_type (MOUnique_type (MOAll_type (get_fresh_int ())))], get_fresh_int ()))in
         let typ_a, locScope = determine_type fulloptiprog optiprog locScope const arga in 
         let typ_b, locScope = determine_type fulloptiprog optiprog locScope const argb in
-        (determine_refine_type typ_a typ_b) , locScope
+        (determine_refine_type (determine_refine_type full_or_type typ_a) 
+                               (determine_refine_type full_or_type  typ_b)) , locScope
     | MWithout -> 
+        let full_or_type = 
+          (MOOr_type ([
+                      MOSet_type (MOUnique_type (MOAll_type (get_fresh_int ()))); 
+                      MOMap_type (MOUnique_type (MOAll_type (get_fresh_int ())),(MOUnique_type (MOAll_type (get_fresh_int ())))) ; 
+                      ], get_fresh_int ()))in
         let typ_a, locScope = determine_type fulloptiprog optiprog locScope const arga in 
         let typ_b, locScope = determine_type fulloptiprog optiprog locScope const argb in
-        (determine_refine_type typ_a typ_b) , locScope
+        (determine_refine_type (determine_refine_type full_or_type typ_a) 
+        (determine_refine_type full_or_type  typ_b))
+        , locScope
     | MHas -> 
         let typ_a, locScope = determine_type fulloptiprog optiprog locScope const arga in 
         (*typ_a must be a set or a map*)
@@ -518,9 +531,10 @@ and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb =
           | MOUnique_type (MOSet_type keytype ) ->
             let typ_b, locScope = determine_type fulloptiprog optiprog locScope (Some keytype) argb in
             MOUnique_type (MOBase_type(MTypeBool)), locScope
-          | MOUnique_type (MOAll_type _)  
-          | MOOr_type _  ->
-            let typ_b, locScope = determine_type fulloptiprog optiprog locScope const argb in
+          | MOUnique_type (MOAll_type i)->
+(*           MAYBE MOOr_type should be considered too *)
+(*           | MOOr_type (_,i)  -> *)
+            let typ_b, locScope = determine_type fulloptiprog optiprog locScope (Some (MOUnique_type (MOAll_type i))) argb in
             let possible_types = (MOOr_type ([
                       MOSet_type typ_b; 
                       MOMap_type (typ_b, MOUnique_type(MOAll_type (get_fresh_int ()))); 
