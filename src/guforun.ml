@@ -17,7 +17,7 @@
     Author: Pierre Vittet
 *)
 
-(*The execution launcher.*)
+(*The main execution launcher.*)
 
 open Lexing
 open Printf

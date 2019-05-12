@@ -29,61 +29,10 @@ open GenUtils
 
 
 
-
-(*
-let print_position lexbuf =
-  let pos = lexbuf.lex_curr_p in
-  sprintf "%s:%d:%d" pos.pos_fname
-    pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
-*)
-
-
-
-(*
-let parse_with_error lexbuf from_shell =
-  try
-    (match from_shell with
-      | true -> Gufo_parser.shell Gufo_lexer.read lexbuf
-      | false -> Gufo_parser.prog Gufo_lexer.read lexbuf
-    )
-  with
-  | SyntaxError msg ->
-     raise (SyntaxError "bouh") 
-(*     raise (SyntaxError (sprintf "%s: %s\n" (print_position lexbuf) msg)) *)
-  | Gufo_parser.Error ->
-     raise (SyntaxError "bouh") 
-(*     raise (SyntaxError (sprintf "%s: syntax error\n" (print_position lexbuf))) *)
-
-*)
-
-
-(*
-let rec parse_and_print lexbuf from_shell =
-  match parse_with_error lexbuf from_shell with
-  | Some prog ->
-
-      debugPrint "Dumping program types\n";
-      (if !GufoConfig.debug 
-      then (StringMap.iter (fun str el -> dump_mtype el) prog.mpg_types)
-      else ());
-      debugPrint "Dumping program variables\n";
-      (if !GufoConfig.debug 
-      then (List.iter dump_var prog.mpg_topvar)
-      else ());
-
-      Some prog
-  | None -> 
-      None
-
-*)
-
-
-
 let parse_shell content =
   let lexbuf = create_lexbuf (Sedlexing.Utf8.from_stream (Stream.of_string content)) in
   let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.shell lexbuf in
   prog
-
 
 
 let module_to_filename modulename =
@@ -92,17 +41,16 @@ let module_to_filename modulename =
 let filename_to_module filename = 
     String.sub (String.capitalize_ascii filename) 0 ((String.length filename) - 3)
    
+(**
+ * parse_file : filename -> parsedResult
+ *
+ *)
 let parse_file filename =
         let inx = open_in filename in
         let lexbuf = create_lexbuf ~file:filename (Sedlexing.Utf8.from_channel inx) in
-(*         lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = filename }; *)
         let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.prog lexbuf in
-(*         let prog = parse_and_print lexbuf false in  *)
         close_in inx;
         prog
-
-
-
 
 let handle_program p curMod = 
   let toparse= GufoParsedToOpt.search_modules p in
