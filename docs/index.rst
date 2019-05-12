@@ -9,7 +9,7 @@ Welcome to Gufo's documentation!
 Gufo is a modern shell programming language.
 It is in alpha stage!
 
-I would say that the main goal is to raise interest and propositions over a new
+The main goal is to raise interest and propositions over a new
 better shell for the linux operating system. Gufo tries to be innovative.
 
 For now, Gufo is developped as an hobby by a simple modest human. Help from
