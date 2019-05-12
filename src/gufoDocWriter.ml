@@ -17,11 +17,10 @@
     Author: Pierre Vittet
 *)
 
-(*Utils for modules.*)
+(*help to write a documentation*)
 
-(*Transform the list of type, into a map, the key is the mosmt_intname. *)
-val gen_mosm_types: Gufo.MCore.mosysmoduletype list -> Gufo.MCore.mosysmoduletype GenUtils.IntMap.t
-val gen_mosm_typstr2int: Gufo.MCore.mosysmoduletype list -> int GenUtils.StringMap.t
-val gen_mosm_typstrfield2int : Gufo.MCore.mosysmoduletype list -> int GenUtils.StringMap.t
-val gen_mosm_typestrfield2inttype : Gufo.MCore.mosysmoduletype list -> int GenUtils.StringMap.t
-val gen_mosm_typfield2inttype: Gufo.MCore.mosysmoduletype list -> int GenUtils.IntMap.t
+let write_main_title stream title = 
+  Printf.sprintf "%s\n%s\n=======" stream title
+
+let write_sub_title stream title = 
+  Printf.sprintf "%s\n%s\n-------" stream title

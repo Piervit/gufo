@@ -58,6 +58,7 @@ let types =
 
 let mosysmodule =
 {
+  mosm_name= "Cmd";
   mosm_types = gen_mosm_types types;
   mosm_typstr2int = gen_mosm_typstr2int types;
   mosm_typstrfield2int= gen_mosm_typstrfield2int types ;

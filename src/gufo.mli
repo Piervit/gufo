@@ -367,6 +367,7 @@ sig
   }
 
   and mosysmodule = {
+    mosm_name : string;
     mosm_types : mosysmoduletype IntMap.t;
     mosm_typstr2int: int StringMap.t;
     mosm_typstrfield2int: int StringMap.t; (*from the field string to the int field*)

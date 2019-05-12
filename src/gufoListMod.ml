@@ -76,6 +76,7 @@ let topvars =
 
 let mosysmodule =
 {
+  mosm_name= "List";
   mosm_types = listtypes;
   mosm_typstr2int= StringMap.empty;
   mosm_typstrfield2int= StringMap.empty;
