@@ -15,4 +15,7 @@ BUG 9:
 % let $afunction $i = $i
 % $afunction 3 4
 
+BUG 10:
 
+Maybe for later:
+gufoModules.ml:72 TODO: can raise bugs.
