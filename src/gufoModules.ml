@@ -29,7 +29,7 @@ exception GufoInvalidModule
 exception GufoModuleInvalidArgument
 
 (*The different existing systems. *)
-let system_modules = ["list"; "cmd"; "string"; "set"; "int"]
+let system_modules = ["list"; "cmd"; "string"; "set"; "int"; "opt"]
 
 let is_system_module filename =
   List.exists
@@ -43,6 +43,7 @@ let parse_system_module filename =
     | "string.ma" -> GufoModString.mosysmodule
     | "set.ma" -> GufoModSet.mosysmodule
     | "int.ma" -> GufoModInt.mosysmodule
+    | "opt.ma" -> GufoModOpt.mosysmodule
     | _ -> raise GufoInvalidModule
 
 
@@ -108,7 +109,8 @@ let write_type stream typ =
   in
   stream
 
-
+  
+  (*This part should be rewritten. It is only basic draft, never has been called. *)
 let generate_stdlib_doc () = 
   List.iter
     (fun modul -> 
