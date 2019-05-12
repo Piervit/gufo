@@ -38,11 +38,11 @@ let is_system_module filename =
 
 let parse_system_module filename = 
   match filename with
-    | "list.ma" -> GufoListMod.mosysmodule
-    | "cmd.ma" -> GufoCmdMod.mosysmodule
-    | "string.ma" -> GufoStringMod.mosysmodule
-    | "set.ma" -> GufoSetMod.mosysmodule
-    | "int.ma" -> GufoIntMod.mosysmodule
+    | "list.ma" -> GufoModList.mosysmodule
+    | "cmd.ma" -> GufoModCmd.mosysmodule
+    | "string.ma" -> GufoModString.mosysmodule
+    | "set.ma" -> GufoModSet.mosysmodule
+    | "int.ma" -> GufoModInt.mosysmodule
     | _ -> raise GufoInvalidModule
 
 
