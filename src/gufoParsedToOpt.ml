@@ -2437,7 +2437,7 @@ let parsedToOpt_type fulloptiprog oldprog optiprog =
                 | MOSystemMod _ -> 
                     let modul, id = GufoModules.get_oref_from_sysmodule ref fulloptiprog
                     in
-                    MOUnique_type (MORef_type (modul, id, 0, []))
+                    MOUnique_type (MORef_type (Some modul, id, 0, []))
               )
         )
     | MAll_type v -> assert false (*TODO*)
