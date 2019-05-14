@@ -23,3 +23,9 @@ gufoModules.ml:72 TODO: can raise bugs.
 BUG 11:
 
 "oo" > "pp"
+
+BUG 12:
+
+let $a = $Opt.get ($Int.fromString $x) "23" 
+
+Selon que la chaine $x soit convertible en int ou non, $a sera de type int ou string -> il devrait y avoir une erreur de type.

@@ -7,7 +7,7 @@
 
 #return the string corresponding to the program at pos i in the file $file.
 let $read_program $i $file = 
-  let $sed_expr = "/#PROGRAM "+$i+"$/,/#END PROGRAM/ p" in
+  let $sed_expr = "/#PROGRAM "^$i^"$/,/#END PROGRAM/ p" in
   (
    sed -n $sed_expr $file
   )
@@ -21,7 +21,7 @@ let $run_test $curTest $file =
 #Return the number of programs in a file
 let $nb_exemples $file = 
   let $nbCmd = grep "^#PROGRAM" $file | wc -l in
-  ($Int.fromString $nbCmd.Cmd.print)
+  ( $Opt.get ($Int.fromString $nbCmd.Cmd.print) 0)
 
 #Run recursively tests in file $file (string) from $cur_test (an integer) to 1.
 let $run_tests_until_end_ $cur_test $file =

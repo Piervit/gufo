@@ -67,13 +67,13 @@ let $factoriel $c = if ($c != 1) then ($factoriel ($c - 1)) * $c else 1 in ($fac
 
 #PROGRAM 9
 #a call ssh function
-let $ssh $user $addr = ssh ($user + "@" + $addr)
+let $ssh $user $addr = ssh ($user ^ "@" ^ $addr)
 
 #END PROGRAM 
 #PROGRAM 10
 #a call ssh function
 **START**
-let $checkset $aset $aval = $aset has? $aval in ($checkset -< 1 >- 1)
+let $checkset $aset $aval = $aset SHas? $aval in ($checkset -< 1 >- 1)
 
 #END PROGRAM 
 
