@@ -344,7 +344,7 @@ and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb =
         for_dict_op full_or_type arga argb
     | MHasSet -> 
         let full_or_type = MOSet_type (MOAll_type (get_fresh_int ())) in
-        let typ_a, locScope = determine_type fulloptiprog optiprog locScope const arga in 
+        let typ_a, locScope = determine_type fulloptiprog optiprog locScope (Some full_or_type) arga in 
         (match typ_a with 
           | MOSet_type keytype ->
             let typ_b, locScope = determine_type fulloptiprog optiprog locScope (Some keytype) argb in
@@ -353,7 +353,7 @@ and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb =
         )
     | MHasMap -> 
         let full_or_type = MOMap_type (MOAll_type (get_fresh_int ()), MOAll_type (get_fresh_int ())) in
-        let typ_a, locScope = determine_type fulloptiprog optiprog locScope const arga in 
+        let typ_a, locScope = determine_type fulloptiprog optiprog locScope (Some full_or_type) arga in 
         (match typ_a with 
           | MOMap_type (keytype, _vtype) ->
             let typ_b, locScope = determine_type fulloptiprog optiprog locScope (Some keytype) argb in
