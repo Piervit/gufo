@@ -213,15 +213,25 @@ and mbinding = {
 }
 
 and m_expr_operation =
+  | MConcatenation
   | MAddition 
+  | MAdditionFloat
   | MSoustraction
+  | MSoustractionFloat
   | MMultiplication
+  | MMultiplicationFLoat
   | MDivision
+  | MDivisionFloat
   | MModulo
-  | MWith
-  | MWithout
-  | MHas
-(*   | IntAbsolute  *)
+  | MModuloFloat
+  | MWithList
+  | MWithSet
+  | MWithMap
+  | MWithoutSet
+  | MWithoutMap
+  | MHasSet
+  | MHasMap
+
 
 (** A scope contains types and variables*)
 and mscope = {
@@ -519,22 +529,42 @@ and dump_cmd_val cmdval =
          dump_var_val bd.mbd_body
      | MBasicFunBody_val (fop, args) ->
          (match fop with
+            | MConcatenation -> 
+                print_call "^" args
             | MAddition -> 
                 print_call "+" args
+            | MAdditionFloat -> 
+                print_call "+." args
             | MSoustraction ->
                 print_call "-" args
+            | MSoustractionFloat ->
+                print_call "-." args
             | MMultiplication ->
                 print_call "*" args
+            | MMultiplicationFLoat ->
+                print_call "*." args
             | MDivision ->
-                print_call "/" args
+                print_call "%" args
+            | MDivisionFloat ->
+                print_call "%." args
             | MModulo ->
                 print_call " mod " args
-            | MWith ->
-                print_call " with " args
-            | MWithout ->
-                print_call " wout " args
-            | MWith ->
-                print_call " has? " args
+            | MModuloFloat ->
+                print_call " mod. " args
+            | MWithList ->
+                print_call " With " args
+            | MWithSet ->
+                print_call " SWith " args
+            | MWithMap ->
+                print_call " MWith " args
+            | MWithoutSet ->
+                print_call " SWout " args
+            | MWithoutMap ->
+                print_call " MWout " args
+            | MHasSet ->
+                print_call " SHas? " args
+            | MHasMap ->
+                print_call " MMHas? " args
          )
       | MIf_val (cond, thn, els ) ->
           print_string "if {";

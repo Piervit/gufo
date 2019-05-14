@@ -46,8 +46,11 @@ issue for commands such as 'ls *'.
 %token FALSE
 (* pattern matching *)
 %token ARROW (* -> *)
-%token WITH (* also array rilated *)
-%token WITHOUT (* also array rilated *)
+%token WITH
+%token WITH_SET 
+%token WITH_MAP 
+%token WITHOUT_SET
+%token WITHOUT_MAP
 (* file/dir shortcut *)
 %token TILDE(* userdir *)
 (* command rilated *)
@@ -71,11 +74,17 @@ issue for commands such as 'ls *'.
 (* %token <string> CMDARG *)
 (* mathematic *)
 %token PLUS
+%token PLUS_DOT
+%token PLUS_STR
 %token DOUBLE_MINUS
 %token MINUS
+%token MINUS_DOT
 %token DIVISION
+%token DIVISION_DOT
 %token STAR
+%token STAR_DOT
 %token MODULO
+%token MODULO_DOT
 %token EQUALITY (* == *)
 %token INEQUALITY (* != *)
 (*
@@ -102,7 +111,8 @@ issue for commands such as 'ls *'.
 %token OPTIONTYPE
 %token EXTENDS
 %token IN
-%token HAS
+%token SHAS
+%token MHAS
 %token BOOLTYPE
 %token CMDTYPE
 %token <int> INT
@@ -138,7 +148,8 @@ issue for commands such as 'ls *'.
 %left MODULO
 %left WITH
 %left WITHOUT
-%left HAS
+%left SHAS
+%left MHAS
 
 
 
@@ -543,22 +554,42 @@ topvarassign :
 
 
 operation : 
+  | i1 = varassign_no_bracket; PLUS_STR; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MConcatenation, [i1; i2])}
   | i1 = varassign_no_bracket; PLUS; i2 = varassign_no_bracket
     {GufoParsed.MBasicFunBody_val (GufoParsed.MAddition, [i1; i2])}
+  | i1 = varassign_no_bracket; PLUS_DOT; i2 = varassign_no_bracket 
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MAdditionFloat, [i1; i2])}
   | i1 = varassign_no_bracket ; MINUS ; i2 = varassign_no_bracket
     {GufoParsed.MBasicFunBody_val (GufoParsed.MSoustraction, [i1; i2])}
+  | i1 = varassign_no_bracket ; MINUS_DOT ; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MSoustractionFloat, [i1; i2])}
   | i1 = varassign_no_bracket ; STAR ; i2 = varassign_no_bracket
     {GufoParsed.MBasicFunBody_val (GufoParsed.MMultiplication, [i1; i2])}
+  | i1 = varassign_no_bracket ; STAR_DOT ; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MMultiplicationFLoat, [i1; i2])}
   | i1 = varassign_no_bracket ; DIVISION ; i2 = varassign_no_bracket
     {GufoParsed.MBasicFunBody_val (GufoParsed.MDivision , [i1; i2])}
+  | i1 = varassign_no_bracket ; DIVISION_DOT ; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MDivisionFloat , [i1; i2])}
   | i1 = varassign_no_bracket; MODULO ; i2 = varassign_no_bracket
     {GufoParsed.MBasicFunBody_val (GufoParsed.MModulo, [i1; i2])}
+  | i1 = varassign_no_bracket; MODULO_DOT ; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MModuloFloat, [i1; i2])}
   | i1 = varassign_no_bracket; WITH ; i2 = varassign_no_bracket
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MWith, [i1; i2])}
-  | i1 = varassign_no_bracket; WITHOUT ; i2 = varassign_no_bracket
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithout, [i1; i2])}
-  | i1 = varassign_no_bracket; HAS ; i2 = varassign_no_bracket
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MHas, [i1; i2])}
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithList, [i1; i2])}
+  | i1 = varassign_no_bracket; WITH_SET ; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithSet, [i1; i2])}
+  | i1 = varassign_no_bracket; WITH_MAP ; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithMap, [i1; i2])}
+  | i1 = varassign_no_bracket; WITHOUT_SET ; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithoutSet, [i1; i2])}
+  | i1 = varassign_no_bracket; WITHOUT_MAP ; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithoutMap, [i1; i2])}
+  | i1 = varassign_no_bracket; SHAS ; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MHasSet, [i1; i2])}
+  | i1 = varassign_no_bracket; MHAS ; i2 = varassign_no_bracket
+    {GufoParsed.MBasicFunBody_val (GufoParsed.MHasMap, [i1; i2])}
   |  cmdas = simple_cmd;
     { GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeCmdVal cmdas)) }
   | acmds = varassign_no_bracket ; SIMPLE_AND 

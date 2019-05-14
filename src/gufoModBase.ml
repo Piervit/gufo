@@ -17,44 +17,22 @@
     Author: Pierre Vittet
 *)
 
-
-(*the system module for List. *)
+(*Base system function *)
 
 open Gufo.MCore
 open GenUtils
-open GufoParsed
 
-let settypes = IntMap.empty
-
-let is_in args scope =  
-  match args with 
-    |  [el_val ;MOSimple_val (MOSet_val(mset)); ] ->
-        MOSimple_val (MOBase_val (MOTypeBoolVal (MSet.mem (core_to_simple_mtype el_val) mset)))
-
-    | _ -> assert false 
+let modtypes = IntMap.empty
 
 
 let topvars = 
   [
-    {
-      mosmv_name = "is_in";
-      mosmv_description = "Return true if the element is in the set. Else, return false.";
-      mosmv_intname = 1;
-      mosmv_type = 
-        MOFun_type
-        ([ MOAll_type (-20) ; 
-          MOSet_type( MOAll_type (-20) )
-        ], MOBase_type(MTypeBool))
-        
-        ;
-      mosmv_action= is_in;
-    };
   ]
 
 let mosysmodule =
 {
-  mosm_name= "Set";
-  mosm_types = settypes;
+  mosm_name= "Base";
+  mosm_types = modtypes;
   mosm_typstr2int= StringMap.empty;
   mosm_typstrfield2int= StringMap.empty;
   mosm_typstrfield2inttype = StringMap.empty;

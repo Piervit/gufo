@@ -28,7 +28,7 @@ struct
 
   type motype_field = {
     motf_name : int;
-    motf_type: motype_or;
+    motf_type: motype;
     motf_debugname : string;
   }
   
@@ -45,21 +45,17 @@ struct
   and motype =
    | MOComposed_type of mocomposed_type
    | MOBase_type of mobase_type
-   | MOTuple_type of motype_or list
-   | MOList_type of motype_or
-   | MOOption_type of motype_or
-   | MOSet_type of motype_or
-   | MOMap_type of motype_or * motype_or
-   | MOFun_type of motype_or list * motype_or 
+   | MOTuple_type of motype list
+   | MOList_type of motype
+   | MOOption_type of motype
+   | MOSet_type of motype
+   | MOMap_type of motype * motype
+   | MOFun_type of motype list * motype 
    | MOAll_type of int
    | MOUnit_type
-   | MORef_type of int option * int * int * motype_or list
-   | MOTupel_type of int option * int *int * motype_or list * int list
+   | MORef_type of int option * int * int * motype list
+   | MOTupel_type of int option * int *int * motype list * int list
    
- and motype_or = 
-   | MOUnique_type of motype 
-   | MOOr_type of motype list * int
-
   module SimpleCore = 
    struct 
 
@@ -399,29 +395,79 @@ struct
                 | i -> i
                 )
         in
+
+(*
+  | MConcatenation
+  | MAddition 
+  | MAdditionFloat
+  | MSoustraction
+  | MSoustractionFloat
+  | MMultiplication
+  | MMultiplicationFLoat
+  | MDivision
+  | MDivisionFloat
+  | MModulo
+  | MModuloFloat
+  | MWithList
+  | MWithSet
+  | MWithMap
+  | MWithoutSet
+  | MWithoutMap
+  | MHasSet
+  | MHasMap
+*)
+
         match opa, opb with 
+          | MConcatenation, MConcatenation
           | MAddition, MAddition 
+          | MAdditionFloat, MAdditionFloat
           | MSoustraction, MSoustraction
+          | MSoustractionFloat, MSoustractionFloat
           | MMultiplication, MMultiplication
+          | MMultiplicationFLoat, MMultiplicationFLoat
           | MDivision, MDivision
+          | MDivisionFloat, MDivisionFloat
           | MModulo, MModulo
-          | MWith, MWith ->  comp_args 
-          | MHas, MHas ->  comp_args 
-          | MWithout, MWithout ->  comp_args 
+          | MModuloFloat, MModuloFloat
+          | MWithList, MWithList
+          | MWithSet, MWithSet
+          | MWithMap, MWithMap
+          | MWithoutSet, MWithoutSet
+          | MWithoutMap, MWithoutMap
+          | MHasSet, MHasSet
+          | MHasMap, MHasMap ->  comp_args 
+          | MConcatenation, _ -> 1
+          | _, MConcatenation  -> -1
           | MAddition, _ -> 1
           | _, MAddition -> -1
+          | MAdditionFloat, _ -> 1
+          | _, MAdditionFloat -> -1
           | MSoustraction, _ -> 1
           | _, MSoustraction -> -1
+          | MSoustractionFloat, _ -> 1
+          | _, MSoustractionFloat -> -1
           | MDivision, _ -> 1
           | _, MDivision -> -1
+          | MDivisionFloat, _ -> 1
+          | _, MDivisionFloat -> -1
           | MModulo, _ -> 1
           | _, MModulo -> -1
-          | MWith,_ -> 1
-          | _,MWith -> -1
-          | MHas, _ -> 1
-          | _, MHas -> -1
-          | MWithout, _ -> 1 
-          | _ , _ -> -1
+          | MModuloFloat, _ -> 1
+          | _, MModuloFloat -> -1
+          | MWithList,_ -> 1
+          | _,MWithList -> -1
+          | MWithSet,_ -> 1
+          | _,MWithSet-> -1
+          | MWithMap,_ -> 1
+          | _,MWithMap-> -1
+          | MWithoutSet, _ -> 1 
+          | _, MWithoutSet-> -1 
+          | MWithoutMap, _ -> 1 
+          | _, MWithoutMap-> -1 
+          | MHasSet , _ -> 1 
+          | _, MHasSet-> -1 
+          | MHasMap, _ -> 1 
+          | _ , _ -> -1 
 
       and compare_binding bda bdb = 
         match (List.length bda.mibd_name) - (List.length bdb.mibd_name) with
@@ -760,14 +806,14 @@ struct
     mosmv_name: string;
     mosmv_description: string; (*A comment associated to the function or variable.*)
     mosmv_intname: int;
-    mosmv_type: motype_or; 
+    mosmv_type: motype; 
     mosmv_action: (motype_val list -> topvar_val IntMap.t -> motype_val); 
   }
 
   and mosysmodulefield = {
     mosmf_name : string;
     mosmf_intname: int;
-    mosmf_type: motype_or;
+    mosmf_type: motype;
   }
 
   and mosysmoduletype = {
@@ -1199,43 +1245,84 @@ struct
   (* END EXPR *)
 
   (** PRINTER **)
+
+(*TODO: not finished, not sur we want this*)
+(*
+let moval_to_type aval = 
+  match aval with
+    |  [MOSimple_val(MOBase_val MOTypeStringVal _) ] -> 
+        (MOUnique_type (MOBase_type MTypeString ))
+    |  [MOSimple_val(MOBase_val MOTypeIntVal _) ] -> 
+        (MOUnique_type (MOBase_type MTypeInt ))
+    |  [MOSimple_val(MOBase_val MOTypeBoolVal _) ] -> 
+        (MOUnique_type (MOBase_type MTypeBool ))
+    |  [MOSimple_val(MOBase_val MOTypeFloatVal _) ] -> 
+        (MOUnique_type (MOBase_type MTypeFloat ))
+    |  [MOSimple_val(MOBase_val MOTypeCmdVal _) ] -> 
+        (MOUnique_type (MOBase_type MTypeCmd ))
+    |  [MOSimple_val(MOTuple_val lst ) ] -> 
+        (MOUnique_type(MOTuple_type (List.map moval_to_type lst)))
+    |  [MOSimple_val(MOList_val v) ] -> 
+        (MOUnique_type(MOList_type (moval_to_type (List.hd lst))))
+    |  [MOSimple_val(MONone_val ) ]  
+        (MOUnique_type(MOList_type (moval_to_type (List.hd lst))))
+    |  [MOSimple_val(MONone_val ) ] -> 
+        (MOUnique_type(MOOption_type (MOUnique_type MOUnit_type)))
+    | [MOSimple_val (MOSome_val v)] ->
+        (MOUnique_type(MOOption_type (moval_to_type v)))
+    | [MOSimple_val (MOSet_val set)] ->
+      match MSet.is_empty set with
+        | true -> 
+          (MOUnique_type(MOSet_type (MOUnit_type) ))
+        | _ -> 
+          (MOUnique_type(MOSet_type (moval_to_type MSet.choose set)))
+    | [MOSimple_val (MOMap_val map)] ->
+      match MMap.is_empty map with
+        | true -> 
+          (MOUnique_type(MOMap_type (MOUnit_type, MOUnit_type)))
+        | _ -> 
+          let k,v = MMap.choose map in
+          (MOUnique_type(MOMap_type (moval_to_type k, moval_to_type v)))
+    | [MOSimple_val (MOFun_val _,args,_)] ->
+        
+*)
+
+
+
+
+
+
+
+
   let rec type_to_string typ = 
-    match typ with
-      | MOUnique_type typ ->
-          (match typ with
-            | MOComposed_type mct -> mct.moct_debugname
-            | MOBase_type bt -> GufoParsed.basetype_to_str bt
-            | MOTuple_type lsttyp -> 
-              sprintf "tuple(%s)" 
-              (List.fold_left 
-                (fun str typ -> sprintf "%s %s," str (type_to_string typ)) 
-                "" 
-                lsttyp
-              )
-            | MOList_type typ -> sprintf "list(%s)" (type_to_string typ)
-            | MOOption_type typ -> sprintf "option(%s)" (type_to_string typ)
-            | MOSet_type typ -> sprintf "set(%s)" (type_to_string typ)
-            | MOMap_type (keytyp, valtyp) -> 
-                sprintf "%s map(%s)" (type_to_string keytyp) (type_to_string valtyp)
-            | MOFun_type(lstargs, rettyp) -> 
-                sprintf "fun %s -> (%s)" 
-                  (List.fold_left 
-                    (fun str arg -> sprintf "%s %s," str (type_to_string arg)) 
-                    "" 
-                    lstargs) 
-                  (type_to_string rettyp)
-            | MOUnit_type  -> "unit"
-            | MOAll_type i -> sprintf "'%d" i
-            | MORef_type (modi, i , deep, args ) -> sprintf "ref %d[%d] %s" i deep 
-                                                    (List.fold_left (fun s arg -> sprintf "%s -> %s" s (type_to_string arg)) "" args)
-            | MOTupel_type _ -> sprintf "Tupel" 
-          )
-      | MOOr_type (ortyps,i) ->
-          sprintf "( %s )'%d" 
+    (match typ with
+      | MOComposed_type mct -> mct.moct_debugname
+      | MOBase_type bt -> GufoParsed.basetype_to_str bt
+      | MOTuple_type lsttyp -> 
+        sprintf "tuple(%s)" 
+        (List.fold_left 
+          (fun str typ -> sprintf "%s %s," str (type_to_string typ)) 
+          "" 
+          lsttyp
+        )
+      | MOList_type typ -> sprintf "list(%s)" (type_to_string typ)
+      | MOOption_type typ -> sprintf "option(%s)" (type_to_string typ)
+      | MOSet_type typ -> sprintf "set(%s)" (type_to_string typ)
+      | MOMap_type (keytyp, valtyp) -> 
+          sprintf "%s map(%s)" (type_to_string keytyp) (type_to_string valtyp)
+      | MOFun_type(lstargs, rettyp) -> 
+          sprintf "fun %s -> (%s)" 
             (List.fold_left 
-              (fun acc ortyp -> sprintf "%s %s | " acc (type_to_string (MOUnique_type ortyp)) ) 
-              "" ortyps)
-            i
+              (fun str arg -> sprintf "%s %s," str (type_to_string arg)) 
+              "" 
+              lstargs) 
+            (type_to_string rettyp)
+      | MOUnit_type  -> "unit"
+      | MOAll_type i -> sprintf "'%d" i
+      | MORef_type (modi, i , deep, args ) -> sprintf "ref %d[%d] %s" i deep 
+                                              (List.fold_left (fun s arg -> sprintf "%s -> %s" s (type_to_string arg)) "" args)
+      | MOTupel_type _ -> sprintf "Tupel" 
+    )
 
 
 

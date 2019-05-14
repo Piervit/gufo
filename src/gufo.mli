@@ -35,7 +35,7 @@ sig
 
   type motype_field = {
     motf_name : int;
-    motf_type: motype_or;
+    motf_type: motype;
     motf_debugname : string;
   }
   
@@ -52,15 +52,15 @@ sig
   and motype =
    | MOComposed_type of mocomposed_type
    | MOBase_type of mobase_type
-   | MOTuple_type of motype_or list
-   | MOList_type of motype_or
-   | MOOption_type of motype_or
-   | MOSet_type of motype_or
-   | MOMap_type of motype_or * motype_or
-   | MOFun_type of motype_or list * motype_or (*arguments type, ret type *)
+   | MOTuple_type of motype list
+   | MOList_type of motype
+   | MOOption_type of motype
+   | MOSet_type of motype
+   | MOMap_type of motype * motype
+   | MOFun_type of motype list * motype (*arguments type, ret type *)
    | MOAll_type of int(*ocaml 'a , the int is only an identifier*)
    | MOUnit_type
-   | MORef_type of int option * int * int * motype_or list
+   | MORef_type of int option * int * int * motype list
  (*
    (module * id_ref * deep *args ) 
    THIS TYPE IS A TRICKY ONE, because it is
@@ -91,16 +91,13 @@ sig
   type and should lead to an error.
    
    *)
-   | MOTupel_type of int option * int *int * motype_or list * int list
+   | MOTupel_type of int option * int *int * motype list * int list
    (*
     * (*module * id_ref * deep * args * pos_in_tuble *)
     * appears in PART 3 of type checking in a similar way than MORef_type.
     * This means that the type is a reference of an element of the tuple (at
     * pos pos_in_tuble)*)
 
- and motype_or = 
-   | MOUnique_type of motype 
-   | MOOr_type of motype list * int
 
    (* The SimpleCore module is internal stuff to manage Map and Set
     * I tried to have this as a functor but as the idea was that any value of
@@ -349,14 +346,14 @@ sig
     mosmv_name: string;
     mosmv_description: string; (*A comment associated to the function or variable.*)
     mosmv_intname: int;
-    mosmv_type: motype_or; 
+    mosmv_type: motype; 
     mosmv_action: (motype_val list -> topvar_val IntMap.t -> motype_val); (* function argument -> scope -> function res *)
   }
 
   and mosysmodulefield = {
     mosmf_name : string;
     mosmf_intname: int;
-    mosmf_type: motype_or;
+    mosmf_type: motype;
   }
 
   and mosysmoduletype = {
@@ -472,9 +469,16 @@ environment 'env'. Raise NotFould if not found.*)
   (*END functions for shell_env*)
 
   (**PRINTER **)
-  val type_to_string: motype_or -> string
 
+  (* return the type as a string *)
+  val type_to_string: motype -> string
+
+  (* return the val as a string *)
   val moval_to_string: motype_val -> string
+  
+  (*TODO: not sure we want this *)
+  (* return the type of a value.*)
+(*   val moval_to_type : motype_val -> motype_or *)
 
   (**END PRINTER **)
 end

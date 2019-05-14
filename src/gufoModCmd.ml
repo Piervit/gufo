@@ -37,17 +37,17 @@ let types =
         {
           mosmf_name = "res";
           mosmf_intname= 2;
-          mosmf_type= MOUnique_type (MOOption_type (MOUnique_type (MOBase_type (MTypeInt))));
+          mosmf_type= MOOption_type (MOBase_type (MTypeInt));
         };
       {
         mosmf_name = "print";
           mosmf_intname= 3;
-          mosmf_type= MOUnique_type ((MOBase_type (MTypeString)));
+          mosmf_type= (MOBase_type (MTypeString));
         };
       {
         mosmf_name = "print_err";
           mosmf_intname= 4;
-          mosmf_type= MOUnique_type ((MOBase_type (MTypeString)));
+          mosmf_type= (MOBase_type (MTypeString));
         }
 
       ];

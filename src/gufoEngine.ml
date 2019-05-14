@@ -998,52 +998,67 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   let reduced_argb = apply_motype_val toplevel arg2valMap argb in
   
   (*TODO: improve perf *)
+  (*TODO: replace assert false by runtime exception*)
   match op, reduced_arga, reduced_argb with 
-  | MAddition, MOSimple_val (MOBase_val (MOTypeStringVal a)),
+            (** Concatenation **)
+  | MConcatenation , MOSimple_val (MOBase_val (MOTypeStringVal a)),
     MOSimple_val (MOBase_val (MOTypeStringVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeStringVal 
       (Printf.sprintf "%s%s" a b)))
+  | MConcatenation, _, _ -> assert false
+            (** Addition **)
   | MAddition, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeIntVal  (a + b)))
-
-  | MAddition, MOSimple_val (MOBase_val (MOTypeFloatVal a)),
+  | MAdditionFloat, MOSimple_val (MOBase_val (MOTypeFloatVal a)),
     MOSimple_val (MOBase_val (MOTypeFloatVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal (a +. b)))
   | MAddition, _, _ -> assert false
+  | MAdditionFloat, _, _ -> assert false
+            (** Soustraction **)
   | MSoustraction, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeIntVal (
       a - b)))
-  | MSoustraction, MOSimple_val (MOBase_val (MOTypeFloatVal a)),
+  | MSoustractionFloat , MOSimple_val (MOBase_val (MOTypeFloatVal a)),
     MOSimple_val (MOBase_val (MOTypeFloatVal b))  -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal (a -. b)))
   | MSoustraction, _,_ -> assert false
+  | MSoustractionFloat, _,_ -> assert false
+            (** Multiplication **)
   | MMultiplication, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) -> 
       MOSimple_val(MOBase_val (MOTypeIntVal 
       (a * b) ))
-  | MMultiplication, MOSimple_val (MOBase_val (MOTypeFloatVal a)), 
+  | MMultiplicationFLoat, MOSimple_val (MOBase_val (MOTypeFloatVal a)), 
     MOSimple_val (MOBase_val (MOTypeFloatVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal (a *. b)))
   | MMultiplication, _, _ -> assert false
+  | MMultiplicationFLoat, _, _ -> assert false
+            (** Division **)
   | MDivision, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) ->
       MOSimple_val (MOBase_val (MOTypeIntVal (a / b)))
-  | MDivision, MOSimple_val (MOBase_val (MOTypeFloatVal a)), 
+  | MDivisionFloat, MOSimple_val (MOBase_val (MOTypeFloatVal a)), 
     MOSimple_val (MOBase_val (MOTypeFloatVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal(a /. b)))
+  | MDivision, _, _ -> assert false
+  | MDivisionFloat, _, _ -> assert false
+            (** Modulo **)
   | MModulo, MOSimple_val (MOBase_val (MOTypeIntVal el1)),
                         MOSimple_val (MOBase_val (MOTypeIntVal el2)) -> 
       MOSimple_val(MOBase_val (MOTypeIntVal (el1/el2)))
-  | MModulo, MOSimple_val (MOBase_val (MOTypeFloatVal el1)),
+  | MModuloFloat, MOSimple_val (MOBase_val (MOTypeFloatVal el1)),
                           MOSimple_val (MOBase_val (MOTypeFloatVal el2)) -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal (mod_float el1 el2)))
-  | MWith, MOSimple_val(MOList_val lst1), MOSimple_val (MOList_val lst2) ->
+  | MModulo, _, _ -> assert false
+  | MModuloFloat, _, _ -> assert false
+            (** With **)
+  | MWithList, MOSimple_val(MOList_val lst1), MOSimple_val (MOList_val lst2) ->
       MOSimple_val(MOList_val (List.concat [lst1; lst2]))
-  | MWith, MOSimple_val(MOSet_val set1), MOSimple_val (MOSet_val set2) ->
+  | MWithSet, MOSimple_val(MOSet_val set1), MOSimple_val (MOSet_val set2) ->
       MOSimple_val(MOSet_val (MSet.union set1 set2))
-  | MWith, MOSimple_val(MOMap_val map1), MOSimple_val (MOMap_val map2) ->
+  | MWithMap, MOSimple_val(MOMap_val map1), MOSimple_val (MOMap_val map2) ->
       MOSimple_val(MOMap_val (MMap.merge (fun k v1 v2 -> 
                                             match v1, v2 with
                                               | None, Some v -> Some v
@@ -1051,13 +1066,20 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
                                               | Some v1, Some v2 -> Some v2
                                               | None, None -> None
                                           ) map1 map2))
-  | MHas, MOSimple_val(MOSet_val set1), possibleEl ->
+  | MWithList, _, _ -> assert false
+  | MWithMap, _, _ -> assert false
+  | MWithSet, _, _ -> assert false
+            (** Has **)
+  | MHasSet, MOSimple_val(MOSet_val set1), possibleEl ->
     MOSimple_val( MOBase_val (MOTypeBoolVal (MSet.mem (core_to_simple_mtype possibleEl) set1)))
-  | MHas, MOSimple_val(MOMap_val map1), possibleEl ->
+  | MHasMap, MOSimple_val(MOMap_val map1), possibleEl ->
     MOSimple_val( MOBase_val (MOTypeBoolVal (MMap.mem (core_to_simple_mtype possibleEl) map1)))
-  | MWithout, MOSimple_val(MOSet_val set1), MOSimple_val (MOSet_val set2) ->
+  | MHasSet, _, _ -> assert false
+  | MHasMap, _, _ -> assert false
+            (** without **)
+  | MWithoutSet, MOSimple_val(MOSet_val set1), MOSimple_val (MOSet_val set2) ->
       MOSimple_val(MOSet_val (MSet.diff set1 set2))
-  | MWithout, MOSimple_val(MOMap_val map1), MOSimple_val (MOMap_val map2) ->
+  | MWithoutMap, MOSimple_val(MOMap_val map1), MOSimple_val (MOMap_val map2) ->
       MOSimple_val(MOMap_val (MMap.merge (fun k v1 v2 -> 
                                             match v1, v2 with
                                               | None, Some v -> None

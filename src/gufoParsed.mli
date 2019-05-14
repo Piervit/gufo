@@ -211,14 +211,24 @@ and mbinding = {
 }
 
 and m_expr_operation =
+  | MConcatenation
   | MAddition 
+  | MAdditionFloat
   | MSoustraction
+  | MSoustractionFloat
   | MMultiplication
+  | MMultiplicationFLoat
   | MDivision
+  | MDivisionFloat
   | MModulo
-  | MWith
-  | MWithout
-  | MHas (*$a has? $b ->return true if $b if in the set or map $a.*)
+  | MModuloFloat
+  | MWithList
+  | MWithSet
+  | MWithMap
+  | MWithoutSet
+  | MWithoutMap
+  | MHasSet
+  | MHasMap
 (*   | IntAbsolute  *)
 
 (** A scope contains types and variables*)

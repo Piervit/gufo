@@ -31,7 +31,7 @@ val unstack_args : Gufo.MCore.mofunarg -> int list
 val unstack_args_with_pos : Gufo.MCore.mofunarg -> (int * int list) list
 
 (*Simple utility fonction to get type of element in case of multi level list.*)
-val get_type_at_deep : Gufo.MCore.motype_or -> int -> Gufo.MCore.motype_or
+val get_type_at_deep : Gufo.MCore.motype -> int -> Gufo.MCore.motype
 
 
 val find_type_in_prog : Gufo.MCore.fullprogopt -> 
@@ -44,7 +44,7 @@ val find_type_in_prog : Gufo.MCore.fullprogopt ->
 val get_ownertype_from_field : Gufo.MCore.fullprogopt -> 
                                Gufo.MCore.moprogram -> 
                                GenUtils.IntMap.key option * GenUtils.IntMap.key -> 
-                               Gufo.MCore.motype_or
+                               Gufo.MCore.motype
 
 
 val get_type_field_from_field : Gufo.MCore.fullprogopt -> 
@@ -56,13 +56,13 @@ val get_type_field_from_field : Gufo.MCore.fullprogopt ->
 val get_type_from_field : Gufo.MCore.fullprogopt -> 
                           Gufo.MCore.moprogram -> 
                           GenUtils.IntMap.key option * GenUtils.IntMap.key -> 
-                          Gufo.MCore.motype_or
+                          Gufo.MCore.motype
 
 
 val get_type_from_ref : Gufo.MCore.fullprogopt -> 
                         Gufo.MCore.moprogram -> 
-                        Gufo.MCore.motype_or GenUtils.IntMap.t GenUtils.IntMap.t -> 
+                        Gufo.MCore.motype GenUtils.IntMap.t GenUtils.IntMap.t -> 
                         Gufo.MCore.moref_val -> 
-                        Gufo.MCore.motype_or
+                        Gufo.MCore.motype
 
 

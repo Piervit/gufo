@@ -47,10 +47,10 @@ let topvars =
         If optval is set to 'some i', return i, else return defval.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOUnique_type (MOFun_type
-        ([ MOUnique_type (MOOption_type (MOUnique_type (MOAll_type 1))) ; (MOUnique_type (MOAll_type 1)) ]
-        , MOUnique_type (MOAll_type 1))
-        )
+        MOFun_type
+        ([ MOOption_type (MOAll_type 1) ; (MOAll_type 1) ]
+        , MOAll_type 1)
+        
         ;
       mosmv_action= get;
     };

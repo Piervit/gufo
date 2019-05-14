@@ -31,14 +31,17 @@ let toString args scope =
        MOSimple_val (MOBase_val (MOTypeStringVal (string_of_int i)))
     | _ -> assert false 
 
-(*TODO
-It should return an option type (None if not parsable as an integer) or Gufo
-should have an exception system.
-*)
+(*return a type option, some i, if the string is parsable to the integer i, else return none.*)
 let fromString args scope = 
   match args with
     |  [MOSimple_val (MOBase_val (MOTypeStringVal i)) ] ->
-       MOSimple_val (MOBase_val (MOTypeIntVal (int_of_string (List.hd (String.split_on_char '\n' i)))))
+        (try
+          MOSimple_val (MOSome_val 
+            (MOSimple_val (MOBase_val (MOTypeIntVal 
+              (int_of_string (List.hd (String.split_on_char '\n' i)))))))
+        with _ ->
+          MOSimple_val (MONone_val)
+        )
     | _ -> assert false 
 
 let topvars = 
@@ -48,23 +51,24 @@ let topvars =
       mosmv_description = "Return the int argument as a string.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOUnique_type (MOFun_type
-        ([ MOUnique_type (MOBase_type (MTypeInt)) ;]
-        , MOUnique_type (MOBase_type (MTypeString)))
-        )
+        MOFun_type
+        ([ MOBase_type (MTypeInt) ;]
+        , MOBase_type (MTypeString))
+        
         ;
       mosmv_action= toString;
     };
     {
       mosmv_name = "fromString";
-      (*TODO: explains the exception cases.*)
-      mosmv_description = "Inspect the first line of the string and try to return it as an integer.";
+      mosmv_description = "Inspect the first line of the string and try to
+return it as an integer: return None, it is not parsable as int, else return
+'(Some i)' with i the parsed integer.";
       mosmv_intname = 2;
       mosmv_type = 
-        MOUnique_type (MOFun_type
-        ([ MOUnique_type (MOBase_type (MTypeString)) ;]
-        , MOUnique_type (MOBase_type (MTypeInt)))
-        )
+        MOFun_type
+        ([ MOBase_type (MTypeString) ;]
+        , MOOption_type (MOBase_type (MTypeInt)))
+        
         ;
       mosmv_action= fromString;
     };

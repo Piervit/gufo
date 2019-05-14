@@ -293,23 +293,23 @@ let print_color_expr term expr optprog types =
   in
   let print_type typ word = 
     (match typ with 
-      | MOUnique_type (MOComposed_type _ ) -> 
+      | MOComposed_type _  -> 
           [ S word ; B_fg c_comp]
-      | MOUnique_type (MOBase_type(   MTypeString)) -> 
+      | MOBase_type(   MTypeString) -> 
           [ S word ; B_fg c_string]
-      | MOUnique_type (MOBase_type( MTypeBool)) -> 
+      | MOBase_type( MTypeBool) -> 
           [ S word; B_fg c_bool]
-      | MOUnique_type (MOBase_type(   MTypeInt)) -> 
+      | MOBase_type(   MTypeInt) -> 
           [S word ; B_fg c_int]
-      | MOUnique_type (MOBase_type(   MTypeFloat)) -> 
+      | MOBase_type(   MTypeFloat) -> 
           [ S word ; B_fg c_float]
-      | MOUnique_type (MOBase_type(   MTypeCmd)) ->
+      | MOBase_type(   MTypeCmd) ->
           [ S word; B_fg c_cmd]
-      | MOUnique_type (MOList_type(_ )) 
-      | MOUnique_type (MOSet_type(_ )) 
-      | MOUnique_type (MOMap_type(_ )) ->
+      | MOList_type(_ ) 
+      | MOSet_type(_ ) 
+      | MOMap_type(_ ) ->
           [ S word; B_fg c_aggregate]
-      | MOUnique_type (MOFun_type _) ->
+      | MOFun_type _ ->
           [ S word; B_fg c_fun]
       | _  -> print_type_not_found word
                   

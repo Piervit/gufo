@@ -267,9 +267,9 @@ let rec get_type_at_deep typ deep =
     | i -> 
         (
           match typ with 
-            | MOUnique_type (MOList_type subtyp)
-            | MOUnique_type (MOSet_type subtyp)
-            | MOUnique_type (MOMap_type (_,subtyp)) ->
+            | MOList_type subtyp
+            | MOSet_type subtyp
+            | MOMap_type (_,subtyp) ->
                 get_type_at_deep subtyp (deep - 1)
             |_ -> raise (TypeError (sprintf "Trying to access sub-element of list (or set or map) for type %s. \n "(type_to_string typ))) 
  
@@ -321,8 +321,8 @@ let find_type_in_prog fulloptiprog modi id =
 (* return the composed type which own the field *)
 let get_ownertype_from_field fulloptiprog optiprog field = 
   match check_is_cmd_field fulloptiprog field with
-    | true -> MOUnique_type (MOBase_type (MTypeCmd))
-    | false -> MOUnique_type (MOComposed_type (get_ownertype_from_field_intern fulloptiprog optiprog field ))
+    | true -> MOBase_type (MTypeCmd)
+    | false -> MOComposed_type (get_ownertype_from_field_intern fulloptiprog optiprog field )
 
 let get_type_field_from_field fulloptiprog optiprog field = 
   let ctype = get_ownertype_from_field_intern fulloptiprog optiprog field in

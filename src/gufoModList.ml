@@ -52,11 +52,11 @@ let topvars =
       mosmv_description = "Iterate over the elements of the list.";
       mosmv_intname = 2;
       mosmv_type = 
-        MOUnique_type (MOFun_type
-        ([ MOUnique_type (MOFun_type([MOUnique_type (MOAll_type 1)], MOUnique_type (MOUnit_type))) ; 
-          MOUnique_type (MOList_type( MOUnique_type (MOAll_type 1 )))
-        ], MOUnique_type (MOUnit_type))
-        )
+        MOFun_type
+        ([ MOFun_type([MOAll_type 1], MOUnit_type) ; 
+          MOList_type( MOAll_type 1 )
+        ], MOUnit_type)
+        
         ;
       mosmv_action= iter;
     };
@@ -65,9 +65,9 @@ let topvars =
       mosmv_description = "Return the size of the given list.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOUnique_type (MOFun_type
-        ([ MOUnique_type (MOList_type( MOUnique_type (MOAll_type 1 )))], MOUnique_type (MOBase_type (MTypeInt)))
-        )
+        MOFun_type
+        ([ MOList_type( MOAll_type 1 )], MOBase_type (MTypeInt))
+        
         ;
       mosmv_action= length;
     };

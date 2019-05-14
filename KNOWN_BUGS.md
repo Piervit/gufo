@@ -19,3 +19,7 @@ BUG 10:
 
 Maybe for later:
 gufoModules.ml:72 TODO: can raise bugs.
+
+BUG 11:
+
+"oo" > "pp"

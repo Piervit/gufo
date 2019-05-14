@@ -72,9 +72,13 @@ let rec read lexbuf =
   | "False"  -> Gufo_parser.FALSE  
   (* pattern matching *)
   | "->"     -> Gufo_parser.ARROW  
-  | "with"   -> Gufo_parser.WITH  
-  | "wout"   -> Gufo_parser.WITHOUT  
+  | "With"   -> Gufo_parser.WITH  
+  | "SWith"  -> Gufo_parser.WITH_SET 
+  | "MWith"  -> Gufo_parser.WITH_MAP
+  | "SWout"   -> Gufo_parser.WITHOUT_SET 
+  | "MWout"   -> Gufo_parser.WITHOUT_MAP
   | "*"      -> Gufo_parser.STAR  
+  | "*."     -> Gufo_parser.STAR_DOT
   | "~"      -> Gufo_parser.TILDE  
   | ">"      -> Gufo_parser.CLOSING_CHEVRON  
   | ">-"     -> Gufo_parser.MINUS_CLOSING_CHEVRON  
@@ -90,10 +94,15 @@ let rec read lexbuf =
   | "<"      -> Gufo_parser.OPENING_CHEVRON  
   | "-<"     -> Gufo_parser.MINUS_OPENING_CHEVRON  
   | "+"      -> Gufo_parser.PLUS  
+  | "+."      -> Gufo_parser.PLUS_DOT
+  | "^"      -> Gufo_parser.PLUS_STR 
   | "--"     -> Gufo_parser.DOUBLE_MINUS  
   | "-"      -> Gufo_parser.MINUS  
+  | "-."      -> Gufo_parser.MINUS_DOT
   | "%"      -> Gufo_parser.DIVISION  
+  | "%."      -> Gufo_parser.DIVISION_DOT
   | "mod"    -> Gufo_parser.MODULO  
+  | "mod."    -> Gufo_parser.MODULO_DOT
   | "=="     -> Gufo_parser.EQUALITY  
   | "!="     -> Gufo_parser.INEQUALITY  
   | "["      -> Gufo_parser.OPEN_SQRBRACKET  
@@ -113,7 +122,8 @@ let rec read lexbuf =
 
   | freetype            -> Gufo_parser.FREETYPE (Sedlexing.Utf8.lexeme buf)
   | "extends"           -> Gufo_parser.EXTENDS  
-  | "has?"                -> Gufo_parser.HAS
+  | "SHas?"                -> Gufo_parser.SHAS
+  | "MHas?"                -> Gufo_parser.MHAS
   | "in"                -> Gufo_parser.IN  
   | "if"                -> Gufo_parser.IF  
   | "then"              -> Gufo_parser.THEN  

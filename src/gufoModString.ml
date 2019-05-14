@@ -42,12 +42,12 @@ let topvars =
       mosmv_description = "Split each line of the given string into a list.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOUnique_type (MOFun_type
+        MOFun_type
         ([
-         MOUnique_type (MOBase_type (MTypeString)); ], 
+         MOBase_type (MTypeString); ], 
          
-         MOUnique_type (MOList_type (MOUnique_type (MOBase_type (MTypeString)))))
-        )
+         MOList_type (MOBase_type (MTypeString)))
+        
         ;
       mosmv_action= asList;
     };

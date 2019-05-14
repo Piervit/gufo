@@ -25,7 +25,7 @@ val search_modules : GufoParsed.mprogram -> int GenUtils.StringMap.t
 
 (*From a low level fullprog to a highlevel fillprog with a map of the type. *)
 val parsedToOpt : GufoParsed.fullprog -> 
-                  Gufo.MCore.fullprogopt * Gufo.MCore.motype_or GenUtils.IntMap.t GenUtils.IntMap.t
+                  Gufo.MCore.fullprogopt * Gufo.MCore.motype GenUtils.IntMap.t GenUtils.IntMap.t
 
 (*
  * add_prog_to_optprog fulloptiprog fullprog 
@@ -39,4 +39,4 @@ val parsedToOpt : GufoParsed.fullprog ->
    * *)
 val add_prog_to_optprog: Gufo.MCore.fullprogopt -> 
                          GufoParsed.fullprog -> 
-                         Gufo.MCore.fullprogopt * Gufo.MCore.motype_or GenUtils.IntMap.t GenUtils.IntMap.t
+                         Gufo.MCore.fullprogopt * Gufo.MCore.motype GenUtils.IntMap.t GenUtils.IntMap.t
