@@ -371,8 +371,7 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
             | MOTypeCmdVal aaaa, MOTypeCmdVal bbbb ->
                   cmd_seq_compare aaaa bbbb
             | _ , _ -> 
-                debugPrint (Printf.sprintf "comparing type %s with %s \n" (moval_to_string (MOSimple_val a)) (moval_to_string (MOSimple_val b)));
-                assert false
+                raise (ExecutionError (Printf.sprintf "comparing type %s with %s \n" (moval_to_string (MOSimple_val a)) (moval_to_string (MOSimple_val b))))
           )
       | MOTuple_val aaa, MOTuple_val bbb -> 
           mtuple_compare aaa bbb
@@ -909,7 +908,7 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
                 in 
 
                 let stdout_lst_char = 
-                  Stream.npeek GufoConfig.max_char_print_buffer stdout_memory_stream in
+                  Stream.npeek (GufoConfig.getMaxCharPrintBuffer ()) stdout_memory_stream in
                 let stdout_lst_char = List.map (fun achar -> String.make 1 achar ) stdout_lst_char in
                 let stdout_str = String.concat "" stdout_lst_char in
                 (*TODO close stdout_channel*)

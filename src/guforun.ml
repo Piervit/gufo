@@ -33,10 +33,12 @@ let parse_program filename =
   let open Format in
   let open Gufo in
   match (GufoStart.parse_file filename) with
-    | None -> printf "No prog!\n"; assert false
+    | None -> Printf.eprintf "No program provided !\n"; assert false
     | Some p -> GufoStart.handle_program p (GufoStart.filename_to_module filename)
 
-(*previous basic interactive mod.*)
+(*previous basic interactive mod.
+  deprecated but conserved in case we have to go back to it.
+*)
 let _run_interactive () =
   printf "## Ilo interactive shell ##\n";
   let rec run_interactive_ () = 
@@ -54,17 +56,42 @@ let _run_interactive () =
   in
   run_interactive_()
 
-let () =
-  match Array.length Sys.argv with
-    | 2 -> 
-        let prog = parse_program Sys.argv.(1) in
-        let opt_prog,_ = GufoParsedToOpt.parsedToOpt prog in
-        let shell_env = Gufo.MCore.get_env (Sys.getcwd ()) in
-        let red_prog, shell_env = (GufoEngine.exec opt_prog shell_env) in
-        printf "%s\n" (Gufo.MCore.moval_to_string red_prog.mofp_mainprog.mopg_topcal)
-    | 1 -> 
-          (*run_interactive ()*)
-        GufoConsole.run ()
+let verbose = ref false
+let full_verbose = ref false
+let help = ref false
+let prog = ref None
 
-    | _ -> printf "bad number of arguments"
+let main () = 
+  let speclist = 
+    [("-v", Arg.Set verbose, " Enables basic information verbosity.");
+     ("--verbose", Arg.Set verbose, " Enables basic information verbosity.");
+     ("-V", Arg.Set full_verbose, " Enables full verbosity.");
+     ("--Verbose", Arg.Set full_verbose, " Enables full verbosity.");
+     ("-h", Arg.Set help, " Print help and exit. ");
+     ("--help", Arg.Set help, " Print help and exit. ");
+    ]
+  in
+  let usage_msg = "usage: gufo [option] ... [file]\nIf called without file, will be set to run in interactive mode, else will execute the file.\nList of options:" in 
+  Arg.parse speclist (fun afile-> prog := Some afile; print_endline "" ) usage_msg;
+  (match !full_verbose with
+    | true -> GufoConfig.setDebug GufoConfig.FULL
+    | false -> match !verbose with
+                | true -> GufoConfig.setDebug GufoConfig.INFO
+                | _ -> GufoConfig.setDebug GufoConfig.NO_DEBUG
+  );
+  match !help with
+    | true -> 
+      Printf.printf "%s" (Arg.usage_string speclist usage_msg)
+    | false -> 
+        (match !prog with
+          | Some prog -> 
+            let parsedProg = parse_program prog in
+            let opt_prog,_ = GufoParsedToOpt.parsedToOpt parsedProg in
+            let shell_env = Gufo.MCore.get_env (Sys.getcwd ()) in
+            let red_prog, shell_env = (GufoEngine.exec opt_prog shell_env) in
+            printf "%s\n" (Gufo.MCore.moval_to_string red_prog.mofp_mainprog.mopg_topcal)
+          | None -> 
+            GufoConsole.run ()
+        );;
 
+main ()

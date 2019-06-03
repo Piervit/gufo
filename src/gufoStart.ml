@@ -30,10 +30,22 @@ open GenUtils
 
 
 let parse_shell content =
-  let lexbuf = create_lexbuf (Sedlexing.Utf8.from_stream (Stream.of_string content)) in
-  let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.shell lexbuf in
-  prog
-
+  debug_info (debug_title1 "Start converting file to a gufo program.");
+  try(
+    let lexbuf = create_lexbuf (Sedlexing.Utf8.from_stream (Stream.of_string content)) in
+    let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.shell lexbuf in
+  
+    match prog with
+      | Some _ -> 
+        debug_info ("File converted to gufo program.\n");
+        prog
+      | None ->
+        debug_info ("Invalid program (unable to convert to valid program)\n");
+        None
+  )
+  with e ->
+    debug_info ("Invalid program (unable to convert to valid program)\n");
+    raise e
 
 let module_to_filename modulename =
     String.concat "." [String.uncapitalize_ascii modulename; "ma"]
@@ -53,11 +65,18 @@ let parse_file filename =
         prog
 
 let handle_program p curMod = 
+  debug_info (debug_title1 "Start converting a gufo program to a full gufo program (including external modules)");
   let toparse= GufoParsedToOpt.search_modules p in
-    StringMap.iter (fun k v -> debugPrint (sprintf "iter: %s: %d \n" k v )) toparse; 
+    (match GufoConfig.getDebugLevel () with
+      | GufoConfig.FULL -> 
+          debug_print (debug_title2 "Linked modules");
+          (match (StringMap.is_empty toparse) with
+            | true -> debug_print "-- no external module used --\n"
+            | false ->  StringMap.iter (fun k v -> debug_print (sprintf "%s: %d \n" k v )) toparse)
+      | _ -> ()
+    ); 
   let toparse= StringMap.remove curMod toparse in
   let rec parse_others_modules mapmodule parsed depmodules toparse = 
-    StringMap.iter (fun k v -> debugPrint (sprintf "%s: %d \n" k v )) toparse; 
     let (mapmodule,progmodules,depmodules, newtoparse) = 
       StringMap.fold 
       (fun newmodule intmod (alreadyparsed, parsed,depmodules, newmodtoparse) -> 
@@ -71,7 +90,7 @@ let handle_program p curMod =
           | false -> 
             let newmoduleprog = parse_file filename in
             match newmoduleprog with
-            | None -> printf "No prog\n"; assert false
+            | None -> eprintf "No program found\n"; assert false
             | Some prog -> let depmodules_str = GufoParsedToOpt.search_modules prog in
               let alreadyparsed = StringMap.add newmodule intmod alreadyparsed in
               let parsed = IntMap.add intmod (MUserMod prog) parsed in
@@ -105,6 +124,7 @@ let handle_program p curMod =
       (fun str i map -> IntMap.add i str map)
       mapmodule IntMap.empty
   in 
+      debug_info ("Gufo program converted to a full gufo program.");
       {
         mfp_mainprog = p;
         mfp_progmodules = progmodules;
