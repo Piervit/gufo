@@ -49,12 +49,36 @@ let load_file f =
   really_input ic s 0 n;
   close_in ic;
   (s)
+ 
+
+let debug_info s = 
+  match GufoConfig.getDebugLevel () with
+    | FULL  
+    | INFO -> Printf.printf "%s\n" s
+    | NO_DEBUG -> ()
 
 
-let debugPrint s = 
-  match !debug with
-    | true -> Printf.printf "%s" s
-    | false -> ()
+
+let debug_print s = 
+  match GufoConfig.getDebugLevel () with
+    | FULL -> Printf.printf "%s\n" s
+    | INFO 
+    | NO_DEBUG -> ()
+
+
+let debug_title0 s =
+  Printf.sprintf "\n%s\n=========================================\n" s
+
+let debug_title1 s =
+  Printf.sprintf "\n%s\n=======================\n" s
+
+let debug_title2 s =
+  Printf.sprintf "\n%s\n============\n" s
+
+let debug_title3 s =
+  Printf.sprintf "\n%s\n======\n" s
+
+
 
 (*LIST UTILITY*)
 

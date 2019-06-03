@@ -19,6 +19,8 @@
 
 (** This file provide some generic utilities functions. **)
 
+(**** USUAL SET/MAP MODULES *)
+
 (*Basic IntSet, widely used.*)
 module IntSet :
   sig
@@ -186,14 +188,27 @@ module StringMap :
     val mapi : (key -> 'a -> 'b) -> 'a t -> 'b t
   end
 
-(*Print only if we are in debug mode.*)
-val debugPrint: string -> unit
+(**** END USUAL SET/MAP MODULES *)
 
 
-(* from a file name, return its full content as byte. *)
-val load_file: string -> bytes
+(**** DEBUG UTILITIES *)
 
-(** LIST UTILTIES **)
+(*Print if we are in debug mode (full or info).*)
+val debug_print: string -> unit
+
+(*Print if we are in info debug mode.*)
+val debug_info: string -> unit
+
+(*format a string as a title (intended to be use when displaying debug informations.*)
+val debug_title0: string -> string
+val debug_title1: string -> string
+val debug_title2: string -> string
+val debug_title3: string -> string
+
+(**** END DEBUG UTILITIES *)
+
+
+(**** LIST UTILITIES *)
 
 (*list_find2 f la lb
  *
@@ -217,9 +232,9 @@ val list_split_at_idx : 'a list -> int -> 'a list * 'a list
  * the elements of the list.*)
 val list_compare: ('a -> 'b -> int) -> 'a list -> 'b list -> int
 
-(** END LIST UTILTIES **)
+(**** END LIST UTILTIES **)
 
-(** STRING UTILTIES **)
+(**** STRING UTILTIES **)
 (*return a new thing from the given string without its first char. *)
 val rm_first_char : string -> string
 
@@ -252,5 +267,8 @@ val split_in_two: string -> int -> (string * string)
 Lets say that we are in the dir cwd and we ask for a path "str_path"
 (absolute or relative), return the absolute path asked. *)
 val get_abs_path : string -> string -> string
+
+(* from a file name, return its full content as byte. *)
+val load_file: string -> bytes
 
 (** END FILE UTILITIES **)
