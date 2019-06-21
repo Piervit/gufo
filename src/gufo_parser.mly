@@ -232,7 +232,6 @@ mfile:
       let (types, variables) = topels in
       GufoParsed.{mpg_types = types; mpg_topvar = variables;  mpg_topcal = MSimple_val(MEmpty_val)} 
     }
-    ;
   |  topels = mtopels; START; main_expr = topvarassign;EOF
     {   
       let (types, variables) = topels in
@@ -368,7 +367,6 @@ toptypedecl:
     { GufoParsed.MRef_type name }
   | first_tupel = typedecl ; DOUBLE_MINUS; tupel_suite= typetupelseq;
     { GufoParsed.MTuple_type (first_tupel:: tupel_suite)}
-    ;
   | tdec = typedecl; OPTIONTYPE; 
     {GufoParsed.MOption_type tdec}
   | tdec = typedecl ;SETTYPE
@@ -798,7 +796,7 @@ modulVar:
     }
 
 lst_index:
-  | {None};
+  | {None}
   | prev_idx = lst_index; OPEN_SQRIDXBRACKET;elkey = varassign_no_bracket; CLOSE_SQRBRACKET;
     {match prev_idx with
       | None -> Some [elkey]

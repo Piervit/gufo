@@ -27,6 +27,6 @@ Executable "gufo"
     lambda-term,
     str,
     unix,
-    sedlex,
+    sedlex.ppx,
     menhir,
     menhirLib

@@ -22,4 +22,5 @@ depends: [
   "lwt"
   "lambda-term" {>= "1.10.1"}
   "base-unix"
+  "sedlex" {>= "2.0.0"}
 ]

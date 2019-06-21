@@ -131,7 +131,7 @@ let get_cursor_coord expr =
 
 let filtered_contents filter history =
   let ctt = LTerm_history.contents history in
-    List.filter (fun str -> Zed_utf8.contains str filter) ctt
+    List.filter (fun str -> Zed_utf8.contains (Zed_string.to_utf8 str) filter) ctt
 
   (*If search_expr doesn t match, we keep cur_expr.*)
 let find_hist_expr cur_expr (history, hist_id) search_expr =
@@ -457,7 +457,6 @@ let print_color_expr term expr optprog types =
   in
   LTerm.fprints term (eval (List.rev to_print)) >>=
     (fun () -> place_cursor_after_print term expr )
-  
   ) 
 
 
@@ -465,7 +464,7 @@ let print_color_expr term expr optprog types =
   Simple one color output. 
 *)
 let print_res term str_res = 
-  LTerm.fprints term (eval [B_fg c_result; R (Zed_rope.of_string (str_res^"\n"))])
+  LTerm.fprints term (eval [B_fg c_result; R (str_to_zed_rope (str_res^"\n"))])
 
 (******************************* END PRINTING ********************************)
 
@@ -476,7 +475,7 @@ let fulloprog = ref empty_ofullprog
 
 let check_full_expr cur_expr = 
   let str_expr = Zed_rope.to_string (Zed_edit.text (Zed_edit.edit cur_expr)) in 
-  GufoStart.parse_shell str_expr
+  GufoStart.parse_shell (Zed_string.to_utf8 str_expr)
 
 let analyse_and_print term cur_expr = 
     try (
@@ -500,10 +499,10 @@ let analyse_and_print term cur_expr =
                | VarError msg 
                | SyntaxError msg ->
             print_expr term cur_expr >>=
-            (fun () -> print_err term cur_expr (Zed_rope.of_string msg))
+            (fun () -> print_err term cur_expr (str_to_zed_rope msg))
                | Not_found -> 
             print_expr term cur_expr >>=
-            (fun () -> print_err term cur_expr (Zed_rope.of_string "Not found"))
+            (fun () -> print_err term cur_expr (str_to_zed_rope "Not found"))
         )
       | None ->
           print_expr term cur_expr
@@ -511,13 +510,13 @@ let analyse_and_print term cur_expr =
     with 
       | TypeError (reason) -> 
          print_expr term cur_expr >>=
-            (fun () -> print_err term cur_expr (Zed_rope.of_string reason))
+            (fun () -> print_err term cur_expr (str_to_zed_rope reason))
       | ParseError(fname, line, col, tok, reason) -> 
        print_expr term cur_expr >>=
          let err_msg = string_of_ParseError (fname, line, col, tok, reason) in
-       (fun () -> print_err term cur_expr (Zed_rope.of_string err_msg))
+       (fun () -> print_err term cur_expr (str_to_zed_rope err_msg))
       | Failure msg -> 
-       print_err term cur_expr (Zed_rope.of_string msg)
+       print_err term cur_expr (str_to_zed_rope msg)
 
 
 let print_completion term shell_env hist cur_expr possibles_expr = 
@@ -528,7 +527,7 @@ let print_completion term shell_env hist cur_expr possibles_expr =
           "" possibles_expr 
           )
         in
-        Zed_rope.of_string 
+          str_to_zed_rope
           (
             match String.length possibles_as_str with
             | 0 -> ""
@@ -584,7 +583,7 @@ let do_nothing term shell_env hist cur_expr = Lwt.return (Some (cur_expr, shell_
 let do_fail term shell_env hist cur_expr exc = 
   (*TODO*)
    clear_res_err_and_comple term cur_expr >>=
-   (fun () -> print_err term cur_expr (Zed_rope.of_string ("Unable to execute the previous line: " ^ (Printexc.to_string exc)))) >>=
+   (fun () -> print_err term cur_expr (str_to_zed_rope ("Unable to execute the previous line: " ^ (Printexc.to_string exc)))) >>=
         (fun () -> LTerm.fprints term (eval [B_fg c_unknown; S "\n\n"])) >>=
         (fun () -> LTerm.flush term) >>=
    (fun () -> 
@@ -612,7 +611,7 @@ let print_char term shell_env hist cur_expr akey =
         (fun () ->
         let expr = 
           match akey.code with 
-            | Char i  ->insert_in_expr cur_expr i
+            | Char i  ->insert_in_expr cur_expr (Zed_char.unsafe_of_uChar i)
             | _ -> assert false
         in
           analyse_and_print term cur_expr >>= 
@@ -640,7 +639,7 @@ let multiline_expr term shell_env hist cur_expr =
 
 let new_line_normal_mod term shell_env (hist, hist_id) cur_expr = 
   (*try to retrieve the current line*)
-  LTerm_history.add hist (ctx_to_string cur_expr);
+  LTerm_history.add hist (ctx_to_zed_string cur_expr);
   let hist_id = 0 in
   debug_info (debug_title0 "Creating a Gufo program.");
   try (
@@ -681,7 +680,7 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
        | Sys_error msg 
        | VarError msg 
        | SyntaxError msg ->
-              print_err term cur_expr (Zed_rope.of_string msg) >>=
+              print_err term cur_expr (str_to_zed_rope msg) >>=
               (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
 
 
@@ -795,7 +794,7 @@ let completion term shell_env hist cur_expr =
   replaced by the word better_word.*)
   let improve_expr cur_expr cur_pos cur_word better_word =
     Zed_edit.remove_prev cur_expr (String.length cur_word);
-    Zed_edit.insert cur_expr (Zed_rope.of_string better_word);
+    Zed_edit.insert cur_expr (str_to_zed_rope better_word);
     cur_expr
   in 
   (*we first want to have a 1 line representation of the expression.*)

@@ -37,7 +37,7 @@ let count_lines_str str =
 let count_lines_rope str = 
   Zed_rope.fold 
     (fun achar acc -> 
-      match UChar.uint_code achar with
+      match UChar.uint_code (Zed_char.core achar) with
         | 0x000A (* newline *) -> acc + 1
         | _ -> acc
     )
@@ -53,7 +53,10 @@ let is_empty_expr expr = Zed_rope.is_empty (Zed_edit.text (Zed_edit.edit expr))
 
 let get_edit_ expr = Zed_edit.edit expr
 
-let ctx_to_string expr = (Zed_rope.to_string (Zed_edit.text (Zed_edit.edit expr)))
+let ctx_to_zed_string expr = Zed_rope.to_string (Zed_edit.text (Zed_edit.edit expr))
+let ctx_to_string expr = Zed_string.to_utf8 (ctx_to_zed_string expr)
+
+let str_to_zed_rope str = Zed_rope.of_string (Zed_string.of_utf8 str)
 
 let utf8_to_expr str = 
   let nctx = create_empty_expr () in
@@ -72,10 +75,10 @@ let insert_in_expr expr achar = Zed_edit.insert expr (Zed_rope.make 1 achar); ex
 
 let delete_in_expr expr = Zed_edit.remove_prev expr 1; expr
 
-let to_uchar achar = UChar.of_char achar
+let to_uchar achar = Zed_char.of_utf8 achar
 
 let insert_newline expr = Zed_edit.newline expr; 
-                          insert_in_expr  (insert_in_expr expr (to_uchar ' ')) (to_uchar ' ')
+                          insert_in_expr  (insert_in_expr expr (to_uchar " ")) (to_uchar " ")
 
 let count_lines expr = (Zed_lines.count (Zed_edit.lines (get_edit_ expr))) + 1
 
@@ -89,10 +92,10 @@ let get_current_word expr =
       | -1 -> curword
       | _ -> 
       (let curchar = Zed_rope.get rop pos in
-      match UChar.uint_code curchar with
+      match UChar.uint_code (Zed_char.core curchar) with
         | 32 (* space *) -> curword
         | _ -> get_word rop 
-                 (pos - 1)(Zed_utf8.insert curword 0 (Zed_utf8.singleton curchar))
+                 (pos - 1)(Zed_utf8.insert curword 0 (Zed_utf8.singleton (Zed_char.core curchar)))
       )
   in
   get_word curline (col - 1 ) curword, (row, col)
@@ -107,7 +110,7 @@ let to_one_line_expr expr =
   let (_,_, new_curs_col) = 
     Zed_rope.fold
       (fun uchar (curs_row, curs_col, new_curs_col) ->
-        (match UChar.uint_code uchar with
+        (match UChar.uint_code (Zed_char.core uchar) with
           | 0x000A
           | 0x000D (*newline *) ->
             (curs_row - 1, curs_col, new_curs_col)
@@ -122,7 +125,7 @@ let to_one_line_expr expr =
       ))
       (Zed_edit.text (Zed_edit.edit expr)) (row, col, -1)
   in
-    Zed_rope.to_string (Zed_rope.Buffer.contents new_rop_buf), new_curs_col
+    (Zed_string.to_utf8 (Zed_rope.to_string (Zed_rope.Buffer.contents new_rop_buf)), new_curs_col)
 
 
 
@@ -133,14 +136,14 @@ let split_rope_message str max_line_size =
   let  _ = 
     Zed_rope.fold 
       (fun uchar cur_col_num ->
-        (match UChar.uint_code uchar with
+        (match UChar.uint_code (Zed_char.core uchar) with
           | 0x000A
           | 0x000D (*newline *) ->
-              let _ = Zed_rope.Buffer.add new_rop_buf (UChar.chr 0x000A) in 0
+              let _ = Zed_rope.Buffer.add new_rop_buf (Zed_char.unsafe_of_uChar (UChar.chr 0x000A)) in 0
           | uchari -> 
               match cur_col_num with
                 | i when i = (max_line_size - 1) ->
-                    let _ = Zed_rope.Buffer.add new_rop_buf (UChar.chr 0x000A) in
+                    let _ = Zed_rope.Buffer.add new_rop_buf (Zed_char.unsafe_of_uChar (UChar.chr 0x000A)) in
                     let _ = Zed_rope.Buffer.add new_rop_buf uchar in
                     1
                 | _ -> 
