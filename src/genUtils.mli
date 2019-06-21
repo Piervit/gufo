@@ -204,6 +204,7 @@ val debug_title0: string -> string
 val debug_title1: string -> string
 val debug_title2: string -> string
 val debug_title3: string -> string
+val debug_title4: string -> string
 
 (**** END DEBUG UTILITIES *)
 
