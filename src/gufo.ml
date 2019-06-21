@@ -142,6 +142,12 @@ struct
         mirv_index: mitype_val list option;
         mirv_debugname: string;
       }
+
+      and mifun_val = {
+        mifv_args_name : int StringMap.t;  
+        mifv_args_id : mifunarg list; 
+        mifv_body : mitype_val;
+        }
       
       and misimple_type_val = 
         | MIBase_val of mibase_type_val 
@@ -149,7 +155,7 @@ struct
         | MIList_val of mitype_val list
         | MINone_val 
         | MISome_val of mitype_val
-        | MIFun_val of int StringMap.t * mifunarg list * mitype_val 
+        | MIFun_val of mifun_val
         | MIEmpty_val
       
       and mifunarg = 
@@ -551,8 +557,9 @@ struct
               mlist_compare aaa bbb
           | MIList_val aaa, MIList_val bbb -> 
               mlist_compare aaa bbb
-          | MIFun_val (_,aaaargs, aaabody), MIFun_val (_,bbbargs, bbbbody) -> 
-              fun_compare (aaaargs, aaabody) (bbbargs, bbbbody)
+          | MIFun_val aaa, MIFun_val bbb -> 
+              fun_compare (aaa.mifv_args_id, aaa.mifv_body) 
+                          (bbb.mifv_args_id, bbb.mifv_body)
           | MIEmpty_val, MIEmpty_val -> 0
           | MIEmpty_val, _ -> 1 
           | _, MIEmpty_val -> -1
@@ -750,6 +757,11 @@ struct
     mocv_resolved_type : int option *int ; 
   }
   
+  and mofun_val = {
+    mofv_args_name : int StringMap.t; (*args name map (for debug + color)*) 
+    mofv_args_id : mofunarg list; 
+    mofv_body : motype_val;
+  } 
  
   and mosimple_type_val = 
     | MOBase_val of mobase_type_val 
@@ -759,7 +771,7 @@ struct
     | MOSome_val of motype_val
     | MOSet_val of MSet.t
     | MOMap_val of motype_val MMap.t
-    | MOFun_val of int StringMap.t * mofunarg list * motype_val 
+    | MOFun_val of mofun_val
     | MOEmpty_val
   
   and mofunarg = 
@@ -1028,10 +1040,16 @@ struct
         MONone_val
     | MISome_val somev ->
         MOSome_val (simple_to_core_val somev)
-    | MIFun_val (funnamelst, funargslst, body) ->
-        MOFun_val (funnamelst,List.map simple_to_core_funarg funargslst,
-        simple_to_core_val body)
+    | MIFun_val fv ->
+        MOFun_val (simple_to_core_fun_val fv)
     | MIEmpty_val -> MOEmpty_val
+
+  and simple_to_core_fun_val fv = 
+    {
+      mofv_args_name= fv.mifv_args_name;
+      mofv_args_id = List.map simple_to_core_funarg fv.mifv_args_id;
+      mofv_body = simple_to_core_val fv.mifv_body;
+    }
 
   and simple_to_core_ref_val rf = 
     {
@@ -1075,7 +1093,7 @@ struct
     let rec core_to_simple_composed ct = 
       {
         micv_module_def = ct.mocv_module_def;
-        micv_fields= IntMap.map core_to_simple_mtype ct.mocv_fields;
+        micv_fields= IntMap.map core_to_simple_val ct.mocv_fields;
         micv_resolved_type = ct.mocv_resolved_type;
       }
 
@@ -1087,7 +1105,7 @@ struct
     and core_to_simple_stringOrRef sor = 
       match sor with
        | MOSORString s -> MISORString s
-       | MOSORExpr e -> MISORExpr (core_to_simple_mtype e)
+       | MOSORExpr e -> MISORExpr (core_to_simple_val e)
 
     and core_to_simple_cmd_output c = 
       match c with 
@@ -1138,7 +1156,14 @@ struct
        | MOPipedCmd (cseqa, cseqb) ->
            MIPipedCmd(core_to_simple_cmdseq cseqa, core_to_simple_cmdseq cseqb)
 
- 
+   and core_to_simple_fun_val fv = 
+    {
+      mifv_args_name= fv.mofv_args_name;
+      mifv_args_id = List.map core_to_simple_funarg fv.mofv_args_id;
+      mifv_body = core_to_simple_val fv.mofv_body;
+    }
+
+
     and core_to_simple_simple_val sv = 
       match sv with 
               | MOBase_val MOTypeStringVal s ->
@@ -1153,12 +1178,12 @@ struct
                   MIBase_val (MITypeCmdVal( core_to_simple_cmdseq c))
               | MOTuple_val lst
               | MOList_val lst ->
-                  MIList_val (List.map core_to_simple_mtype lst )
+                  MIList_val (List.map core_to_simple_val lst )
               | MONone_val -> MINone_val 
               | MOSome_val v -> 
-                  MISome_val (core_to_simple_mtype v )
-              | MOFun_val (argnameslst, mofunarglst, body) -> 
-                  MIFun_val (argnameslst,List.map core_to_simple_funarg mofunarglst , core_to_simple_mtype body)
+                  MISome_val (core_to_simple_val v )
+              | MOFun_val fv -> 
+                  MIFun_val (core_to_simple_fun_val fv)
               | MOEmpty_val -> MIEmpty_val
               | MOSet_val _ -> raise (TypeError "We cannot have set of set, nor use set as map key.")
               | MOMap_val _ ->  raise (TypeError "We cannot have set of map, nor use map as map key.")
@@ -1171,7 +1196,7 @@ struct
         mirv_index = 
           (match rf.morv_index with
             | None -> None
-            | Some lst -> Some (List.map core_to_simple_mtype lst));
+            | Some lst -> Some (List.map core_to_simple_val lst));
         mirv_debugname = rf.morv_debugname;
       }
 
@@ -1179,12 +1204,12 @@ struct
       {
         mibd_name = bd.mobd_name;
         mibd_debugnames = bd.mobd_debugnames;
-        mibd_value= core_to_simple_mtype bd.mobd_value ;
-        mibd_body=  core_to_simple_mtype bd.mobd_body;
+        mibd_value= core_to_simple_val bd.mobd_value ;
+        mibd_body=  core_to_simple_val bd.mobd_body;
       }
 
 
-    and core_to_simple_mtype v = 
+    and core_to_simple_val v = 
       match v with 
         | MOSimple_val sv -> 
             MISimple_val (core_to_simple_simple_val sv )
@@ -1194,20 +1219,20 @@ struct
         | MORef_val (ref,args) -> 
             MIRef_val (
               core_to_simple_ref_val ref, 
-              List.map core_to_simple_mtype args
+              List.map core_to_simple_val args
             )
         | MOEnvRef_val (var) -> 
             MIEnvRef_val (var)
         | MOBasicFunBody_val (op, arga, argb)  ->
-          MIBasicFunBody_val (op, core_to_simple_mtype arga, core_to_simple_mtype argb)
+          MIBasicFunBody_val (op, core_to_simple_val arga, core_to_simple_val argb)
         | MOBind_val (bd) -> 
             MIBind_val (core_to_simple_binding_val bd)
         | MOIf_val (cond, thn, els) ->
-            MIIf_val (core_to_simple_mtype cond, core_to_simple_mtype thn, core_to_simple_mtype els)
+            MIIf_val (core_to_simple_val cond, core_to_simple_val thn, core_to_simple_val els)
         | MOComp_val (op, left, right) -> 
-            MIComp_val (op, core_to_simple_mtype left, core_to_simple_mtype right)
+            MIComp_val (op, core_to_simple_val left, core_to_simple_val right)
         | MOBody_val bdlst -> 
-            MIBody_val (List.map core_to_simple_mtype bdlst)
+            MIBody_val (List.map core_to_simple_val bdlst)
 
   (**END Transformation from SimpleCore to Core **)
 
@@ -1319,8 +1344,8 @@ let moval_to_type aval =
             (type_to_string rettyp)
       | MOUnit_type  -> "unit"
       | MOAll_type i -> sprintf "'%d" i
-      | MORef_type (modi, i , deep, args ) -> sprintf "ref %d[%d] %s" i deep 
-                                              (List.fold_left (fun s arg -> sprintf "%s -> %s" s (type_to_string arg)) "" args)
+      | MORef_type (modi, i , deep, args ) -> sprintf "ref %d[%d] (nbargs: %d) {%s}" i deep (List.length args) 
+                                              (List.fold_left (fun s arg -> sprintf "%s, %s" s (type_to_string arg)) "" args)
       | MOTupel_type _ -> sprintf "Tupel" 
     )
 
@@ -1387,7 +1412,7 @@ let moval_to_type aval =
                     )
                     (List.tl lst))
 
-              | MOFun_val (_,funargs, body) -> "-fun-"
+              | MOFun_val _fv -> "-fun-"
               | MOEmpty_val -> ""
             )
         | MOComposed_val mct -> "-composed-"

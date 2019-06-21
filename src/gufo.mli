@@ -283,7 +283,12 @@ sig
     mocv_fields: motype_val IntMap.t; (*The key are are name of the field, the values are the value of the field.*)
     mocv_resolved_type : int option *int ; (*module, id of the type*)
   }
-  
+ 
+  and mofun_val = {
+    mofv_args_name : int StringMap.t; (*args name map (for debug + color)*) 
+    mofv_args_id : mofunarg list; 
+    mofv_body : motype_val;
+  } 
  
   and mosimple_type_val = 
     | MOBase_val of mobase_type_val 
@@ -293,7 +298,7 @@ sig
     | MOSome_val of motype_val
     | MOSet_val of MSet.t
     | MOMap_val of motype_val MMap.t
-    | MOFun_val of int StringMap.t * mofunarg list * motype_val (*args name map (for debug + color)* args id * body_expr *)
+    | MOFun_val of mofun_val
     | MOEmpty_val
   
   and mofunarg = 
@@ -434,7 +439,7 @@ sig
 
   val simple_to_core_val: mitype_val -> motype_val
 
-  val core_to_simple_mtype: motype_val -> mitype_val
+  val core_to_simple_val: motype_val -> mitype_val
 
   (**END Transformation from SimpleCore to Core **)
 

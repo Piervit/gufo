@@ -385,8 +385,8 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
       | MOMap_val a, MOMap_val b -> 
           MMap.compare val_compare a b
       
-      | MOFun_val (_,aaaargs, aaabody), MOFun_val (_,bbbargs, bbbbody) -> 
-          fun_compare (aaaargs, aaabody) (bbbargs, bbbbody)
+      | MOFun_val aaa, MOFun_val bbb -> 
+          fun_compare (aaa.mofv_args_id, aaa.mofv_body) (bbb.mofv_args_id, bbb.mofv_body)
       | MOEmpty_val, MOEmpty_val -> 0
       | MOEmpty_val, _ -> 1 
       | _, MOEmpty_val -> -1
@@ -676,33 +676,41 @@ and apply_fun toplevel arg2valMap funval arglst =
       | [] -> full_fun
       | cur_partial_arg ::partial_args -> 
         (match full_fun with
-          | MOSimple_val(MOFun_val (dbg, curfunarg::mofunarglst, body)) ->
+          | MOSimple_val(MOFun_val fv) ->
+            let curfunarg, mofunarglst = 
+              List.hd fv.mofv_args_id, List.tl fv.mofv_args_id 
+            in
             let body_binding = 
               {
                 mobd_name = unstack_args_with_pos curfunarg;
                 mobd_debugnames = IntMap.empty ; (*at this level, we don't care about debug*)
                 mobd_value= cur_partial_arg;
-                mobd_body= body ;
+                mobd_body= fv.mofv_body;
               }
-            in apply_partial_fun (MOSimple_val (MOFun_val (dbg, mofunarglst, MOBind_val body_binding))) partial_args
+            in
+            let new_fv = {mofv_args_name = fv.mofv_args_name; 
+                          mofv_args_id = mofunarglst; 
+                          mofv_body = MOBind_val body_binding} 
+            in 
+              apply_partial_fun (MOSimple_val (MOFun_val new_fv)) partial_args
           | _ -> assert false
         )
   in 
   match funval with 
-    | MOSimple_val(MOFun_val (dbg,mofunarglst, body)) -> 
+    | MOSimple_val(MOFun_val fv) -> 
       (*apply the code using arg2valMap when needed.*)
       (*we check if it is a partial application *)
-      (match (Pervasives.compare (List.length arglst) (List.length mofunarglst)) with
+      (match (Pervasives.compare (List.length arglst) (List.length fv.mofv_args_id)) with
         | i when i < 0 -> 
             apply_partial_fun funval arglst
         | 0 -> 
-            let arg2valMap,_ = create_pointer arg2valMap mofunarglst arglst in
-            apply_motype_val toplevel arg2valMap body
+            let arg2valMap,_ = create_pointer arg2valMap fv.mofv_args_id arglst in
+            apply_motype_val toplevel arg2valMap fv.mofv_body
         | _ ->  (*more argument than take the function*)
-              let pos = (List.length arglst) - (List.length mofunarglst) in
+              let pos = (List.length arglst) - (List.length fv.mofv_args_id) in
                let arglst, nargs = list_split_at_idx arglst pos in
-               let narg2valMap,_ = create_pointer arg2valMap mofunarglst arglst in
-               let funval = (apply_motype_val toplevel narg2valMap body) in 
+               let narg2valMap,_ = create_pointer arg2valMap fv.mofv_args_id arglst in
+               let funval = (apply_motype_val toplevel narg2valMap fv.mofv_body) in 
                apply_fun toplevel arg2valMap funval nargs
       )
     | _ -> apply_motype_val toplevel arg2valMap funval
@@ -1070,9 +1078,9 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   | MWithSet, _, _ -> assert false
             (** Has **)
   | MHasSet, MOSimple_val(MOSet_val set1), possibleEl ->
-    MOSimple_val( MOBase_val (MOTypeBoolVal (MSet.mem (core_to_simple_mtype possibleEl) set1)))
+    MOSimple_val( MOBase_val (MOTypeBoolVal (MSet.mem (core_to_simple_val possibleEl) set1)))
   | MHasMap, MOSimple_val(MOMap_val map1), possibleEl ->
-    MOSimple_val( MOBase_val (MOTypeBoolVal (MMap.mem (core_to_simple_mtype possibleEl) map1)))
+    MOSimple_val( MOBase_val (MOTypeBoolVal (MMap.mem (core_to_simple_val possibleEl) map1)))
   | MHasSet, _, _ -> assert false
   | MHasMap, _, _ -> assert false
             (** without **)
@@ -1139,7 +1147,7 @@ and apply_mosimpletype_val toplevel arg2valMap aval =
         MOSimple_val (MOList_val (List.map (apply_motype_val toplevel arg2valMap) lst))
     | MOSet_val set ->
         let nset = MSet.fold (fun aval nset -> 
-          MSet.add (core_to_simple_mtype (apply_motype_val toplevel arg2valMap 
+          MSet.add (core_to_simple_val (apply_motype_val toplevel arg2valMap 
                     (simple_to_core_val aval))) nset) set MSet.empty
         in
         MOSimple_val (MOSet_val nset)
@@ -1148,15 +1156,15 @@ and apply_mosimpletype_val toplevel arg2valMap aval =
           MMap.fold 
           (fun key value newmap ->
             MMap.add 
-              (core_to_simple_mtype
+              (core_to_simple_val
                 (apply_motype_val toplevel arg2valMap (simple_to_core_val key))) 
             (apply_motype_val toplevel arg2valMap value) newmap
           ) mmap MMap.empty))
     | MONone_val  -> MOSimple_val (MONone_val)
     | MOSome_val sv -> MOSimple_val (MOSome_val (apply_motype_val toplevel arg2valMap sv))
 
-    | MOFun_val (onames, arglst, body) ->
-        MOSimple_val (MOFun_val (onames, arglst, body))
+    | MOFun_val fv  ->
+        MOSimple_val (MOFun_val fv)
     | MOEmpty_val -> MOSimple_val (MOEmpty_val)
 
 and apply_in_list toplevel arg2valMap ref indices =

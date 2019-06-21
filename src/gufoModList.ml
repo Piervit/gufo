@@ -27,10 +27,10 @@ let listtypes = IntMap.empty
 
 let iter args scope =  
   match args with 
-    |  [MOSimple_val (MOFun_val(onames,arglist, bodyexpr)); MOSimple_val (MOList_val mtvlist)] ->
+    |  [MOSimple_val (MOFun_val fv); MOSimple_val (MOList_val mtvlist)] ->
         let _ = List.iter 
         (fun arg -> 
-          let _res = GufoEngine.apply_fun true scope (MOSimple_val (MOFun_val(onames,arglist,bodyexpr))) [arg]
+          let _res = GufoEngine.apply_fun true scope (MOSimple_val (MOFun_val fv)) [arg]
           in 
           ()
         )

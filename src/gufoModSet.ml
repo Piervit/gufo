@@ -29,7 +29,7 @@ let settypes = IntMap.empty
 let is_in args scope =  
   match args with 
     |  [el_val ;MOSimple_val (MOSet_val(mset)); ] ->
-        MOSimple_val (MOBase_val (MOTypeBoolVal (MSet.mem (core_to_simple_mtype el_val) mset)))
+        MOSimple_val (MOBase_val (MOTypeBoolVal (MSet.mem (core_to_simple_val el_val) mset)))
 
     | _ -> assert false 
 

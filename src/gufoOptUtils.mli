@@ -17,12 +17,16 @@
     Author: Pierre Vittet
 *)
 
+
 val fold_over_obinding_val : ('a -> Gufo.MCore.mobinding -> 'a) -> 'a -> Gufo.MCore.motype_val -> 'a
 
-val fold_over_obinding_and_ofun_val : ('a -> Gufo.MCore.mobinding -> 'a) -> 
-                                      ('a ->  int GenUtils.StringMap.t * Gufo.MCore.mofunarg list *  Gufo.MCore.motype_val -> 'a) -> 
+val fold_over_obinding_and_ofun_val : 
+  ('a -> Gufo.MCore.mobinding -> 'a) -> 
+  ('a -> Gufo.MCore.mofun_val  -> 'a) -> 
                                        'a -> 
                                         Gufo.MCore.motype_val -> 'a
+
+(* val fold_over_oref_val : ('a -> Gufo.MCore.moref_val -> 'a) -> 'a -> Gufo.MCore.motype_val -> 'a *)
 
 (*for a funarg type, return the type unfolded list of arguments. *)
 val unstack_args : Gufo.MCore.mofunarg -> int list
