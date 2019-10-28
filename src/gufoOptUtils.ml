@@ -103,6 +103,9 @@ let fold_over_obinding_val apply_fun acc expr =
           in
             List.fold_left fold_over_obinding_val_ acc mtyplst
       | MOEnvRef_val _ -> acc
+      | MONRFCall_val (fval, args) -> 
+          let acc = fold_over_obinding_val_ acc fval.mofv_body in
+          List.fold_left fold_over_obinding_val_ acc args 
       | MOBind_val mbind -> 
           let acc = apply_fun acc mbind in 
           let acc = fold_over_obinding_val_ acc mbind.mobd_value in
@@ -203,6 +206,9 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
               | Some lst -> List.fold_left fold_over_obinding_and_ofun_val_ acc lst
           in
             List.fold_left fold_over_obinding_and_ofun_val_ acc mtyplst
+      | MONRFCall_val (fval, args) -> 
+          let acc = fold_over_obinding_and_ofun_val_ acc fval.mofv_body in
+          List.fold_left fold_over_obinding_and_ofun_val_ acc args 
       | MOEnvRef_val _ ->  acc
       | MOBind_val mbind -> 
           let acc = apply_bind_fun acc mbind in 
@@ -224,8 +230,6 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
     fold_over_obinding_and_ofun_val_ acc expr
 
 
-(*TODO: not ready*)
-(*
 
 let fold_over_oref_val apply_fun acc expr = 
   let rec fold_over_oref_val_ acc expr = 
@@ -306,6 +310,9 @@ let fold_over_oref_val apply_fun acc expr =
               | Some lst -> List.fold_left fold_over_oref_val_ acc lst
           in
             List.fold_left fold_over_oref_val_ acc mtyplst
+      | MONRFCall_val (fval, args) -> 
+          let acc = fold_over_oref_val_ acc fval.mofv_body in
+          List.fold_left fold_over_oref_val_ acc args 
       | MOEnvRef_val _ -> acc
       | MOBind_val mbind -> 
           let acc = fold_over_oref_val_ acc mbind.mobd_value in
@@ -325,10 +332,127 @@ let fold_over_oref_val apply_fun acc expr =
   in
     fold_over_oref_val_ acc expr
 
-
-
-
+(*
+let transform_ref_in_funcall transform_fun expr =
+  let rec transform_ref_in_funcall_ transform_fun expr =
+    let rec fold_over_cmd_val_from_cmdseq seq = 
+      let rec over_moStringOrRef sor = 
+        match sor with
+          | MOSORString _ -> sor
+          | MOSORExpr expr -> MOSORExpr (transform_ref_in_funcall_ expr)
+      in
+      let rec over_cmd_output out =
+        match out with 
+          | MOCMDOStdOut
+          | MOCMDOStdErr -> out
+          | MOCMDOFile sor -> MOCMDOFile (over_moStringOrRef sor)
+          | MOCMDOFileAppend sor ->
+              MOCMDOFileAppend (over_moStringOrRef sor)
+      in
+      let rec over_cmd_outputerr out =
+        match out with 
+          | MOCMDEStdOut
+          | MOCMDEStdErr -> out
+          | MOCMDEFile sor -> MOCMDEFile (over_moStringOrRef sor)
+          | MOCMDEFileAppend sor ->
+              MOCMDEFileAppend (over_moStringOrRef acc sor)
+      in
+      let rec over_cmd_input inp =
+        match inp with 
+          | MOCMDIStdIn -> inp
+          | MOCMDIFile sor -> MOCMDIFile (over_moStringOrRef acc sor)
+      in
+        match seq with 
+        | MOSimpleCmd cmd -> 
+          MOSimpleCmd {cmd with 
+                mocm_args = List.map over_moStringOrRef cmd.mocm_args;
+                mocm_output = over_cmd_output cmd.mocm_output;
+                mocm_outputerr = over_cmd_outputerr cmd.mocm_outputerr;
+                mocm_input_src = over_cmd_input cmd.mocm_input_src;
+              }
+        | MOForkedCmd seq -> 
+          MOForkedCmd (fold_over_cmd_val_from_cmdseq seq)
+        | MOOrCmd (seq1, seq2) ->
+          MOOrCmd (fold_over_cmd_val_from_cmdseq seq1, fold_over_cmd_val_from_cmdseq seq2)
+        | MOSequenceCmd (seq1, seq2) ->
+          MOSequenceCmd (fold_over_cmd_val_from_cmdseq seq1, fold_over_cmd_val_from_cmdseq seq2)
+        | MOPipedCmd (seq1, seq2) -> 
+          MOPipedCmd (fold_over_cmd_val_from_cmdseq seq1, fold_over_cmd_val_from_cmdseq seq2)
+        | MOAndCmd (seq1, seq2) -> 
+          MOAndCmd (fold_over_cmd_val_from_cmdseq seq1, fold_over_cmd_val_from_cmdseq seq2)
+    in
+      match expr with
+      | MOComposed_val ct -> 
+          MOComposed_val 
+          {ct with mocv_fields = transform_ref_in_funcall_ ct.mocv_fields}
+      | MOSimple_val msimple ->
+        (match msimple with 
+          | MONone_val -> MONone_val
+          | MOBase_val bv -> 
+            (match bv with 
+              | MOTypeCmdVal cseq -> 
+                  MOBase_val ( MOTypeCmdVal (fold_over_cmd_val_from_cmdseq cseq))
+              | MOTypeStringVal _ | MOTypeBoolVal _ | MOTypeIntVal _ | MOTypeFloatVal _ -> 
+                MOBase_val bv
+            )
+          | MOSet_val set -> 
+              MOSet_val 
+                (MSet.map 
+                  (fun el -> core_to_simple_val (transform_ref_in_funcall_ 
+                                        (simple_to_core_val el) )) set)
+          | MOList_val mtypelst ->
+              MOList_val (List.map transform_ref_in_funcall_ mtypelst)
+          | MOTuple_val mtypelst ->
+              MOTuple_val (List.map transform_ref_in_funcall_ mtypelst)
+          | MOFun_val fv ->
+              MOFun_val {fv with 
+                mofv_body = transform_ref_in_funcall_ fv.mofv_body;
+              }
+          | MOSome_val mtype -> 
+            MOSome_val (transform_ref_in_funcall_ mtyp)
+          | MOMap_val keyValLst ->
+              MOMap_val 
+              (MMap.map 
+                (fun el -> (core_to_simple_val (transform_ref_in_funcall_ (simple_to_core_val el)))) 
+                keyValLst
+              )
+          | MOEmpty_val -> MOEmpty_val
+        )
+      | MOBasicFunBody_val (expr_op, e1, e2) ->
+          MOBasicFunBody_val (expr_op, transform_ref_in_funcall_ e1, (transform_ref_in_funcall_ e2))
+      | MORef_val (mref, mtyplst) -> 
+         let new_mref = 
+          { mref with 
+            morv_index = (match mref.morv_index with  
+                           | None -> None
+                           | Some lst -> 
+                             List.map transform_ref_in_funcall_ lst)
+            ;
+          }
+          in
+          let new_mtyplst = 
+            List.map transform_ref_in_funcall_ mtyplst
+          in 
+          transform_fun new_mref new_mtyplst
+      | MOEnvRef_val s -> MOEnvRef_val s
+      | MOBind_val mbind -> 
+          MOBody_val {mbind with
+            mobd_value = transform_ref_in_funcall_ mbind.mobd_value;
+            mobd_body = transform_ref_in_funcall_ mbind.mobd_body;
+          }
+      | MOIf_val (cond, thn , els) ->
+          MOIf_val (transform_ref_in_funcall_ cond, 
+                    transform_ref_in_funcall_ thn, 
+                    transform_ref_in_funcall_ els)
+      | MOComp_val (cmp, mtyp1, mtyp2) ->
+          MOComp_val (cmp, transform_ref_in_funcall_ mtyp1, transform_ref_in_funcall_ mtyp2)
+      | MOBody_val (lst) ->
+          MOBody_val (List.map transform_ref_in_funcall_ lst)
+  in
+    fold_over_oref_val_ acc expr
 *)
+
+
 
 
 

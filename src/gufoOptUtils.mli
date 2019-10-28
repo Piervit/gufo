@@ -17,16 +17,39 @@
     Author: Pierre Vittet
 *)
 
+(*
+  fold_over_obinding_val : apply_fun -> accumulator -> expr -> accumulator
+  Recursively apply apply_fun to every mobinding found within expr and add
+  result in accumulator.
 
+*)
 val fold_over_obinding_val : ('a -> Gufo.MCore.mobinding -> 'a) -> 'a -> Gufo.MCore.motype_val -> 'a
 
+(*
+  fold_over_obinding_and_ofun_val: apply_fun -> accumulator -> expr ->
+  accumulator Recursively apply apply_fun to every mobinding and mofun_val found
+  within expr and add result in accumulator.
+*)
 val fold_over_obinding_and_ofun_val : 
   ('a -> Gufo.MCore.mobinding -> 'a) -> 
   ('a -> Gufo.MCore.mofun_val  -> 'a) -> 
                                        'a -> 
                                         Gufo.MCore.motype_val -> 'a
 
-(* val fold_over_oref_val : ('a -> Gufo.MCore.moref_val -> 'a) -> 'a -> Gufo.MCore.motype_val -> 'a *)
+(*
+  fold_over_oref_val: apply_fun -> accumulator -> expr ->
+  accumulator Recursively apply apply_fun to every moref_val found
+  within expr and add result in accumulator.
+*)
+val fold_over_oref_val : ('a -> Gufo.MCore.moref_val -> 'a) -> 'a -> Gufo.MCore.motype_val -> 'a
+
+(* transform_ref_in_funcall transform_fun -> val -> newval
+   transform every moref_val within val into mofun_val (using the
+   transformation function transform_fun).
+   A ref can have internal links to other references: the childs of a reference
+   are transformed by transform_fun before the given reference.
+ *)
+(* val transform_ref_in_funcall : (Gufo.MCore.moref_val -> Gufo.MCore.mofun_val) -> Gufo.MCore.motype_val -> Gufo.MCore.motype_val *)
 
 (*for a funarg type, return the type unfolded list of arguments. *)
 val unstack_args : Gufo.MCore.mofunarg -> int list
