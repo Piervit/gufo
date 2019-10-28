@@ -26,6 +26,12 @@ BUG 11:
 
 BUG 12:
 
-let $a = $Opt.get ($Int.fromString $x) "23" 
+let $a = $Opt.get ($Int.fromString "3") 23 fonctionne mais pas  
+($Opt.get ($Int.fromString "3") 3 ) ^ "STR2"
 
 Selon que la chaine $x soit convertible en int ou non, $a sera de type int ou string -> il devrait y avoir une erreur de type.
+
+BUG 13:
+
+Try tiping:
+git commit _oasis
