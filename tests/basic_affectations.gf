@@ -94,4 +94,17 @@ let $a = ls in ($a)
 let $a = true in ($a)
 #END PROGRAM 
 
+#PROGRAM 11
+#a simple tuple affectation (with differents types), direct use
+**START**
+let $a -- $b = 3 -- "Toto" in ($a -- $b )
+#END PROGRAM 
+
+#PROGRAM 12
+#a simple tuple affectation 
+let $a -- $b = 3 -- "Toto" 
+**START**
+$a 
+#END PROGRAM 
+
 
