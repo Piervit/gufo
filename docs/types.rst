@@ -21,6 +21,7 @@ Aggregation types:
   * list
   * set : no order, no duplicated value.
   * map : a map is a set of key values binded to values.
+  * tuple: a tuple is a sequence of value with potentially different types.
 
 List, set and maps can only contains element of same type.
 
@@ -109,8 +110,18 @@ You can use the list module for a deeper uses (length, iterator, map...)::
     % $Map.length $myMap 
     5
 
+How to use a tuple
+-----------------
+A tuple is a sequence of value with potentially different types. The separation
+character for a tuple is "--". This is mainly used as a shortcut to variable
+declaration::
 
+    % let $a -- $b = 3 -- "Hello" 
 
+Allows to declare in a single line two variables, $a with value 3 and $b with
+value "Hello".
+
+    
   
 
 Struct type
