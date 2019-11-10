@@ -20,7 +20,7 @@
 # This file contains multiples unvalid programs.
 #Pprograms are separated by "#PROGRAM comments".
 # They are dedicated to tests non-regressions in Gufo: Theses programs are
-considered as invalid and the gufo compiler should thread them as invalid.
+#considered as invalid and the gufo compiler should thread them as invalid.
 
 
 
