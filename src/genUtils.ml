@@ -115,6 +115,15 @@ let list_compare compar la lb =
     | Invalid_argument _ -> (List.length la) - (List.length lb) 
     | Not_found -> 0 
 
+let list_starts lst n = 
+   let rec lst_start_ new_lst lst n =
+    match n with
+      | 0 -> List.rev new_lst
+      | i -> lst_starts_ (List.hd lst)::new_lst (List.tl lst)  (n - 1)
+  in
+lst_starts_ [] lst n  
+  
+
 (* return lst without the n first elements. 
  * This function has slow performance.
  * *)

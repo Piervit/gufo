@@ -219,6 +219,12 @@ val debug_title4: string -> string
 *)
 val list_find2: ('a -> 'b -> bool) -> 'a list -> 'b list -> 'a * 'b
 
+(*return list with only the n first elements
+  This function has slow performances.
+  *)
+val list_starts: 'a list -> int -> 'a list
+
+
 (* return lst without the n first elements. 
  * This function has slow performance.
  * *)
