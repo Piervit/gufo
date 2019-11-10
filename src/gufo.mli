@@ -199,13 +199,6 @@ sig
     mova_value: motype_val;
   }
 
-(*
-  (* environment variable. *)
-  and movar_env = {
-    movae: string;
-  }
-*)
-
   and moref_val = {
     morv_module : int option; (* None if defined in current module.*)
     morv_varname : int * (int option * int) list; (*varname * (fieldmoduleid * fieldsid *)
@@ -312,21 +305,11 @@ sig
   
   (*
     This is the values of gufo optimized representation.
-    In fact, it hides 2 representations:
-      - before type checking : we have MORef_val values but no MONRFCall_val values.
-      - after the type checking: MORef_val have been replaced by MONRFCall_val.
-    That way, we do not have to worry anymore about references after the type
-    checking.
-    A 'cleaner' solution would have been to create a new type without ref but
-this would oblige to rewrite the MSet /MMap stuff which would have requiert a
-lot of work.
   *)
   and motype_val = 
     | MOSimple_val of mosimple_type_val
     | MOComposed_val of mocomposed_type_val
     | MORef_val of moref_val * motype_val list (*ref , varname args*)
-    | MONRFCall_val of mofun_val* motype_val list (*module, varname args,
-      as of now it is unused, only a proposition to add*) 
     | MOEnvRef_val of string
     | MOBasicFunBody_val of mo_expr_operation * motype_val * motype_val
     | MOBind_val of mobinding
