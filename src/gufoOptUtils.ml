@@ -102,10 +102,6 @@ let fold_over_obinding_val apply_fun acc expr =
               | Some lst -> List.fold_left fold_over_obinding_val_ acc lst
           in
             List.fold_left fold_over_obinding_val_ acc mtyplst
-      | MOEnvRef_val _ -> acc
-      | MONRFCall_val (fval, args) -> 
-          let acc = fold_over_obinding_val_ acc fval.mofv_body in
-          List.fold_left fold_over_obinding_val_ acc args 
       | MOBind_val mbind -> 
           let acc = apply_fun acc mbind in 
           let acc = fold_over_obinding_val_ acc mbind.mobd_value in
@@ -206,9 +202,6 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
               | Some lst -> List.fold_left fold_over_obinding_and_ofun_val_ acc lst
           in
             List.fold_left fold_over_obinding_and_ofun_val_ acc mtyplst
-      | MONRFCall_val (fval, args) -> 
-          let acc = fold_over_obinding_and_ofun_val_ acc fval.mofv_body in
-          List.fold_left fold_over_obinding_and_ofun_val_ acc args 
       | MOEnvRef_val _ ->  acc
       | MOBind_val mbind -> 
           let acc = apply_bind_fun acc mbind in 
@@ -310,9 +303,6 @@ let fold_over_oref_val apply_fun acc expr =
               | Some lst -> List.fold_left fold_over_oref_val_ acc lst
           in
             List.fold_left fold_over_oref_val_ acc mtyplst
-      | MONRFCall_val (fval, args) -> 
-          let acc = fold_over_oref_val_ acc fval.mofv_body in
-          List.fold_left fold_over_oref_val_ acc args 
       | MOEnvRef_val _ -> acc
       | MOBind_val mbind -> 
           let acc = fold_over_oref_val_ acc mbind.mobd_value in
