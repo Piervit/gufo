@@ -1012,7 +1012,7 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
     MOSimple_val (MOBase_val (MOTypeStringVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeStringVal 
       (Printf.sprintf "%s%s" a b)))
-  | MConcatenation, _, _ -> assert false
+  | MConcatenation, _, _ -> raise (InternalError "Execution engine error")
             (** Addition **)
   | MAddition, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) -> 
@@ -1020,8 +1020,8 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   | MAdditionFloat, MOSimple_val (MOBase_val (MOTypeFloatVal a)),
     MOSimple_val (MOBase_val (MOTypeFloatVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal (a +. b)))
-  | MAddition, _, _ -> assert false
-  | MAdditionFloat, _, _ -> assert false
+  | MAddition, _, _ -> raise (InternalError "Execution engine error")  
+  | MAdditionFloat, _, _ -> raise (InternalError "Execution engine error")
             (** Soustraction **)
   | MSoustraction, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) -> 
@@ -1030,8 +1030,8 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   | MSoustractionFloat , MOSimple_val (MOBase_val (MOTypeFloatVal a)),
     MOSimple_val (MOBase_val (MOTypeFloatVal b))  -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal (a -. b)))
-  | MSoustraction, _,_ -> assert false
-  | MSoustractionFloat, _,_ -> assert false
+  | MSoustraction, _,_ -> raise (InternalError "Execution engine error")
+  | MSoustractionFloat, _,_ -> raise (InternalError "Execution engine error")
             (** Multiplication **)
   | MMultiplication, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) -> 
@@ -1040,8 +1040,8 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   | MMultiplicationFLoat, MOSimple_val (MOBase_val (MOTypeFloatVal a)), 
     MOSimple_val (MOBase_val (MOTypeFloatVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal (a *. b)))
-  | MMultiplication, _, _ -> assert false
-  | MMultiplicationFLoat, _, _ -> assert false
+  | MMultiplication, _, _ -> raise (InternalError "Execution engine error")
+  | MMultiplicationFLoat, _, _ -> raise (InternalError "Execution engine error")
             (** Division **)
   | MDivision, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) ->
@@ -1049,8 +1049,8 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   | MDivisionFloat, MOSimple_val (MOBase_val (MOTypeFloatVal a)), 
     MOSimple_val (MOBase_val (MOTypeFloatVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal(a /. b)))
-  | MDivision, _, _ -> assert false
-  | MDivisionFloat, _, _ -> assert false
+  | MDivision, _, _ -> raise (InternalError "Execution engine error")
+  | MDivisionFloat, _, _ -> raise (InternalError "Execution engine error")
             (** Modulo **)
   | MModulo, MOSimple_val (MOBase_val (MOTypeIntVal el1)),
                         MOSimple_val (MOBase_val (MOTypeIntVal el2)) -> 
@@ -1058,8 +1058,8 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   | MModuloFloat, MOSimple_val (MOBase_val (MOTypeFloatVal el1)),
                           MOSimple_val (MOBase_val (MOTypeFloatVal el2)) -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal (mod_float el1 el2)))
-  | MModulo, _, _ -> assert false
-  | MModuloFloat, _, _ -> assert false
+  | MModulo, _, _ -> raise (InternalError "Execution engine error")
+  | MModuloFloat, _, _ -> raise (InternalError "Execution engine error")
             (** With **)
   | MWithList, MOSimple_val(MOList_val lst1), MOSimple_val (MOList_val lst2) ->
       MOSimple_val(MOList_val (List.concat [lst1; lst2]))
@@ -1073,16 +1073,16 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
                                               | Some v1, Some v2 -> Some v2
                                               | None, None -> None
                                           ) map1 map2))
-  | MWithList, _, _ -> assert false
-  | MWithMap, _, _ -> assert false
-  | MWithSet, _, _ -> assert false
+  | MWithList, _, _ -> raise (InternalError "Execution engine error")
+  | MWithMap, _, _ -> raise (InternalError "Execution engine error")
+  | MWithSet, _, _ -> raise (InternalError "Execution engine error")
             (** Has **)
   | MHasSet, MOSimple_val(MOSet_val set1), possibleEl ->
     MOSimple_val( MOBase_val (MOTypeBoolVal (MSet.mem (core_to_simple_val possibleEl) set1)))
   | MHasMap, MOSimple_val(MOMap_val map1), possibleEl ->
     MOSimple_val( MOBase_val (MOTypeBoolVal (MMap.mem (core_to_simple_val possibleEl) map1)))
-  | MHasSet, _, _ -> assert false
-  | MHasMap, _, _ -> assert false
+  | MHasSet, _, _ -> raise (InternalError "Execution engine error")
+  | MHasMap, _, _ -> raise (InternalError "Execution engine error")
             (** without **)
   | MWithoutSet, MOSimple_val(MOSet_val set1), MOSimple_val (MOSet_val set2) ->
       MOSimple_val(MOSet_val (MSet.diff set1 set2))
@@ -1094,7 +1094,7 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
                                               | Some v1, Some v2 -> None
                                               | None, None -> None
                                           ) map1 map2))
-  | _ -> assert false
+  | _ -> raise (InternalError "Execution engine error")
 
 
 
