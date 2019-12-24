@@ -29,7 +29,7 @@ exception GufoInvalidModule
 exception GufoModuleInvalidArgument
 
 (*The different existing systems. *)
-let system_modules = ["list"; "cmd"; "string"; "set"; "int"; "float"; "opt"]
+let system_modules = ["list"; "cmd"; "string"; "set";"map"; "int"; "float"; "opt"]
 
 let is_system_module filename =
   List.exists
@@ -42,6 +42,7 @@ let parse_system_module filename =
     | "cmd.ma" -> GufoModCmd.mosysmodule
     | "string.ma" -> GufoModString.mosysmodule
     | "set.ma" -> GufoModSet.mosysmodule
+    | "map.ma" -> GufoModMap.mosysmodule
     | "int.ma" -> GufoModInt.mosysmodule
     | "float.ma" -> GufoModFloat.mosysmodule
     | "opt.ma" -> GufoModOpt.mosysmodule
