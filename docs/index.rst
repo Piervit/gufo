@@ -29,6 +29,7 @@ Main website is here: http://gufo.pvittet.com
    commands
    syntax
    functions
+   standard_library
    dive_into_technic
    thanks
    license
