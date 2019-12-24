@@ -222,6 +222,7 @@ let print_err term cur_expr str_err =
 (******************************* END ERROR PRINTING **************************)
 
 (******************************* CLEARING ************************************)
+
 let clear_expr term expr = 
   clear_res_err_and_comple term expr >>=
   (fun () -> 
@@ -435,7 +436,7 @@ let print_color_expr term expr optprog types =
             | _ ->
               acc, sprintf "%s%s" curword (UTF8.init 1 (fun _ -> new_char) ), false,false
           )
-      | _,true -> 
+      | _,true ->  (*in a string*)
           (match UChar.uint_code new_char with
             | 0x0022  -> (* quote symbol *)
                 [ S (sprintf "%s%c" curword (UChar.char_of new_char) );B_fg c_string] @ acc, "",false,false
