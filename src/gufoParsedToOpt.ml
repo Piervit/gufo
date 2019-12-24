@@ -2748,11 +2748,16 @@ function we used it to not lost informations. *)
             (*need to get the current module id*)
         | Some modulId -> modulId
     in 
-    let funtype =  get_type_from_var_types var_types modulId funname in
+    let funtype =  
+      match (List.rev field) with 
+        | [] -> get_type_from_var_types var_types modulId funname 
+        | fd::lst -> (get_type_field_from_field fulloptiprog optiprog fd).motf_type
+    in
     
       debug_print(sprintf "function  ret type before analysis: %s \n"  (type_to_string funtype));
     match args with
-      | [] -> (*no args, we return funtype*) (funtype, var_types)
+      | [] -> 
+        (*no args, we return funtype*) (funtype, var_types)
       | lst -> 
           let funtyp, allTypeMap = do_analyse_funcall_ var_types funtype args allTypeMap
           in  funtyp, var_types
