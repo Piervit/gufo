@@ -203,7 +203,8 @@ let rec determine_refine_type ?id_var:(id_var = None) t1 t2 =
         let lst_args = List.map2 determine_refine_type  aargs bargs in
         let ret = determine_refine_type aret bret in
         MOFun_type (lst_args, ret)
-    | _,_ -> raise (TypeError "Cannot infer correct type")
+    | _,_ -> raise (TypeError 
+              (sprintf "Cannot infer correct type: %s and %s " (type_to_string t1) (type_to_string t2)))
     
 (*Determining the type of every top level function *)
     (*Caution, we try here to deduce toplevel type, not to check low level
