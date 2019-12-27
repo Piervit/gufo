@@ -36,8 +36,3 @@ Exemples:
     % let $nbCmd = grep "^#PROGRAM" $file | wc -l in
       ( $Opt.get ($Int.fromString $nbCmd.Cmd.print) 0)
 
-
-variables:
-----------
-No associated variables.
-

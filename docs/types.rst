@@ -66,12 +66,12 @@ Similarly to a list::
 
 Check if an element is in a set::
 
-    % $mySet has? 1
+    % $Set.is_in $mySet 1
     True
 
 Concatenate a set with another one::
 
-    % let $mySet = $mySet with -< 3, 4 >-
+    % let $mySet = $Set.union $mySet -< 3, 4 >-
 
 So if you want to add only a single element::
     
@@ -94,7 +94,7 @@ Similarly to a list::
 
 Check if an element has a key in the map::
 
-    % $myMap has? 1
+    % $Map.is_in $myMap 1
     True
 
 Concatenate a list with another one::
