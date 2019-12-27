@@ -48,6 +48,11 @@ let term_rawmod = ref None
 (*state if we are in search mod or no.*)
 let term_search_mod = ref None
 
+let size = ref {
+              rows = 0;
+              cols = 0;
+              }
+
 (******************************* COLORS **************************************)
 (* foreground color *)
 
@@ -91,6 +96,8 @@ let c_aggregate = lblue (*list, set or map*)
 (* background color *)
 let cb_option = blue
 
+let completion_separator_size = 4
+
 
 (******************************* END COLORS **********************************)
 
@@ -108,6 +115,7 @@ let print_prefix term =
 (******************************* END PREFIX **********************************)
 (******************************* EXPR ****************************************)
 
+(*get the lenght of current line in expr (including eventual prefix) *)
 let get_line_length expr line_num = 
   match line_num with
     | 0 -> (Zed_rope.length (Zed_edit.get_line (get_edit_ expr) line_num)) + prefix_len
@@ -204,8 +212,9 @@ let clear_extra_infos term cur_expr =
     | i, y -> clear_res_err_and_comple term cur_expr 
 
 let print_err term cur_expr str_err = 
-  (*str is splitted so it has no line longer than 80 cols. *)
-  let str_err = split_rope_message str_err 80 in 
+  (*str is splitted so it has no line longer than term size. *)
+  let str_err = split_rope_message str_err (!size.cols - 1 ) in 
+    debug_print (sprintf "str_error '%s' \n"  (Zed_string.to_utf8 (Zed_rope.to_string str_err))); 
   let nb_error_line = count_lines_rope str_err in
   let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
   let expr_lines_count = get_lines_count cur_expr in
@@ -499,11 +508,11 @@ let analyse_and_print term cur_expr =
                | Sys_error msg 
                | VarError msg 
                | SyntaxError msg ->
-            print_expr term cur_expr >>=
-            (fun () -> print_err term cur_expr (str_to_zed_rope msg))
+                  print_expr term cur_expr >>=
+            (fun () -> print_err term cur_expr msg)
                | Not_found -> 
-            print_expr term cur_expr >>=
-            (fun () -> print_err term cur_expr (str_to_zed_rope "Not found"))
+                  print_expr term cur_expr >>=
+            (fun () -> print_err term cur_expr "Not found")
         )
       | None ->
           print_expr term cur_expr
@@ -511,30 +520,19 @@ let analyse_and_print term cur_expr =
     with 
       | TypeError (reason) -> 
          print_expr term cur_expr >>=
-            (fun () -> print_err term cur_expr (str_to_zed_rope reason))
+            (fun () -> print_err term cur_expr reason)
       | ParseError(fname, line, col, tok, reason) -> 
        print_expr term cur_expr >>=
          let err_msg = string_of_ParseError (fname, line, col, tok, reason) in
-       (fun () -> print_err term cur_expr (str_to_zed_rope err_msg))
+       (fun () -> print_err term cur_expr err_msg)
       | Failure msg -> 
-       print_err term cur_expr (str_to_zed_rope msg)
+       print_err term cur_expr msg
 
 
 let print_completion term shell_env hist cur_expr possibles_expr = 
-      let possibles_as_rope = 
-        let possibles_as_str = 
-          (List.fold_left
-          (fun str expr -> str ^ expr ^ "\t")
-          "" possibles_expr 
-          )
-        in
-          str_to_zed_rope
-          (
-            match String.length possibles_as_str with
-            | 0 -> ""
-            | i -> String.sub possibles_as_str 0 (i -1))
-      in
-      let str_possibles = split_rope_message possibles_as_rope 80 in 
+      let str_possibles = exprList_to_splittedMessage 
+                            possibles_expr (!size.cols - 1) completion_separator_size
+      in 
       let nb_poss_line = count_lines_rope str_possibles in
       let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
       let expr_lines_count = get_lines_count cur_expr in 
@@ -584,7 +582,7 @@ let do_nothing term shell_env hist cur_expr = Lwt.return (Some (cur_expr, shell_
 let do_fail term shell_env hist cur_expr exc = 
   (*TODO*)
    clear_res_err_and_comple term cur_expr >>=
-   (fun () -> print_err term cur_expr (str_to_zed_rope ("Unable to execute the previous line: " ^ (Printexc.to_string exc)))) >>=
+   (fun () -> print_err term cur_expr ("Unable to execute the previous line: " ^ (Printexc.to_string exc))) >>=
         (fun () -> LTerm.fprints term (eval [B_fg c_unknown; S "\n\n"])) >>=
         (fun () -> LTerm.flush term) >>=
    (fun () -> 
@@ -681,7 +679,8 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
        | Sys_error msg 
        | VarError msg 
        | SyntaxError msg ->
-              print_err term cur_expr (str_to_zed_rope msg) >>=
+              print_err term cur_expr msg 
+              >>=
               (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
 
 
@@ -907,15 +906,18 @@ let main () =
     (fun () ->
        Lazy.force LTerm.stdout
        >>= fun term ->
+       size := LTerm.size term ;
        let tmod = (LTerm.enter_raw_mode term >>=
          (fun tmod -> term_rawmod := Some tmod; return tmod) ) in
        let cur_expr = create_empty_expr () in 
+       let display_size = (sprintf "Term size: rows:%d col:%d\n" !size.rows !size.cols ) in
        LTerm.fprints term (eval [S "Welcome, \n";
 (*                                  S "Gufo is the Unidentified Flying Ofug.\n";  *)
                                  S "Gufo is an Unidentified Flying Object but it also means 'Owl' in esperanto. \n\n"; 
                                  S "This program is GPLV3, created by Pierre Vittet. \n"; 
                                  S "This is a pre-release experimental version.\n\n";
                                  S "To escape GUFO, just press escape.\n";
+                                 S display_size; 
                                  S "----------------------------------\n";
         ]) 
        >>=

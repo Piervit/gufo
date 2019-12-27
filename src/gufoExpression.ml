@@ -21,6 +21,9 @@ open CamomileLibrary
 (******************************* EXPR ****************************************)
 (*expression manipulation: an expression is made from a zed_edit context *)
 
+
+let get_edit_ expr = Zed_edit.edit expr
+
 let count_lines_str str = 
   Zed_utf8.fold 
     (fun achar acc -> 
@@ -43,6 +46,7 @@ let count_lines_rope str =
     )
     str 1 
 
+let count_lines expr = (Zed_lines.count (Zed_edit.lines (get_edit_ expr))) + 1
 
 let create_empty_expr () = 
   let zedit = Zed_edit.create ?editable:(Some (fun _ _ -> true)) () in
@@ -51,7 +55,6 @@ let create_empty_expr () =
 
 let is_empty_expr expr = Zed_rope.is_empty (Zed_edit.text (Zed_edit.edit expr))
 
-let get_edit_ expr = Zed_edit.edit expr
 
 let ctx_to_zed_string expr = Zed_rope.to_string (Zed_edit.text (Zed_edit.edit expr))
 let ctx_to_string expr = Zed_string.to_utf8 (ctx_to_zed_string expr)
@@ -80,7 +83,6 @@ let to_uchar achar = Zed_char.of_utf8 achar
 let insert_newline expr = Zed_edit.newline expr; 
                           insert_in_expr  (insert_in_expr expr (to_uchar " ")) (to_uchar " ")
 
-let count_lines expr = (Zed_lines.count (Zed_edit.lines (get_edit_ expr))) + 1
 
 (*Return the word on which the cursor currently is.*)
 let get_current_word expr = 
@@ -128,31 +130,36 @@ let to_one_line_expr expr =
     (Zed_string.to_utf8 (Zed_rope.to_string (Zed_rope.Buffer.contents new_rop_buf)), new_curs_col)
 
 
-
 (* The message will be splitted in such a way that it has no lines longer than
  * max_line_size.*)
-let split_rope_message str max_line_size = 
-  let new_rop_buf = Zed_rope.Buffer.create () in
-  let  _ = 
-    Zed_rope.fold 
-      (fun uchar cur_col_num ->
-        (match UChar.uint_code (Zed_char.core uchar) with
-          | 0x000A
-          | 0x000D (*newline *) ->
-              let _ = Zed_rope.Buffer.add new_rop_buf (Zed_char.unsafe_of_uChar (UChar.chr 0x000A)) in 0
-          | uchari -> 
-              match cur_col_num with
-                | i when i = (max_line_size - 1) ->
-                    let _ = Zed_rope.Buffer.add new_rop_buf (Zed_char.unsafe_of_uChar (UChar.chr 0x000A)) in
-                    let _ = Zed_rope.Buffer.add new_rop_buf uchar in
-                    1
-                | _ -> 
-                    let _ =  Zed_rope.Buffer.add new_rop_buf uchar in
-                    cur_col_num + 1
-      ))
-      str 0
+let exprList_to_splittedMessage list_expr max_line_size split_size = 
+  let separator = String.make split_size ' ' in
+  let possibles_as_rope = 
+    let _, possibles_as_str = 
+      (List.fold_left
+      (fun (cursize, str) expr -> 
+          let lenExpr = (String.length expr) in
+          match  max_line_size - (cursize + lenExpr + split_size) with
+            | i when i <= 0 -> (*negative size, we have to split. *) 
+              (lenExpr+ split_size , str ^ "\n" ^ expr ^ separator)
+            | i when i > 0 -> (*no need to split to split. *)
+              (cursize + lenExpr+ split_size, str ^ expr ^ separator)
+      )
+      (0, "") list_expr
+      )
+    in
+      str_to_zed_rope
+      (
+        match String.length possibles_as_str with
+        | 0 -> ""
+        | i -> String.sub possibles_as_str 0 (i -1))
   in
-    Zed_rope.Buffer.contents new_rop_buf
+  possibles_as_rope
+
+
+let split_rope_message str max_line_size = 
+  exprList_to_splittedMessage (String.split_on_char ' ' str) max_line_size 1
+  
 
 
 
