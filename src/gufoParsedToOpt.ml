@@ -99,7 +99,7 @@ let search_modules mprogram =
  * tupl_typ is the general type of the tuple while position is the position of the element.*)
 let rec get_type_from_tuple_el tupl_typ position = 
   match position with 
-    | [] -> assert false
+    | [] -> raise (InternalError "Gufo internal error.")
     | [last_pos] -> 
         (match tupl_typ with
           | MOTuple_type subtyplst -> 
@@ -370,7 +370,7 @@ and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb =
           | MOSet_type keytype ->
             let typ_b, locScope = determine_type fulloptiprog optiprog locScope (Some keytype) argb in
             MOBase_type(MTypeBool), locScope
-          | _ -> assert false (*Cannot happen*)
+          | _ -> raise (InternalError "Gufo internal error.") (*Cannot append *)
         )
     | MHasMap -> 
         let full_or_type = MOMap_type (MOAll_type (get_fresh_int ()), MOAll_type (get_fresh_int ())) in
@@ -379,7 +379,7 @@ and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb =
           | MOMap_type (keytype, _vtype) ->
             let typ_b, locScope = determine_type fulloptiprog optiprog locScope (Some keytype) argb in
             MOBase_type(MTypeBool), locScope
-          | _ -> assert false (*Cannot happen*)
+          | _ -> raise (InternalError "Gufo internal error.") (*Cannot append *)
         )
   in 
   typ, locScope
@@ -483,7 +483,9 @@ and determine_ref_with_index ref ref_vtyp  =
                 | MOSet_type( subtyp) ->  subtyp 
                 | MOMap_type (_, subtyp) -> subtyp
                 | MOAll_type i -> MOAll_type (get_fresh_int ())
-                | _ -> assert false (*we don't have deep for other types.*)
+                | _ -> raise (InternalError 
+                        "Gufo internal error: no deep for the given type.") 
+                        (*we don't have deep for other types.*)
               )
             | i -> 
               (match ref_vtyp with 
@@ -491,7 +493,9 @@ and determine_ref_with_index ref ref_vtyp  =
                 | MOSet_type( subtyp) -> determine_ref_with_index_ (i-1) subtyp 
                 | MOMap_type (_, subtyp) -> determine_ref_with_index_ (i-1) subtyp 
                 | MOAll_type i -> MOAll_type (get_fresh_int ())
-                | _ -> assert false (*we don't have deep for other types.*)
+                | _ -> raise (InternalError 
+                        "Gufo internal error: no deep for the given type.") 
+                        (*we don't have deep for other types.*)
               )
         in
         determine_ref_with_index_ idx_deep ref_vtyp
@@ -502,7 +506,7 @@ and determine_type_ref fulloptiprog optiprog locScope ref =
 
   let rec determine_with_fields fields index = 
     match fields with 
-      | [] -> assert false
+      | [] -> raise (InternalError "Gufo internal error")
       | [field] -> 
         let tfield = get_type_field_from_field fulloptiprog optiprog field in
           tfield.motf_type
@@ -688,7 +692,7 @@ and determine_type fulloptiprog optiprog locScope const e =
                     | None -> None
                     | Some (MOAll_type i) -> None
                     | Some (MOTuple_type lst) -> Some lst
-                    | _ ->  assert false
+                    | _ ->  raise (TypeError "Type checker was expecting a type tuple.")
                 in
                 let  nlst, locScope = 
                   (match new_const with
@@ -719,7 +723,7 @@ and determine_type fulloptiprog optiprog locScope const e =
                     | None -> None
                     | Some (MOAll_type i) -> None
                     | Some (MOList_type typ) -> Some typ
-                    | _ ->  assert false
+                    | _ ->  raise (TypeError "Type checker was expecting a type list.")
                 in
 
                 (match lv with
@@ -746,7 +750,7 @@ and determine_type fulloptiprog optiprog locScope const e =
                     | None -> None
                     | Some (MOAll_type i) -> None
                     | Some (MOOption_type typ)-> Some typ
-                    | _ ->  assert false
+                    | _ ->  raise (TypeError "Type checker was expecting a type option.")
                 in
                 let opt_typ, locScope = 
                   determine_type fulloptiprog optiprog locScope new_const el 
@@ -758,7 +762,7 @@ and determine_type fulloptiprog optiprog locScope const e =
                     | None -> None
                     | Some (MOAll_type i) -> None
                     | Some (MOSet_type typ)-> Some typ
-                    | _ ->  assert false
+                    | _ ->  raise (TypeError "Type checker was expecting a type set.")
                 in
                 let typ, locScope = 
                 MSet.fold
@@ -779,7 +783,7 @@ and determine_type fulloptiprog optiprog locScope const e =
                     | None -> None, None
                     | Some (MOAll_type i) -> None, None
                     | Some (MOMap_type (typkey, typval))-> Some typkey, Some typval
-                    | _ ->  assert false
+                    | _ ->  raise (TypeError "Type checker was expecting a type map.")
                 in
 
                 let keyt, elt,locScope = 
@@ -807,7 +811,7 @@ and determine_type fulloptiprog optiprog locScope const e =
                     | Some (MOAll_type i) -> None, None
                     | Some (MOFun_type(arglstTyp, rettyp))->
                         Some arglstTyp, Some rettyp
-                    | _ ->  assert false
+                    | _ ->  raise (TypeError "Type checker was expecting a type function.")
                 in
 
                 let locScope, nargs = add_args_to_scope lstargtyp_const fv.mofv_args_id locScope in  
@@ -1176,10 +1180,10 @@ let type_check_has_type fulloptiprog optiprog var_types required_typ expr =
       | MOUnit_type, _ -> true (*TODO : this should be discussed. *)
       | MOAll_type i, _ -> true
       | _, MOAll_type i2 -> true
-      | MORef_type (_,_,_,_), _ -> assert false (*because we should have no more ref at this point *)
-      | _, MORef_type(_,_,_,_) -> assert false (*because we should have no more ref at this point *)
-      | MOTupel_type (_,_,_,_,_), _ -> assert false
-      | _, MOTupel_type (_,_,_,_,_) -> assert false
+      | MORef_type (_,_,_,_), _ -> raise (InternalError "Gufo internal error (ref should not exist)") false (*because we should have no more ref at this point *)
+      | _, MORef_type(_,_,_,_) -> raise (InternalError "Gufo internal error (ref should not exist)")
+      | MOTupel_type (_,_,_,_,_), _ -> raise (InternalError "unexpected tupel)")
+      | _, MOTupel_type (_,_,_,_,_) ->  raise (InternalError "unexpected tupel)")
       | _, _ -> raise (TypeError (sprintf "Incompatible type: %s found while type %s required" 
                                   (type_to_string found) (type_to_string required)))
     in has_unique_type required found
@@ -1447,10 +1451,10 @@ let type_check_has_type_with_allTypeConstraint
       | MOUnit_type, _ -> MOUnit_type, allTypeMap (*TODO : this should be discussed. *)
       | MOAll_type i, typ -> typ, allType_addRealType i typ allTypeMap
       | typ, MOAll_type i2 -> typ, allType_addRealType i2 typ allTypeMap
-      | MORef_type (_,_,_,_), _ -> assert false (*because we should have no more ref at this point *)
-      | _, MORef_type(_,_,_,_) -> assert false (*because we should have no more ref at this point *)
-      | MOTupel_type (_,_,_,_,_), _ -> assert false
-      | _, MOTupel_type (_,_,_,_,_) -> assert false
+      | MORef_type (_,_,_,_), _ -> raise (InternalError "Gufo internal error (ref should not exist)") (*because we should have no more ref at this point *)
+      | _, MORef_type(_,_,_,_) -> raise (InternalError "Gufo internal error (ref should not exist)")
+      | MOTupel_type (_,_,_,_,_), _ -> raise (InternalError "unexpected tupel)")
+      | _, MOTupel_type (_,_,_,_,_) ->  raise (InternalError "unexpected tupel)")
       | _, _ -> raise (TypeError (sprintf "Incompatible type: %s found while type %s required" 
                                   (type_to_string found) (type_to_string required)))
     in has_unique_type required found
@@ -2513,7 +2517,7 @@ let parsedToOpt_type fulloptiprog oldprog optiprog =
                     MORef_type (Some modul, id, 0, [])
               )
         )
-    | MAll_type v -> assert false (*TODO*)
+    | MAll_type v -> raise (InternalError "Gufo internal error") (*TODO*)
 
 
   in
@@ -2560,7 +2564,7 @@ let parsedToOpt_type fulloptiprog oldprog optiprog =
                   moct_debugname = mc.mct_name;
                 } in
               {optiprog with mopg_types = IntMap.add inttype omc optiprog.mopg_types}
-          | MSimple_type st -> assert false (*For V2*)
+          | MSimple_type st -> raise (InternalError "Internal error: feature expected for V2. ")
 
 
       ) oldprog.mpg_types optiprog
@@ -2590,7 +2594,7 @@ let rec type_check_val_to_top fulloptiprog optiprog modi varval var_types =
   (*var_types contains strictly more accurate information than a locScope (as
 used in the determine_type* functions.). So to call some determine_type*
 function we used it to not lost informations. *)
-  let locScope = IntMap.find optiprog.mopg_name var_types in
+(*   let locScope = IntMap.find optiprog.mopg_name var_types in *)
   let get_type_from_var_types var_types idmodul id  =
     match IntMap.find_opt idmodul var_types with
       | None -> raise (InternalError "type checker error.")(*We hope this cannot happen.*)
@@ -2975,7 +2979,7 @@ let parsedToOpt fullprog =
       match optimod,oldprog with
         | MOUserMod optiprog, MUserMod oldprog -> MOUserMod (parsedToOpt_type fulloptiprog oldprog optiprog)
         | MOSystemMod sysmod, MSystemMod _ -> MOSystemMod sysmod
-        | _ -> assert false
+        | _ -> raise (InternalError "Internal error concerning module system.)")
       ) 
     fulloptiprog.mofp_progmodules 
   in
@@ -2995,7 +2999,7 @@ let parsedToOpt fullprog =
       match optimod,oldprog with
         | MOUserMod optiprog, MUserMod oldprog -> MOUserMod (parsedToOpt_topval_intmap oldprog optiprog)
         | MOSystemMod sysmod, MSystemMod _ -> MOSystemMod sysmod
-        | _ -> assert false
+        | _ -> raise (InternalError "Internal error concerning module system.)")
       ) 
     fulloptiprog.mofp_progmodules 
   in
@@ -3016,7 +3020,7 @@ let parsedToOpt fullprog =
       match optimod,oldprog with
         | MOUserMod optiprog, MUserMod oldprog -> MOUserMod (parsedToOpt_topval fulloptiprog oldprog optiprog false None)
         | MOSystemMod sysmod, MSystemMod _ -> MOSystemMod sysmod
-        | _ -> assert false
+        | _ -> raise (InternalError "Internal error concerning module system.)")
       ) 
     fulloptiprog.mofp_progmodules 
   in
@@ -3156,7 +3160,7 @@ let add_prog_to_optprog fulloptiprog fullprog =
 
   let apply_for_modules apply_fun acc = 
   match StringMap.cardinal fullprog.mfp_progmap with 
-    | 0 -> assert false
+    | 0 -> raise (InternalError "Internal error.")
     | 1 -> (*only mainprog*) 
         acc
     | _ -> (**mainprog and other programs*)
