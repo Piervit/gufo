@@ -25,18 +25,9 @@ open GenUtils
 
 let listtypes = IntMap.empty
 
-let iter args scope =  
-  match args with 
-    |  [MOSimple_val (MOFun_val fv); MOSimple_val (MOList_val mtvlist)] ->
-        let _ = List.iter 
-        (fun arg -> 
-          let _res = GufoEngine.apply_fun true scope (MOSimple_val (MOFun_val fv)) [arg]
-          in 
-          ()
-        )
-        mtvlist
-        in MOSimple_val (MOEmpty_val)
-    | _ -> assert false 
+(*The code of iter is directly in GufoEngine, because modules cannot directly
+call GufoEngine to avoid circular dependancies.*)
+let iter args scope = assert false 
 
 let length args scope =
   match args with

@@ -52,18 +52,18 @@ let load_file f =
  
 
 let debug_info s = 
-  match GufoConfig.getDebugLevel () with
-    | FULL  
-    | INFO -> Printf.printf "%s\n" s
-    | NO_DEBUG -> ()
+  match GufoConfig.get_debug_level () with
+    | DBG_FULL  
+    | DBG_INFO -> Printf.printf "%s\n" s
+    | DBG_NO_DEBUG -> ()
 
 
 
 let debug_print s = 
-  match GufoConfig.getDebugLevel () with
-    | FULL -> Printf.printf "%s\n" s
-    | INFO 
-    | NO_DEBUG -> ()
+  match GufoConfig.get_debug_level () with
+    | DBG_FULL -> Printf.printf "%s\n" s
+    | DBG_INFO 
+    | DBG_NO_DEBUG -> ()
 
 
 let debug_title0 s =

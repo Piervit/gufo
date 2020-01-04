@@ -34,7 +34,7 @@ let parse_program filename =
   let open Gufo in
   match (GufoStart.parse_file filename) with
     | None -> Printf.eprintf "No program provided !\n"; assert false
-    | Some p -> GufoStart.handle_program p (GufoStart.filename_to_module filename)
+    | Some p -> GufoStart.handle_program p (GufoModuleUtils.filename_to_module filename)
 
 (*previous basic interactive mod.
   deprecated but conserved in case we have to go back to it.
@@ -61,6 +61,8 @@ let full_verbose = ref false
 let help = ref false
 let prog = ref None
 
+let init_backtrace _ = Printexc.record_backtrace true
+
 let main () = 
   let speclist = 
     [("-v", Arg.Set verbose, " Enables basic information verbosity.");
@@ -74,10 +76,10 @@ let main () =
   let usage_msg = "usage: gufo [option] ... [file]\nIf called without file, will be set to run in interactive mode, else will execute the file.\nList of options:" in 
   Arg.parse speclist (fun afile-> prog := Some afile; print_endline "" ) usage_msg;
   (match !full_verbose with
-    | true -> GufoConfig.setDebug GufoConfig.FULL
+    | true -> init_backtrace (); GufoConfig.set_debug GufoConfig.DBG_FULL
     | false -> match !verbose with
-                | true -> GufoConfig.setDebug GufoConfig.INFO
-                | _ -> GufoConfig.setDebug GufoConfig.NO_DEBUG
+                | true -> GufoConfig.set_debug GufoConfig.DBG_INFO
+                | _ -> GufoConfig.set_debug GufoConfig.DBG_NO_DEBUG
   );
   match !help with
     | true -> 

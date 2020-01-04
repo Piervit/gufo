@@ -25,3 +25,12 @@ val gen_mosm_typstr2int: Gufo.MCore.mosysmoduletype list -> int GenUtils.StringM
 val gen_mosm_typstrfield2int : Gufo.MCore.mosysmoduletype list -> int GenUtils.StringMap.t
 val gen_mosm_typestrfield2inttype : Gufo.MCore.mosysmoduletype list -> int GenUtils.StringMap.t
 val gen_mosm_typfield2inttype: Gufo.MCore.mosysmoduletype list -> int GenUtils.IntMap.t
+
+
+val module_to_filename: string -> string
+val filename_to_module : string -> string
+
+(*return the module name from a valid path file.*)
+val getModuleNameFromPath : string -> string
+
+

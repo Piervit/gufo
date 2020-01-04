@@ -25,42 +25,45 @@ open GufoParsed
 open Format
 
 
-exception GufoInvalidModule 
+exception GufoInvalidModule of string
 exception GufoModuleInvalidArgument
 
 (*The different existing systems. *)
-let system_modules = ["list"; "cmd"; "string"; "set";"map"; "int"; "float"; "opt"]
+let system_modules = ["Base"; "List"; "Cmd"; "String"; "Set";"Map"; "Int"; "Float"; "Opt"]
+
+
 
 let is_system_module filename =
   List.exists
-    (fun lstel -> (String.compare (Printf.sprintf "%s.ma" lstel) filename) == 0) 
-    system_modules
+    (fun lstel -> (String.compare  lstel filename) == 0) 
+    (List.map GufoModuleUtils.module_to_filename system_modules)
 
 let parse_system_module filename = 
   match filename with
-    | "list.ma" -> GufoModList.mosysmodule
-    | "cmd.ma" -> GufoModCmd.mosysmodule
-    | "string.ma" -> GufoModString.mosysmodule
-    | "set.ma" -> GufoModSet.mosysmodule
-    | "map.ma" -> GufoModMap.mosysmodule
-    | "int.ma" -> GufoModInt.mosysmodule
-    | "float.ma" -> GufoModFloat.mosysmodule
-    | "opt.ma" -> GufoModOpt.mosysmodule
-    | _ -> raise GufoInvalidModule
+    | "base.gf" -> GufoModBase.mosysmodule
+    | "list.gf" -> GufoModList.mosysmodule
+    | "cmd.gf" -> GufoModCmd.mosysmodule
+    | "string.gf" -> GufoModString.mosysmodule
+    | "set.gf" -> GufoModSet.mosysmodule
+    | "map.gf" -> GufoModMap.mosysmodule
+    | "int.gf" -> GufoModInt.mosysmodule
+    | "float.gf" -> GufoModFloat.mosysmodule
+    | "opt.gf" -> GufoModOpt.mosysmodule
+    | _ -> raise (GufoInvalidModule ("Cannot parse "^ filename))
 
 
 let get_intname_from_modulestr modstr fulloprog = 
   try
     StringMap.find modstr fulloprog.mofp_progmap 
   with Not_found ->
-    raise GufoInvalidModule
+    raise (GufoInvalidModule ("Cannot find intname from " ^ modstr))
 
 let get_module_prog_from_modulestr modstr fulloprog = 
   let iname = get_intname_from_modulestr modstr fulloprog in
   try
     IntMap.find iname fulloprog.mofp_progmodules 
   with Not_found ->
-    raise GufoInvalidModule
+    raise (GufoInvalidModule ("Cannot get module from "^ modstr))
 
 
 let get_oref_from_sysmodule ref fulloprog = 
@@ -133,3 +136,38 @@ let generate_stdlib_doc () =
       (*TODO*)
     )
     system_modules
+
+
+let get_system_modules = 
+  let _ , sysmap = 
+    List.fold_left
+      (fun (i,map) el -> (i+1, IntMap.add i (MSystemMod (el)) map) )
+      (1, IntMap.empty) (List.map GufoModuleUtils.module_to_filename system_modules)
+  in 
+    sysmap
+
+let get_system_modules_dep = 
+   let _ , sysmap = 
+    List.fold_left
+      (fun (i,map) _el -> (i+1, IntMap.add i IntSet.empty map) )
+      (1, IntMap.empty) system_modules
+  in 
+    sysmap
+
+ let get_system_modules_progmap = 
+   let _ , sysmap = 
+    List.fold_left
+      (fun (i,map) el -> (i+1, StringMap.add el i map) )
+      (1, StringMap.empty) system_modules
+  in 
+    sysmap
+
+ let get_system_modules_progmap_debug = 
+   let _ , sysmap = 
+    List.fold_left
+      (fun (i,map) el -> (i+1, IntMap.add i el map) )
+      (1, IntMap.empty) system_modules
+  in 
+    sysmap
+
+

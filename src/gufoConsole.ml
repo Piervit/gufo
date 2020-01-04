@@ -201,7 +201,7 @@ let clear_res_completion term cur_expr =
 
 (*clear completion display*)
 let clear_res_err_and_comple term cur_expr = 
-  (clear_res_generic term cur_expr (!nb_lines_error + !nb_lines_completion) )
+  (clear_res_generic term cur_expr (!nb_lines_error + !nb_lines_completion))
   >>=
   (fun () -> nb_lines_error:= 0; nb_lines_completion:= 0;  return ())
 let clear_extra_infos term cur_expr = 
@@ -216,9 +216,11 @@ let print_err term cur_expr str_err =
   let str_err = split_rope_message str_err (!size.cols - 1 ) in 
     debug_print (sprintf "str_error '%s' \n"  (Zed_string.to_utf8 (Zed_rope.to_string str_err))); 
   let nb_error_line = count_lines_rope str_err in
+    debug_print (sprintf "Nb error lines: %d\n" nb_error_line); 
   let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
   let expr_lines_count = get_lines_count cur_expr in
-
+(*   clear_res_err_and_comple term cur_expr >>= *)
+(*   (fun () ->  *)
   LTerm.fprints term (eval [B_fg c_error; S "\n"]) >>=
   (fun () -> nb_lines_error:= nb_error_line;
     LTerm.move term (expr_lines_count - expr_cursor_row - 1 ) (-500)) >>=
@@ -493,7 +495,8 @@ let analyse_and_print term cur_expr =
       | Some p ->
           debug_info (debug_title0 "Creating a Gufo program.");
           (try (
-            let prog = GufoStart.handle_program p "Shell_prog" in
+             let prog = GufoStart.handle_consolprog p (!fulloprog) in 
+(*             let prog = GufoStart.handle_program p "shell prog" in *)
             let opt_prog, types = 
             match  Gufo.MCore.is_empty_ofullprog (!fulloprog) with
               | true -> GufoParsedToOpt.parsedToOpt prog
@@ -509,10 +512,11 @@ let analyse_and_print term cur_expr =
                | VarError msg 
                | SyntaxError msg ->
                   print_expr term cur_expr >>=
-            (fun () -> print_err term cur_expr msg)
-               | Not_found -> 
+                  (fun () -> print_err term cur_expr msg)
+               | Not_found as e -> 
                   print_expr term cur_expr >>=
-            (fun () -> print_err term cur_expr "Not found")
+                  (fun () -> print_err term cur_expr (Printexc.to_string e)) >>=
+                  (fun () -> print_err term cur_expr (Printexc.get_backtrace ()))
         )
       | None ->
           print_expr term cur_expr
@@ -526,7 +530,9 @@ let analyse_and_print term cur_expr =
          let err_msg = string_of_ParseError (fname, line, col, tok, reason) in
        (fun () -> print_err term cur_expr err_msg)
       | Failure msg -> 
-       print_err term cur_expr msg
+       print_expr term cur_expr >>=
+       (fun () -> print_err term cur_expr (sprintf "Failed : %s \n"msg)) >>=
+       (fun () -> print_err term cur_expr (Printexc.get_backtrace ()))
 
 
 let print_completion term shell_env hist cur_expr possibles_expr = 
@@ -582,7 +588,7 @@ let do_nothing term shell_env hist cur_expr = Lwt.return (Some (cur_expr, shell_
 let do_fail term shell_env hist cur_expr exc = 
   (*TODO*)
    clear_res_err_and_comple term cur_expr >>=
-   (fun () -> print_err term cur_expr ("Unable to execute the previous line: " ^ (Printexc.to_string exc))) >>=
+   (fun () -> print_err term cur_expr ("Unable to execute the previous line: " ^ (Printexc.to_string exc) ^ (Printexc.get_backtrace ()))) >>=
         (fun () -> LTerm.fprints term (eval [B_fg c_unknown; S "\n\n"])) >>=
         (fun () -> LTerm.flush term) >>=
    (fun () -> 
@@ -603,7 +609,23 @@ let search_hist term shell_env hist cur_expr =
         clear_search_mod term shell_env hist cur_expr search_expr >>=
         (fun () -> return (Some (cur_expr, shell_env, hist)))
 
+(*This function is a hack for an issue that I haven't been able to correct.
+  Without call to this function, when I reach the bottom line of my screen, I
+  got some unmanaged line change (current line goes up causing potentiel bad
+  writing). This function print four new line and goes back to its position. It
+  means we don't exploit the last lines but don't have issues with tem.
+*)
+let prepare_term term cur_expr = 
+  let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
+  LTerm.fprints term (eval [ S "\n"]) >>=
+  (fun () ->  LTerm.fprints term (eval [ S "\n"]) )>>=
+  (fun () ->  LTerm.fprints term (eval [ S "\n"]) )>>=
+  (fun () ->  LTerm.fprints term (eval [ S "\n"]) )>>=
+  (fun () -> LTerm.move term (-4) 0)
+
 let print_char term shell_env hist cur_expr akey = 
+    (prepare_term term cur_expr) >>=
+    (fun () ->
     match (!term_search_mod) with
       | None -> (*standard mod*)
         clear_expr term cur_expr >>=
@@ -627,6 +649,7 @@ let print_char term shell_env hist cur_expr akey =
             (fun () -> 
               term_search_mod := Some search_expr;
               return (Some (new_expr, shell_env, hist)))
+    )
 
 let multiline_expr term shell_env hist cur_expr = 
   clear_expr term cur_expr >>= 
@@ -644,7 +667,8 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
   try (
   match check_full_expr cur_expr with 
     | Some p ->
-        let prog = GufoStart.handle_program p "Shell_prog" in
+(*         let prog = GufoStart.handle_program p "Shell_prog" in *)
+        let prog = GufoStart.handle_consolprog p (!fulloprog) in 
         let opt_prog, types = 
         match  Gufo.MCore.is_empty_ofullprog (!fulloprog) with
           | true -> GufoParsedToOpt.parsedToOpt prog
@@ -679,7 +703,7 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
        | Sys_error msg 
        | VarError msg 
        | SyntaxError msg ->
-              print_err term cur_expr msg 
+              print_err term cur_expr (sprintf "error found :%s\n" msg )
               >>=
               (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
 
@@ -899,6 +923,7 @@ let rec loop term shell_env history tmod cur_expr =
           loop term shell_env history tmod cur_expr
  )
 
+
 let main () =
   LTerm_inputrc.load ()
   >>= fun () ->
@@ -912,8 +937,9 @@ let main () =
        let cur_expr = create_empty_expr () in 
        let display_size = (sprintf "Term size: rows:%d col:%d\n" !size.rows !size.cols ) in
        LTerm.fprints term (eval [S "Welcome, \n";
-(*                                  S "Gufo is the Unidentified Flying Ofug.\n";  *)
-                                 S "Gufo is an Unidentified Flying Object but it also means 'Owl' in esperanto. \n\n"; 
+(*                                  S "Gufo is the Unidentified Flying Ofug.\n";   *)
+(*                                  S "Ofug is the Flying Unidentified Gufo.\n";   *)
+                                 S "Gufo is an Unidentified Flying Object but it also means 'Owl' in esperanto. \n\n";  
                                  S "This program is GPLV3, created by Pierre Vittet. \n"; 
                                  S "This is a pre-release experimental version.\n\n";
                                  S "To escape GUFO, just press escape.\n";

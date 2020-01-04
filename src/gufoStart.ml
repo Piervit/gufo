@@ -25,62 +25,43 @@ open Gufo_lexer
 open Gufo_lexing
 open GufoEngine
 open GenUtils
+open GufoStartComp
+open Gufo.MCore
 
 
+let parse_shell content = GufoStartComp.parse_shell content
 
 
-let parse_shell content =
-  debug_info (debug_title1 "Start converting file to a gufo program.");
-  try(
-    let lexbuf = create_lexbuf (Sedlexing.Utf8.from_stream (Stream.of_string content)) in
-    let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.shell lexbuf in
-  
-    match prog with
-      | Some _ -> 
-        debug_info ("File converted to gufo program.\n");
-        prog
-      | None ->
-        debug_info ("Invalid program (unable to convert to valid program)\n");
-        None
-  )
-  with e ->
-    debug_info ("Invalid program (unable to convert to valid program)\n");
-    raise e
+let add_mainprog_to_progmap curModName progmap = 
+      StringMap.add curModName 0 progmap
 
-let module_to_filename modulename =
-    String.concat "." [String.uncapitalize_ascii modulename; "ma"]
-
-let filename_to_module filename = 
-    String.sub (String.capitalize_ascii filename) 0 ((String.length filename) - 3)
+let add_mainprog_to_progmap_debug curModName progmap_dbg = 
+      IntMap.add 0 curModName progmap_dbg
    
 (**
  * parse_file : filename -> parsedResult
  *
  *)
-let parse_file filename =
-        let inx = open_in filename in
-        let lexbuf = create_lexbuf ~file:filename (Sedlexing.Utf8.from_channel inx) in
-        let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.prog lexbuf in
-        close_in inx;
-        prog
+let parse_file filename = GufoStartComp.parse_file filename
 
 let handle_program p curMod = 
   debug_info (debug_title1 "Start converting a gufo program to a full gufo program (including external modules)");
   let toparse= GufoParsedToOpt.search_modules p in
-    (match GufoConfig.getDebugLevel () with
-      | GufoConfig.FULL -> 
+    (match GufoConfig.get_debug_level () with
+      | GufoConfig.DBG_FULL -> 
           debug_print (debug_title2 "Linked modules");
           (match (StringMap.is_empty toparse) with
             | true -> debug_print "-- no external module used --\n"
             | false ->  StringMap.iter (fun k v -> debug_print (sprintf "%s: %d \n" k v )) toparse)
       | _ -> ()
     ); 
-  let toparse= StringMap.remove curMod toparse in
+  let toparse = StringMap.remove curMod toparse in
   let rec parse_others_modules mapmodule parsed depmodules toparse = 
     let (mapmodule,progmodules,depmodules, newtoparse) = 
       StringMap.fold 
       (fun newmodule intmod (alreadyparsed, parsed,depmodules, newmodtoparse) -> 
-        let filename = module_to_filename newmodule in
+        let filename = GufoModuleUtils.module_to_filename newmodule in
+        debug_print (sprintf "gufoStart %s \n" filename) ;
         (match GufoModules.is_system_module filename with
           | true -> 
               let alreadyparsed = StringMap.add newmodule intmod alreadyparsed in
@@ -88,7 +69,12 @@ let handle_program p curMod =
               let depmodules = IntMap.add intmod IntSet.empty depmodules in
               (alreadyparsed, parsed , depmodules, newmodtoparse)
           | false -> 
-            let newmoduleprog = parse_file filename in
+            let newmoduleprog =
+              (match Sys.file_exists filename with
+                | true ->  parse_file filename 
+                | false ->  None 
+              )
+            in
             match newmoduleprog with
             | None -> eprintf "No program found\n"; assert false
             | Some prog -> let depmodules_str = GufoParsedToOpt.search_modules prog in
@@ -125,18 +111,43 @@ let handle_program p curMod =
       mapmodule IntMap.empty
   in 
       debug_info ("Gufo program converted to a full gufo program.");
+  let prog = 
       {
         mfp_mainprog = p;
         mfp_progmodules = progmodules;
         mfp_module_dep = depmodules; 
-        mfp_progmap = StringMap.add curMod 0 mapmodule;
-        mfp_progmap_debug = IntMap.add 0 curMod progmap_debug;
+        mfp_progmap = add_mainprog_to_progmap curMod mapmodule;
+        mfp_progmap_debug = add_mainprog_to_progmap_debug curMod progmap_debug;
         
       }
+  in dump_fullprog prog; prog
 
+let handle_consolprog p previous_fulloptiprog = 
+  debug_info (debug_title1 "Start converting a gufo console program using the info already acquired from existing program.");
+  let prog = 
+    match is_empty_ofullprog previous_fulloptiprog with 
+      | true -> 
+        (*If the previous_fulloptiprog is empty, we are on the start of our
+          interactive program, and we have to init system modules. *)
+        {
+          mfp_mainprog = p;
+          mfp_progmodules = GufoModules.get_system_modules; 
+          mfp_module_dep =  GufoModules.get_system_modules_dep;
+          mfp_progmap = add_mainprog_to_progmap "Shell Prog" 
+                          (GufoModules.get_system_modules_progmap) ;
+          mfp_progmap_debug = add_mainprog_to_progmap_debug "Shell Prog" 
+                                (GufoModules.get_system_modules_progmap_debug) ;
+        }
+      | false -> 
+        {
+          mfp_mainprog = p;
+          mfp_progmodules =  IntMap.empty;
+          mfp_module_dep = previous_fulloptiprog.mofp_module_dep; 
+          mfp_progmap = previous_fulloptiprog.mofp_progmap;
+          mfp_progmap_debug = previous_fulloptiprog.mofp_progmap_debug;
+        }
+  in dump_fullprog prog ; prog
 
-
- 
 
 
 

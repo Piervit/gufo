@@ -29,14 +29,17 @@
 (* This function allow to compare two gufo values. *)
 val val_compare: Gufo.MCore.motype_val -> Gufo.MCore.motype_val -> int
 
+(*
 (* This function sadly needs to be exposed because it is used by system
  * modules. 
  * This should normally not be used.
  * *)
 val apply_fun : bool -> Gufo.MCore.topvar_val GenUtils.IntMap.t -> Gufo.MCore.motype_val -> Gufo.MCore.motype_val list -> Gufo.MCore.motype_val
 
+*)
 (* The execution of a Gufo program.
  *
  * The fullprogopt returned is a reduced prog after "execution".
  * *)
 val exec: Gufo.MCore.fullprogopt -> Gufo.MCore.shell_env -> Gufo.MCore.fullprogopt * Gufo.MCore.shell_env
+

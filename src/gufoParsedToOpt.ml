@@ -32,13 +32,15 @@ open Printf
 
 
 
+
+
 (** transformation from gufoParsed to gufo.core **)
 
 let fresh_int = ref 1
 let get_fresh_int () = 
   fresh_int:= (!fresh_int + 1); !fresh_int
 
-  (*First part of the job will be to get every modules that we have to import. *)
+(*First part of the job will be to get every modules that we have to import. *)
 
 let search_modules mprogram =
   let add_module_from_mref module2int mref =
@@ -275,6 +277,9 @@ and determine_type_base_val fulloptiprog optiprog locScope bv =
       | MOTypeCmdVal cseq -> determine_type_cmdseq fulloptiprog optiprog locScope cseq
   in 
   MOBase_type typ, locScope
+
+
+
 
 and determine_type_composed fulloptiprog optiprog mct = 
   let modul, id = mct.mocv_resolved_type in 
@@ -2154,7 +2159,14 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
                 "" ref.mrv_varname;
           }
       | Some s -> 
-          let modi = StringMap.find s fulloptiprog.mofp_progmap in
+          let modi = 
+            match StringMap.find_opt s fulloptiprog.mofp_progmap with
+              | None -> 
+                  debug_print (sprintf "Dumping fulloptiprog modules: %s \n"
+                          (fulloptiprogModules_to_string fulloptiprog));
+                  raise (InternalError (sprintf "Cannot find module %s." s))
+              | Some modi -> modi
+          in
           {
             morv_module = Some modi;
             morv_varname = 
@@ -2390,6 +2402,7 @@ let parsedToOpt_topval_intmap prog optiprog =
                   mopg_topvar_debugname = topvar_debug}
   in optiprog
  
+(*we here replace every MORef_type to the MOComposed_type they represent.*)
 let moref_to_moctype fulloptiprog optiprog = 
   let replace_field fd = 
     let rec ref_to_ctype typ = 
@@ -2705,8 +2718,8 @@ function we used it to not lost informations. *)
                   in
                   ret, allTypeMap
                 | _ -> 
-                    let cur_fun_args_types, ret_fun_args_types = 
-                      list_split_at_idx args_types (List.length args_required_type) 
+                    let cur_fun_required_types, _ = 
+                      list_split_at_idx args_required_type (List.length args_types) 
                     in
                     let allTypeMap = 
                     List.fold_left2 (fun allTypeMap required real -> 
@@ -2715,19 +2728,11 @@ function we used it to not lost informations. *)
                                       allTypeMap
                                     ) 
                       allTypeMap
-                      args_required_type 
-                      cur_fun_args_types
+                      cur_fun_required_types
+                      args_types
                     in
                     (*the types of the argument might impact the ret type*)
                     (*TODO: debug allTypeMap*)
-(*
-                    debug_print (sprintf "before allTypeMap debug ") ;
-                    (IntMap.iter
-                    (fun k v -> 
-                      (debug_print_allType_relation k v ); ()
-                    )
-                    allTypeMap);
-*)
                     let ret = allType_getRealType ret allTypeMap in
                     ret, allTypeMap
           )
@@ -3309,4 +3314,54 @@ let add_prog_to_optprog fulloptiprog fullprog =
   let var_types = type_check_bottom_to_top nfulloptiprog var_types in
   nfulloptiprog, var_types
 
+  
+let add_module_to_optprog progname fulloptiprog moduleprog = 
+  (*this function allows the added module to take an unused key.*)
+  let get_module_key map = 
+    let rec find_valid i =
+      match IntMap.find_opt i map with
+        | None -> i 
+        | Some _ -> find_valid (i + 1)
+    in
+    find_valid (IntMap.cardinal map)
+  in
+  let module_key = get_module_key fulloptiprog.mofp_progmodules in
+
+  let progmap = fulloptiprog.mofp_progmap in 
+  let progmap_debug = fulloptiprog.mofp_progmap_debug in 
+  let fulloptiprog = {fulloptiprog with 
+      mofp_progmap = StringMap.add progname module_key progmap ;
+      mofp_progmap_debug = IntMap.add module_key progname progmap_debug;
+    }
+  in
+
+(*   let  = search_modules moduleprog in *)
+  (*FROM PART 1*)
+  (*do the provide_type_id for the moduleprog*)
+  let omoduleprog = (provide_type_id moduleprog empty_oprog) in
+  let omoduleprog = {omoduleprog with mopg_name=module_key} in 
+  (*fully check type for the prog *)
+  let omoduleprog = parsedToOpt_type fulloptiprog moduleprog omoduleprog in
+  let modul_progs = IntMap.add module_key (MOUserMod omoduleprog)  fulloptiprog.mofp_progmodules in
+  let fulloptiprog = {fulloptiprog with mofp_progmodules = modul_progs}  in
+  (*END PART 1*)
+  (*FROM PART 2*)
+  let omoduleprog = parsedToOpt_topval_intmap moduleprog omoduleprog in
+  let omoduleprog = parsedToOpt_topval fulloptiprog moduleprog omoduleprog false None in
+  let omoduleprog = moref_to_moctype fulloptiprog omoduleprog in
+  (*END PART 2*)
+  let modul_progs = IntMap.add module_key (MOUserMod omoduleprog) fulloptiprog.mofp_progmodules in
+  let fulloptiprog = {fulloptiprog with mofp_progmodules = modul_progs} in
+  (*FROM PART 3*)
+  let var_types = top_level_types fulloptiprog in 
+  let var_types = top_level_types_no_ref var_types None in
+  debug_to_level_type fulloptiprog var_types ;
+   type_check fulloptiprog var_types   ;
+  (*END PART 3*)
+  (*PART 4 *)
+  let var_types = type_check_bottom_to_top fulloptiprog var_types in
+  debug_print (sprintf "Dumping fulloptiprog modules after adding modules: %s \n"
+          (fulloptiprogModules_to_string fulloptiprog));
+
+  fulloptiprog, var_types
 

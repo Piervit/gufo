@@ -25,7 +25,7 @@ open GufoParsed
 
 let types = IntMap.empty
 
-let asList args scope =  
+let split args scope =  
   match args with 
     |  [MOSimple_val (MOBase_val MOTypeStringVal (str))] ->
         let res = String.split_on_char '\n' str in
@@ -34,11 +34,27 @@ let asList args scope =
         in MOSimple_val (MOList_val res)
     | _ -> assert false 
 
+(*
+let split args scope =  
+  match args with 
+    |  [MOSimple_val (MOBase_val MOTypeStringVal (sep));
+        MOSimple_val (MOBase_val MOTypeStringVal (str))] ->
+        let res = 
+          match sep.length with
+            | 1 -> String.split_on_char '\n' str 
+            | n -> (*TODO*)
+        in
+        let res =
+        List.map (fun str -> MOSimple_val (MOBase_val (MOTypeStringVal((String.trim str))))) res
+        in MOSimple_val (MOList_val res)
+    | _ -> assert false 
+
+*)
 let topvars = 
   [
     {
       (*split a string into a list *)
-      mosmv_name = "asList";
+      mosmv_name = "split";
       mosmv_description = "Split each line of the given string into a list.";
       mosmv_intname = 1;
       mosmv_type = 
@@ -49,7 +65,7 @@ let topvars =
          MOList_type (MOBase_type (MTypeString)))
         
         ;
-      mosmv_action= asList;
+      mosmv_action= split;
     };
   ]
 

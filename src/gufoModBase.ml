@@ -22,11 +22,36 @@
 open Gufo.MCore
 open GenUtils
 
+open Sedlexing
+open Sedlex_menhir
+open Printf
+open Gufo_lexer
+open Gufo_lexing
+
+open GufoStartComp
+
+
+
 let modtypes = IntMap.empty
+
+
+
+let loadProg args scope =  assert false 
 
 
 let topvars = 
   [
+    {
+      mosmv_name = "load";
+      mosmv_description = "Load the given file as a as a gufo module.";
+      mosmv_intname = 1;
+      mosmv_type = 
+        MOFun_type
+        ([ MOBase_type (MTypeString) ;]
+        , MOBase_type (MTypeBool))
+        ;
+      mosmv_action= loadProg;
+    };
   ]
 
 let mosysmodule =

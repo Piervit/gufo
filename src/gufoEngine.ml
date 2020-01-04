@@ -561,14 +561,14 @@ let find_var_in_prog varname scope =
           let tup_val = IntMap.find id_tupel scope in
           (match tup_val with
             | MOTop_val moval -> find_with_pos pos moval
-            | _ -> raise (ExecutionError "internal error")
+            | _ -> raise (ExecutionError "Internal error")
           )
   in
   match varname with 
     | i,[] -> 
         (try find_in_topvar i
         with 
-          | Not_found -> assert false)
+          | Not_found -> raise (ExecutionError "Internal error, variable not found."))
     | i,fields ->  (* $a.field.field *)
         let from_var = 
           ( try find_in_topvar i
@@ -655,6 +655,46 @@ and apply_in_body toplevel arg2valMap bodieslst =
 
 and apply_core_fun arg2valMap msysmodvar argslst = 
   msysmodvar.mosmv_action argslst arg2valMap
+
+(*merge_loaded_prog fullprog loaded_prog -> 
+  Merge loaded_prog into fullprog.
+*)
+(* and merge_loaded_prog fulloptiprog loaded_prog =  *)
+  
+and apply_load_fun args =
+  try
+  (
+  match args with
+    |  [MOSimple_val (MOBase_val (MOTypeStringVal filePath)) ] ->
+        (match GufoStartComp.parse_file filePath with
+          | Some prog -> 
+            let progname = GufoModuleUtils.getModuleNameFromPath filePath in
+            debug_print (sprintf "progname : %s\n" progname);
+            let fullprog , _ = GufoParsedToOpt.add_module_to_optprog 
+                                progname (get_fullprog ()) prog in
+             set_fullprog fullprog; 
+            MOSimple_val (MOBase_val (MOTypeStringVal "success"))
+          | None -> MOSimple_val (MOBase_val (MOTypeStringVal "fail"))
+        )
+    | _ -> MOSimple_val (MOBase_val (MOTypeStringVal "fail"))
+  )
+  with e -> 
+    MOSimple_val (MOBase_val (MOTypeStringVal (Printexc.to_string e )))
+
+and iter args scope =  
+  match args with 
+    |  [MOSimple_val (MOFun_val fv); MOSimple_val (MOList_val mtvlist)] ->
+        let _ = List.iter 
+        (fun arg -> 
+          let _res = apply_fun true scope (MOSimple_val (MOFun_val fv)) [arg]
+          in 
+          ()
+        )
+        mtvlist
+        in MOSimple_val (MOEmpty_val)
+    | _ -> assert false 
+
+
 
 (*it can be a partial application*)
 and apply_fun toplevel arg2valMap funval arglst = 
@@ -916,7 +956,7 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
                 in 
 
                 let stdout_lst_char = 
-                  Stream.npeek (GufoConfig.getMaxCharPrintBuffer ()) stdout_memory_stream in
+                  Stream.npeek (GufoConfig.get_max_char_PrintBuffer()) stdout_memory_stream in
                 let stdout_lst_char = List.map (fun achar -> String.make 1 achar ) stdout_lst_char in
                 let stdout_str = String.concat "" stdout_lst_char in
                 (*TODO close stdout_channel*)
@@ -1222,6 +1262,28 @@ and apply_motype_val toplevel arg2valMap aval =
                   )
                 in
               (apply_fun toplevel arg2valMap funvar (List.map (apply_motype_val toplevel arg2valMap) argslst)) 
+              | MOSystemMod msymodule when msymodule.mosm_name = "Base"-> 
+                  (*$Base.load filename function: this is specific code which
+                    do not work like others modules: 
+                      - it does not use mosmv_action because it need to access
+                        the main fulloptiprog which cannot be accessed from
+                        within a module.
+                   *)
+                  (match (find_var_in_sysmod ref.morv_varname msymodule).mosmv_name with
+                    | "load" -> apply_load_fun argslst
+                    | _ -> assert false 
+                  )
+              | MOSystemMod msymodule when msymodule.mosm_name = "List"-> 
+                  (*$List.iter : this is specific code which
+                    do not work like others modules: 
+                      - it does not use mosmv_action because it need to access
+                        the gufoEngine which cannot be accessed from
+                        within a module.
+                   *)
+                  (match (find_var_in_sysmod ref.morv_varname msymodule).mosmv_name with
+                    | "iter" -> iter argslst arg2valMap
+                    | _ -> assert false 
+                  )
               | MOSystemMod msymodule -> 
               (apply_core_fun arg2valMap (find_var_in_sysmod ref.morv_varname msymodule) (List.map (apply_motype_val toplevel arg2valMap) argslst) )
               )
@@ -1265,6 +1327,9 @@ let exec prog shenv=
   (*play main expr*)
   let start_expr = prog.mofp_mainprog.mopg_topcal in
   let res = apply_motype_val true prog.mofp_mainprog.mopg_topvar start_expr in
+  (*We get back prog because execution might have changed the program.
+    This happen for exemple, if we use the $Base.load commmand. *)
+  let prog = get_fullprog () in
   let redprog = 
     { 
       prog with mofp_mainprog = 

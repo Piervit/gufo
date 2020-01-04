@@ -82,4 +82,13 @@ let gen_mosm_typfield2inttype sysmodtypes =
     IntMap.empty
     sysmodtypes
 
+let module_to_filename modulename =
+    String.concat "." [String.uncapitalize_ascii modulename; "gf"]
 
+let filename_to_module filename = 
+    String.sub (String.capitalize_ascii filename) 0 ((String.length filename) - 3)
+ 
+let getModuleNameFromPath path =
+  let last_file = List.hd (List.rev (String.split_on_char '/' path)) in
+  filename_to_module last_file
+  

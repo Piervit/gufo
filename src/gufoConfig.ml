@@ -17,27 +17,27 @@
     Author: Pierre Vittet
 *)
 
-type debuglevel =
-   | NO_DEBUG (* NO DEBUG INFORMATION *)
-   | INFO     (* ONLY MAIN INFORMATION *)
-   | FULL     (* FULL INFORMATION *)
+type debug_level =
+   | DBG_NO_DEBUG (* NO DEBUG INFORMATION *)
+   | DBG_INFO     (* ONLY MAIN INFORMATION *)
+   | DBG_FULL     (* FULL INFORMATION *)
  
 
-let debug = ref NO_DEBUG
+let debug = ref DBG_NO_DEBUG
 
 
-let setDebug level =
+let set_debug level =
   debug := level
 
-let getDebugLevel () = 
+let get_debug_level () = 
   !debug
 
 let max_char_print_buffer = 10000
 
-let getMaxCharPrintBuffer () = 
+let get_max_char_PrintBuffer () = 
   max_char_print_buffer
 
 let max_char_printerr_buffer = 10000
 
-let getMaxCharPrintErrBuffer () = 
+let get_max_char_printErrBuffer() = 
   max_char_printerr_buffer

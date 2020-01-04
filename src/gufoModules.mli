@@ -19,12 +19,13 @@
 
 (* Standard system module handling. *)
 
+open GenUtils
 (**
  *  This exception is throw if a caller of a gufoModule function try to use an
  *  invalid module.
  *)
 
-exception GufoInvalidModule 
+exception GufoInvalidModule of string
 (**
  * This exception is thrown if a function from gufoModules is called with an
  * invalid argument.
@@ -52,7 +53,7 @@ val parse_system_module : string -> Gufo.MCore.mosysmodule
 (**
  * get_intname_from_modulestr : module -> prog -> intname
  *
- * From a module (as string such as "list"), return the intname: the integer
+ * From a module (as string such as "List"), return the intname: the integer
  * identifier of the module in the given program. This can both be used from
  * standard library module and user-defined modules.
  *
@@ -64,7 +65,7 @@ val get_intname_from_modulestr : string -> Gufo.MCore.fullprogopt -> int
 (**
  *get_module_prog_from_modulestr : module -> prog -> module
  *
- * From a 'module' (as string such as "list"), return the internal representation
+ * From a 'module' (as string such as "List"), return the internal representation
  * of the module. This can both be used from standard library module and
  * user-defined modules.
  *
@@ -103,3 +104,7 @@ val sysmodctype_to_ctype : Gufo.MCore.mosysmoduletype -> Gufo.MCore.mocomposed_t
  *)
 val get_types_map : Gufo.MCore.mosysmodule -> Gufo.MCore.motype GenUtils.IntMap.t
 
+val get_system_modules : GufoParsed.mmodultype IntMap.t 
+val get_system_modules_dep : IntSet.t IntMap.t 
+val get_system_modules_progmap : int StringMap.t
+val get_system_modules_progmap_debug : string IntMap.t
