@@ -615,3 +615,36 @@ and dump_var var =
   dump_var_val var.mva_value;
   close_box ();
   print_newline ()
+
+
+let dump_fullprog prog = 
+      debug_info ("-- mfp_progmodules --");
+      IntMap.iter
+        (fun i modu -> debug_info (sprintf "%d %s \n" i 
+                        (match modu with 
+                          | MSystemMod strmod -> strmod
+                          | _ -> "user mod"
+                        )
+                      )
+        )
+        prog.mfp_progmodules;
+      debug_info ("-- mfp_module_dep--");
+      IntMap.iter
+        (fun i _ -> debug_info (sprintf "%d \n" i )
+        )
+        prog.mfp_module_dep;
+      debug_info ("-- mfp_progmap --");
+      StringMap.iter
+        (fun modname i -> debug_info (sprintf "%s : %d \n" modname i )
+        )
+        prog.mfp_progmap;
+
+      debug_info ("-- mfp_progmap_debug --");
+      IntMap.iter
+        (fun i modname -> debug_info (sprintf "%d : %s \n" i modname )
+        )
+        prog.mfp_progmap_debug
+
+
+
+

@@ -194,8 +194,15 @@ and mtype_val =
                           * mtype for side effect.
                           * For exemple like "printf "aa";; true" 
                           * *)
+(*and mpos = 
+  {
+    mps_line : int;
+    mps_col : int;
+  }
 
-
+and mtype_val_with_pos =
+  mtype_val * pos
+*)
 and mcomp_op = 
   | Egal      (* == *)
   | NotEqual (* != *)
@@ -257,9 +264,9 @@ and mmodultype =
 
 and fullprog= {
   mfp_mainprog : mprogram ;
-  mfp_progmodules : mmodultype IntMap.t ;
+  mfp_progmodules : mmodultype IntMap.t ; 
   mfp_module_dep : IntSet.t IntMap.t; (*For a module i, give the set of module used as dependancy*)
-  mfp_progmap : int StringMap.t; 
+  mfp_progmap : int StringMap.t;  (*For each module name, return its integer name.*)
   mfp_progmap_debug : string IntMap.t; 
 }
 
@@ -287,5 +294,7 @@ val dump_mtype : mtype -> unit
 val dump_var :mvar -> unit
 
 val mval_to_cmd: mtype_val -> mcmd_seq
+
+val dump_fullprog : fullprog -> unit
 
 (* END FUNCTIONS *)
