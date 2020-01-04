@@ -447,7 +447,9 @@ sig
   (*functions for program *)
   
   val empty_oprog : moprogram
+
   val empty_ofullprog: fullprogopt
+
   val is_empty_ofullprog : fullprogopt -> bool
 
   (*END functions for progam *)
@@ -482,9 +484,8 @@ environment 'env'. Raise NotFould if not found.*)
   (* return the val as a string *)
   val moval_to_string: motype_val -> string
   
-  (*TODO: not sure we want this *)
-  (* return the type of a value.*)
-(*   val moval_to_type : motype_val -> motype_or *)
-
+  (*Display as a list every modules of the given fullprogopt.*)
+  val fulloptiprogModules_to_string: fullprogopt -> string 
+  
   (**END PRINTER **)
 end

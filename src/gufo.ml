@@ -1238,6 +1238,7 @@ struct
 
   (*Utility *)
 
+
   let empty_oprog = 
     {
           mopg_name= -1 ;
@@ -1423,6 +1424,12 @@ let moval_to_type aval =
         | MOIf_val (cond, thn, els) -> "-if-"
         | MOComp_val (op, left, right) -> "-comp-"
         | MOBody_val lstbodies -> "-body-"
+
+
+let fulloptiprogModules_to_string fulloprog = 
+  StringMap.fold 
+    (fun modName i str ->  (sprintf "%s , %s:%d " str modName i))
+    fulloprog.mofp_progmap "Dumping program modules:\n"
 
 
   (** END PRINTER **)
