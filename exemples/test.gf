@@ -3,4 +3,4 @@
 
 **START**
 
-let $$path = "toto" in(echo $$path)
+let $test = ls in ($test.Cmd.print) 
