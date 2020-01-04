@@ -22,6 +22,7 @@
 
 open Gufo.MCore
 open GenUtils
+open GufoParsed
 
 let modtypes = IntMap.empty
 
@@ -30,6 +31,14 @@ let get args scope =
     |  [MOSimple_val (MOSome_val i ); defval ] -> i
     |  [MOSimple_val (MONone_val); defval ] -> defval
     | _ -> assert false 
+
+let force args scope = 
+  match args with
+    |  [MOSimple_val (MOSome_val i ); ] -> i
+    |  [MOSimple_val (MONone_val); ] -> raise (ExecutionError "$Opt.force was used with a None value.")
+    | _ -> assert false 
+
+
 
 (*TODO
 let fail args scope = 
@@ -53,6 +62,19 @@ let topvars =
         
         ;
       mosmv_action= get;
+    };
+    {
+      mosmv_name = "force";
+      mosmv_description = "force : optval -> val
+        If optval is set to 'some i', return i, else exit the program with an
+        error (this should be used only when you are sure the option is set.";
+      mosmv_intname = 2;
+      mosmv_type = 
+        MOFun_type
+        ([ MOOption_type (MOAll_type 1) ; ]
+        , MOAll_type 1)
+        ;
+      mosmv_action= force;
     };
   ]
 
