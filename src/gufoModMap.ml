@@ -38,6 +38,15 @@ let mwith args scope =
       MOSimple_val (MOMap_val (MMap.union (fun _k _a b -> (Some b)) mmap mmap2))
     | _ -> assert false 
 
+let get args scope = 
+  match args with
+    |  [MOSimple_val (MOMap_val(mmap)); kval ] ->
+        (match (MMap.find_opt (core_to_simple_val kval) mmap) with
+          | None -> MOSimple_val (MONone_val)
+          | Some v -> MOSimple_val (MOSome_val v)
+        )
+    | _ -> assert false 
+
 let add args scope = 
   match args with
     |  [MOSimple_val (MOMap_val(mmap)); kval; vval ] ->
@@ -66,10 +75,23 @@ let topvars =
       mosmv_action= is_in;
     };
     {
+      mosmv_name = "get";
+      mosmv_description = "Get the element of the map pointed by the key.";
+      mosmv_intname = 2;
+      mosmv_type = 
+        MOFun_type
+        ([ MOMap_type( MOAll_type (-20), MOAll_type (-21) );
+           MOAll_type (-20) 
+        ], 
+           MOOption_type (MOAll_type (-21)))
+        ;
+      mosmv_action= get;
+    };
+    {
       mosmv_name = "union";
       mosmv_description = "Do the union of two maps. In case key already
                            exists, the value of the second map is used.";
-      mosmv_intname = 2;
+      mosmv_intname = 3;
       mosmv_type = 
         MOFun_type
         ([ MOMap_type( MOAll_type (-20), MOAll_type (-21) );
@@ -82,7 +104,7 @@ let topvars =
     {
       mosmv_name = "add";
       mosmv_description = "Add a (key, value) to a map.";
-      mosmv_intname = 3;
+      mosmv_intname = 4;
       mosmv_type = 
         MOFun_type
         ([ 
@@ -97,7 +119,7 @@ let topvars =
     {
       mosmv_name = "rm";
       mosmv_description = "remove a key and its associated value from the map.";
-      mosmv_intname = 4;
+      mosmv_intname = 5;
       mosmv_type = 
         MOFun_type
         ([ 
