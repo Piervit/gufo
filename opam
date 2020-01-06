@@ -20,7 +20,7 @@ depends: [
   "camomile"
   "react"
   "lwt"
-  "lambda-term" {>= "1.10.1"}
+  "lambda-term" {>= "2.0.2"}
   "base-unix"
   "sedlex" {>= "2.0.0"}
 ]
