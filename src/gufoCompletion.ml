@@ -205,8 +205,16 @@ let var_completion fulloprog cur_word =
   StringSet.empty
 
 let module_completion fulloprog cur_word =
-  (*TODO*)
-  StringSet.empty
+  IntMap.fold
+    (fun _ modname possibles -> 
+      let full_current_mod = ("$"^modname) in
+      match comp_word_to_cur_word cur_word full_current_mod with
+        | false -> possibles
+        | true -> 
+            StringSet.add full_current_mod possibles
+    )
+    fulloprog.Gufo.MCore.mofp_progmap_debug
+    StringSet.empty
 
 let file_completion shell_env cur_word =
   (*we complete relatively to the file present in the current dir.*)
@@ -276,7 +284,7 @@ let completion shell_env fulloprog cmp_type cur_word =
   let posibilities = 
     match cmp_type with
     | CompVar -> var_completion fulloprog cur_word 
-    | CompModul -> module_completion fulloprog cur_word (*TODO*)
+    | CompModul -> module_completion fulloprog cur_word 
     | CompVarOrModul -> 
         let possibles_vars = var_completion fulloprog cur_word in
         let possibles_completion = module_completion fulloprog cur_word in
