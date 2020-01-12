@@ -1456,8 +1456,12 @@ let type_check_has_type_with_allTypeConstraint
       | MOUnit_type, _ -> MOUnit_type, allTypeMap (*TODO : this should be discussed. *)
       | MOAll_type i, typ -> typ, allType_addRealType i typ allTypeMap
       | typ, MOAll_type i2 -> typ, allType_addRealType i2 typ allTypeMap
-      | MORef_type (_,_,_,_), _ -> raise (InternalError "Gufo internal error (ref should not exist)") (*because we should have no more ref at this point *)
-      | _, MORef_type(_,_,_,_) -> raise (InternalError "Gufo internal error (ref should not exist)")
+      | MORef_type (mod1,idref1,deep1,arg1), _ -> 
+          let required = 
+            get_type_from_topvar_types optiprog var_types (mod1, idref1, deep1) arg1 
+          in
+          has_type required found allTypeMap 
+      | _, MORef_type(_,_,_,_) -> raise (InternalError "Gufo internal error (ref should not exist2)")
       | MOTupel_type (_,_,_,_,_), _ -> raise (InternalError "unexpected tupel)")
       | _, MOTupel_type (_,_,_,_,_) ->  raise (InternalError "unexpected tupel)")
       | _, _ -> raise (TypeError (sprintf "Incompatible type: %s found while type %s required" 
