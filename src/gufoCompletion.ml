@@ -22,6 +22,7 @@
 
 open GenUtils
 open GufoExpression
+open Gufo.MCore 
 
 (*a comp_type is a type for a kind of completion.
 For exemple, a file will not be completed on the same way than a var.
@@ -130,7 +131,10 @@ let analyser expr pos cur_word =
     let first_char = String.get cur_word 0 in
     try 
       let second_char = String.get cur_word 1 in 
-      get_type_using_two_chars first_char second_char
+      let ty, res = get_type_using_two_chars first_char second_char in
+      debug_print (Printf.sprintf "completion type: %s \n" (comp_type_to_string ty));
+      ty,res
+
     with Invalid_argument _ -> 
       (*cur_word has only a single char*)
       get_type_single_char first_char
@@ -201,20 +205,59 @@ let var_completion fulloprog cur_word =
         | true -> StringSet.add full_current_var possibles 
     )
   (*retrieve every variables of the program.*)
-  fulloprog.Gufo.MCore.mofp_mainprog.Gufo.MCore.mopg_topvar_debugname
+  fulloprog.mofp_mainprog.mopg_topvar_debugname
   StringSet.empty
 
+(*Xan complet a module or a module variable.*)
 let module_completion fulloprog cur_word =
-  IntMap.fold
-    (fun _ modname possibles -> 
-      let full_current_mod = ("$"^modname) in
-      match comp_word_to_cur_word cur_word full_current_mod with
-        | false -> possibles
-        | true -> 
-            StringSet.add full_current_mod possibles
-    )
-    fulloprog.Gufo.MCore.mofp_progmap_debug
-    StringSet.empty
+  match String.index_opt cur_word '.' with
+    | None -> 
+        (*We are completing a module*)
+        IntMap.fold
+          (fun _ modname possibles -> 
+            let full_current_mod = ("$"^modname) in
+            match comp_word_to_cur_word cur_word full_current_mod with
+              | false -> possibles
+              | true -> 
+                  StringSet.add full_current_mod possibles
+          )
+          fulloprog.mofp_progmap_debug
+          StringSet.empty
+    | Some idx_dot -> 
+        (*$We are completing a module variable*)
+        let modulName = String.sub cur_word 1 (idx_dot - 1) in
+        let partial_var_name = String.sub cur_word (idx_dot + 1)
+                                ((String.length cur_word) - idx_dot - 1) in
+        (*does it match a known program module : *)
+        match StringMap.find_opt modulName fulloprog.mofp_progmap with
+          | Some imod -> (*yes*)
+              (match IntMap.find imod fulloprog.mofp_progmodules with
+                | MOUserMod umod -> 
+                  (*User module*)
+                  IntMap.fold 
+                    (fun _ modvar possibles -> 
+                      match comp_word_to_cur_word partial_var_name modvar with
+                        | false -> possibles
+                        | true -> StringSet.add ("$"^modulName^"."^modvar) possibles
+                    )
+                    umod.mopg_topvar_debugname
+                    StringSet.empty
+                  | MOSystemMod smod ->
+                  (*System module*)
+                   IntMap.fold 
+                    (fun _ modvar possibles -> 
+                      match comp_word_to_cur_word partial_var_name modvar.mosmv_name with
+                        | false -> possibles
+                        | true -> StringSet.add 
+                                    ("$"^modulName^"."^modvar.mosmv_name) possibles
+                    )
+                    smod.mosm_topvar
+                    StringSet.empty   
+              )
+          | None -> (*no*) 
+              StringSet.empty
+          
+
 
 let file_completion shell_env cur_word =
   (*we complete relatively to the file present in the current dir.*)
@@ -229,7 +272,7 @@ let file_completion shell_env cur_word =
     match syntaxic_dir_part with
       | None -> 
         (* cur_dir is current working directory *)
-        shell_env.Gufo.MCore.mose_curdir 
+        shell_env.mose_curdir 
       | Some dir_part -> dir_part
   in 
   try 
