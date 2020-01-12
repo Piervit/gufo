@@ -1345,8 +1345,13 @@ let moval_to_type aval =
             (type_to_string rettyp)
       | MOUnit_type  -> "unit"
       | MOAll_type i -> sprintf "'%d" i
-      | MORef_type (modi, i , deep, args ) -> sprintf "ref %d[%d] (nbargs: %d) {%s}" i deep (List.length args) 
-                                              (List.fold_left (fun s arg -> sprintf "%s, %s" s (type_to_string arg)) "" args)
+      | MORef_type (modi, i , deep, args ) -> sprintf "ref %s%d[%d] (nbargs: %d) {%s}" 
+        (match modi with
+          | None -> ""
+          | Some i -> sprintf "%d." i
+        )
+         i deep (List.length args) 
+         (List.fold_left (fun s arg -> sprintf "%s, %s" s (type_to_string arg)) "" args)
       | MOTupel_type _ -> sprintf "Tupel" 
     )
 
