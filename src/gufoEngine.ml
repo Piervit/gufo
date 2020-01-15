@@ -568,7 +568,7 @@ let find_var_in_prog varname scope =
     | i,[] -> 
         (try find_in_topvar i
         with 
-          | Not_found -> raise (ExecutionError "Internal error, variable not found."))
+          | Not_found -> raise (ExecutionError (sprintf "Internal error, variable %d not found." i)))
     | i,fields ->  (* $a.field.field *)
         let from_var = 
           ( try find_in_topvar i
@@ -656,11 +656,8 @@ and apply_in_body toplevel arg2valMap bodieslst =
 and apply_core_fun arg2valMap msysmodvar argslst = 
   msysmodvar.mosmv_action argslst arg2valMap
 
-(*merge_loaded_prog fullprog loaded_prog -> 
-  Merge loaded_prog into fullprog.
-*)
-(* and merge_loaded_prog fulloptiprog loaded_prog =  *)
-  
+(*apply the special function $Base.load --> load a new module into the current 
+  one.*)
 and apply_load_fun args =
   try
   (
@@ -681,6 +678,7 @@ and apply_load_fun args =
   with e -> 
     MOSimple_val (MOBase_val (MOTypeStringVal (Printexc.to_string e )))
 
+(*Apply the special function $List.iter *)
 and iter args scope =  
   match args with 
     |  [MOSimple_val (MOFun_val fv); MOSimple_val (MOList_val mtvlist)] ->
@@ -1232,7 +1230,7 @@ and apply_in_list toplevel arg2valMap ref indices =
   apply_in_list_ (find_var_in_prog ref.morv_varname arg2valMap) indices
 
 and apply_motype_val toplevel arg2valMap aval = 
-  match aval with 
+    match aval with 
     | MOSimple_val sv ->
         apply_mosimpletype_val toplevel arg2valMap sv
     | MOComposed_val mct -> apply_composed_type toplevel arg2valMap mct 
@@ -1261,7 +1259,12 @@ and apply_motype_val toplevel arg2valMap aval =
                         apply_in_list toplevel arg2valMap ref idx_lst 
                   )
                 in
-              (apply_fun toplevel arg2valMap funvar (List.map (apply_motype_val toplevel arg2valMap) argslst)) 
+              (*If the function come from a module, then the toplevel variables
+                from this module become reachable in the arg2valMap. On the
+                contrary, the toplevel from the current module are no more
+              present.*)
+              let farg2valMap = modul.mopg_topvar in
+              (apply_fun toplevel farg2valMap funvar (List.map (apply_motype_val toplevel arg2valMap) argslst)) 
               | MOSystemMod msymodule when msymodule.mosm_name = "Base"-> 
                   (*$Base.load filename function: this is specific code which
                     do not work like others modules: 
