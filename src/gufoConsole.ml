@@ -483,6 +483,7 @@ let print_res term str_res =
 (******************************* EXPRESSION CHECKING *************************)
 (*Using the Gufo language to check if an expression is a valid one or not. *)
 
+(*The reference to the current program*)
 let fulloprog = ref empty_ofullprog
 
 let check_full_expr cur_expr = 
@@ -658,6 +659,34 @@ let multiline_expr term shell_env hist cur_expr =
     analyse_and_print term cur_expr >>= 
       (fun () -> return (Some (expr,shell_env, hist)))
   )
+
+let first_line term shell_env (hist, hist_id) cur_expr = 
+  (*try to retrieve the current line*)
+  LTerm_history.add hist (ctx_to_zed_string cur_expr);
+  let hist_id = 0 in
+  debug_info (debug_title0 "Creating a Gufo program.");
+  try (
+  match check_full_expr cur_expr with 
+    | Some p ->
+(*         let prog = GufoStart.handle_program p "Shell_prog" in *)
+        let prog = GufoStart.handle_consolprog p (!fulloprog) in 
+        let opt_prog, types = 
+        match  Gufo.MCore.is_empty_ofullprog (!fulloprog) with
+          | true -> GufoParsedToOpt.parsedToOpt prog
+          | false -> GufoParsedToOpt.add_prog_to_optprog !fulloprog prog
+        in
+        fulloprog := opt_prog;
+          let redprog ,shell_env = (GufoEngine.exec opt_prog shell_env) in
+          fulloprog := redprog;
+        return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
+    | None ->
+        return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
+  ) with | TypeError msg 
+       | InternalError msg 
+       | Sys_error msg 
+       | VarError msg 
+       | SyntaxError msg ->
+              return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
 
 let new_line_normal_mod term shell_env (hist, hist_id) cur_expr = 
   (*try to retrieve the current line*)
@@ -933,7 +962,8 @@ let main () =
        >>= fun term ->
        size := LTerm.size term ;
        let tmod = (LTerm.enter_raw_mode term >>=
-         (fun tmod -> term_rawmod := Some tmod; return tmod) ) in
+         (fun tmod -> 
+            term_rawmod := Some tmod; return tmod) ) in
        let cur_expr = create_empty_expr () in 
        let display_size = (sprintf "Term size: rows:%d col:%d\n" !size.rows !size.cols ) in
        LTerm.fprints term (eval [S "Welcome, \n";
@@ -949,7 +979,16 @@ let main () =
        >>=
         (fun () -> 
           let shell_env = Gufo.MCore.get_env (Sys.getcwd ()) in
-          loop term shell_env (LTerm_history.create [], 0) tmod cur_expr)
+          (*A dummy first line : it allows to create initial program with
+          initial modules (for completion*)
+          first_line term shell_env (LTerm_history.create [], 0) cur_expr >>=
+          (fun res -> 
+            (match res with 
+              | Some (expr,shell_env, hist) -> loop term shell_env hist tmod expr
+              | None -> Lwt.fail (ExitTerm (term,tmod))
+            )
+          )
+        )
     )
     (function
       | ExitTerm (term,tmod) -> Lwt.return (term,tmod)
