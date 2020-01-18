@@ -95,8 +95,8 @@ sig
    (*
     * (*module * id_ref * deep * args * pos_in_tuble *)
     * appears in PART 3 of type checking in a similar way than MORef_type.
-    * This means that the type is a reference of an element of the tuple (at
-    * pos pos_in_tuble)*)
+    * This means that the type is a reference to an element of the tuple (at
+    * pos pos_in_tuple)*)
 
 
    (* The SimpleCore module is internal stuff to manage Map and Set

@@ -1352,7 +1352,20 @@ let moval_to_type aval =
         )
          i deep (List.length args) 
          (List.fold_left (fun s arg -> sprintf "%s, %s" s (type_to_string arg)) "" args)
-      | MOTupel_type _ -> sprintf "Tupel" 
+      | MOTupel_type (modi, i, deeps, args, pos)  -> 
+          (sprintf "Tupel from %d.%d deep: %d nb_args : %d pos : %d \n"
+            (match modi with
+              | None -> -1
+              | Some i -> i
+            )
+            i 
+            deeps 
+            (List.length args) 
+            (match pos with
+              | [i] -> i
+              | _ -> -1
+            )
+          )
     )
 
 
