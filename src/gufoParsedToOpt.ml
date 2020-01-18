@@ -109,7 +109,7 @@ let rec get_type_from_tuple_el tupl_typ position =
               with _ -> raise (TypeError "The tuple value cannot be assigned to the assigned variable tuples."))
           | MORef_type (modul, iref, idx, args) -> 
               (MOTupel_type (modul, iref, idx, args, position) )
-          | _ -> raise (InternalError "type checker error.")
+          | _ -> raise (InternalError (sprintf "type checker error.\n" ))
         )
     | i::lst -> 
         (match tupl_typ with
@@ -123,7 +123,7 @@ let rec get_type_from_tuple_el tupl_typ position =
 let determine_refine_type_composed i j = 
   match i.moct_name - j.moct_name with
     | 0 -> i
-    | _ -> raise (TypeError (sprintf "Cannot use type %d and %d together (TODO: give source name) (heritage not implemented))" i.moct_name j.moct_name))
+    | _ -> raise (TypeError (sprintf "Cannot merge type %d and %d together (TODO: give source name) (heritage not implemented))" i.moct_name j.moct_name))
 
 let determine_refine_base_type i j = 
   match i, j with 
@@ -132,7 +132,7 @@ let determine_refine_base_type i j =
     | MTypeInt, MTypeInt -> MTypeInt
     | MTypeFloat, MTypeFloat -> MTypeFloat
     | MTypeCmd, MTypeCmd -> MTypeCmd
-    | _, _ -> raise (TypeError (sprintf "Cannot use together type %s and type %s ." (basetype_to_str i) (basetype_to_str j)))
+    | _, _ -> raise (TypeError (sprintf "Cannot merge together type %s and type %s ." (basetype_to_str i) (basetype_to_str j)))
 
 (*
 * alltypeMap give for a given 'alltype' id a list of constraints to which it is
@@ -552,13 +552,13 @@ and determine_type_ref fulloptiprog optiprog locScope ref =
 and precise_with_args ref_typ args_typ =
   match args_typ with
     | [] -> ref_typ
-    | typ :: args_typ -> 
+    | typ :: oargs_typ -> 
         (match ref_typ with 
           | MORef_type (_,_,_,_) -> 
               ref_typ
               (*TODO: there might be a better solution to find.*)
           | MOAll_type i ->
-              (MOFun_type (typ::args_typ, MOAll_type i)) 
+              (MOFun_type (typ::oargs_typ, MOAll_type i)) 
           | _ -> 
               ref_typ
         )
@@ -585,8 +585,8 @@ and determine_refapplication_type ref_typ args_typ bd_alltype =
           (match ref_typ with 
             | MOFun_type ([_refarg], refret) ->
                 apply refret args_typ
-            | MOFun_type (refarg:: refargs , refret) ->
-                apply (MOFun_type (refargs, refret)) args_typ
+              | MOFun_type (refarg:: refargs , refret) ->
+                  apply (MOFun_type (refargs, refret)) args_typ
             | MORef_type (modi,i,deep,args) -> 
                 apply (MORef_type (modi,i,deep,(List.rev (typ::(List.rev args))))) args_typ
                 (*TODO: there might be a better solution to find.*)
@@ -1018,8 +1018,7 @@ let top_level_types_no_ref var_types past_var_map =
                 let past_i = IntMap.find i past_map in
                 let modi = get_module modi nmodi in
                 let bd_alltype, typ = find_and_get_type modi past_i ndeep bd_alltype in
-                apply typ args bd_alltype
-
+                apply typ args bd_alltype 
             | None, modi, ni, i when (0 = modi && ni = i ) ->  
                 let past_i = IntMap.find i past_map in
                 let modi = get_module modi nmodi in
@@ -1090,9 +1089,7 @@ let top_level_types_no_ref var_types past_var_map =
               let $af $i = $Int.toString $i
           For $af, rett is ref 1[0], for newrett, it is (fun int -> string) 
         *)
-       let new_lst_args =  
-          refine_with_bd_alltyp (List.rev new_lst_args) bd_alltype 
-        in 
+       let new_lst_args =  (List.rev new_lst_args) in
         bd_alltype, MOFun_type (new_lst_args, newrett)
       | MOAll_type _  -> bd_alltype , typ 
       | MOUnit_type  -> bd_alltype, typ 
@@ -1102,9 +1099,10 @@ let top_level_types_no_ref var_types past_var_map =
          let bd_alltype, typ = find_and_get_type modi i deep bd_alltype in
             let bd_alltype, typ = apply typ args bd_alltype in
             bd_alltype, typ
-      | MOTupel_type (refmodi , i , deep , _args,  position) -> 
+      | MOTupel_type (refmodi , i , deep , args,  position) -> 
           let modi = get_module modi refmodi in
           let bd_alltype, typ = find_and_get_type modi i deep bd_alltype in
+          let bd_alltype, typ = apply typ args bd_alltype in 
           bd_alltype, get_type_from_tuple_el typ position
     in
 
@@ -1119,9 +1117,9 @@ let top_level_types_no_ref var_types past_var_map =
     IntMap.fold
       (fun modi topvar_map (bd_alltype, newtopvar_map) ->
         let bd_alltype, newMap = 
-        IntMap.fold
-          (fun i el (bd_alltype, newMap )-> 
-            let bd_alltype, newtyp = _recRemoveRef bd_alltype modi el in
+          IntMap.fold
+          (fun i typ (bd_alltype, newMap )-> 
+            let bd_alltype, newtyp = _recRemoveRef bd_alltype modi typ in
             bd_alltype, IntMap.add i newtyp newMap
           )
           topvar_map (bd_alltype, IntMap.empty)
@@ -1156,7 +1154,8 @@ let get_type_from_topvar_types optiprog var_types (imod, idref, deep) args =
 (*expr should have a type copatible with required_typ, else we would throw a
 TypeError exception.*)
 let type_check_has_type fulloptiprog optiprog var_types required_typ expr =
-  debug_print (sprintf "checking expr '%s' has type '%s'\n" (moval_to_string expr) (type_to_string required_typ));
+  debug_print (sprintf "checking expr '%s' has type '%s'\n" 
+                        (moval_to_string expr) (type_to_string required_typ));
   let rec has_type required found = 
     let has_unique_type required found = 
     match required, found with
@@ -1385,7 +1384,7 @@ let rec refine_allTypeConstraint typ allTypeMap =
    | MOAll_type i -> 
       allType_getRealType (MOAll_type i) allTypeMap
    | MOUnit_type -> MOUnit_type
-   | MORef_type (_,_,_, _ ) -> raise (InternalError "type checker error")
+   | MORef_type (_,_,_, _ ) -> raise (InternalError "type checker error.")
 
 
 (*This function check an exepected type and an effectively found one, using it
@@ -1804,7 +1803,7 @@ let debug_to_level_type fulloptiprog var_types =
                 | Some (MOUserMod mprog) -> find_debug_name mprog var
                 | Some (MOSystemMod sysmod) -> (IntMap.find var sysmod.mosm_topvar).mosmv_name
             in
-            debug_print (sprintf "from module %s: %s : %s\n" mod_str var_str (type_to_string typ))
+            debug_print (sprintf "from module %s: %d (%s) : %s\n" mod_str var var_str (type_to_string typ))
           )
           toptypmap
     )
