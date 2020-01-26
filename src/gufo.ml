@@ -1435,13 +1435,38 @@ let moval_to_type aval =
               | MOEmpty_val -> ""
             )
         | MOComposed_val mct -> "-composed-"
-        | MORef_val (ref, args) -> "-ref-"
+        | MORef_val (ref, args) -> 
+            let modu_i = 
+              (match ref.morv_module with
+                | None -> -1
+                | Some i -> i
+              )
+            in
+            let varname_i, _ =  ref.morv_varname in
+            let varname_str = ref.morv_debugname in
+            let args_str = 
+              List.fold_left 
+                (fun acc arg -> acc ^ ", " ^ (moval_to_string arg) ) 
+              "" args
+            in
+            sprintf "ref %d.%d (%s) %s" modu_i varname_i varname_str args_str
+
         | MOEnvRef_val (var) -> var
         | MOBasicFunBody_val (op, arga, argb) -> "-basicfun-"
         | MOBind_val bd -> "-binding-"
         | MOIf_val (cond, thn, els) -> "-if-"
         | MOComp_val (op, left, right) -> "-comp-"
         | MOBody_val lstbodies -> "-body-"
+
+
+let topvar_to_string v = 
+  match v with 
+    | MOTop_val v -> sprintf "Topval %s" (moval_to_string v)
+    | MOTupEl_val (i, pos) -> sprintf "MOTupEl %d pos : [%s] " i 
+                                      (List.fold_left
+                                        (fun acc p -> sprintf "%s %d," acc p) 
+                                        "" pos
+                                      )
 
 
 let fulloptiprogModules_to_string fulloprog = 
