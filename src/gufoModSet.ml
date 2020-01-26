@@ -26,6 +26,13 @@ open GufoParsed
 
 let settypes = IntMap.empty
 
+let cardinal args scope =  
+  match args with 
+    |  [MOSimple_val (MOSet_val(mset)); ] ->
+        MOSimple_val (MOBase_val (MOTypeIntVal (MSet.cardinal mset)))
+
+    | _ -> assert false 
+
 let is_in args scope =  
   match args with 
     |  [MOSimple_val (MOSet_val(mset)); el_val ] ->
@@ -55,9 +62,21 @@ let rm args scope =
 let topvars = 
   [
     {
+      mosmv_name = "cardinal";
+      mosmv_description = "Return the number of elements of the set as an integer.";
+      mosmv_intname = 1;
+      mosmv_type = 
+        MOFun_type
+        ([ MOSet_type( MOAll_type (-20) );
+        ], MOBase_type(MTypeInt))
+        
+        ;
+      mosmv_action= cardinal;
+    };
+    {
       mosmv_name = "is_in";
       mosmv_description = "Return true if the element is in the set. Else, return false.";
-      mosmv_intname = 1;
+      mosmv_intname = 2;
       mosmv_type = 
         MOFun_type
         ([ MOSet_type( MOAll_type (-20) );
@@ -70,7 +89,7 @@ let topvars =
     {
       mosmv_name = "union";
       mosmv_description = "Do the union of two sets. ";
-      mosmv_intname = 2;
+      mosmv_intname = 3;
       mosmv_type = 
         MOFun_type
         ([ MOSet_type( MOAll_type (-20) );
@@ -83,7 +102,7 @@ let topvars =
     {
       mosmv_name = "add";
       mosmv_description = "Add a specific value to a set.";
-      mosmv_intname = 3;
+      mosmv_intname = 4;
       mosmv_type = 
         MOFun_type
         ([ MOSet_type( MOAll_type (-20) );
@@ -96,7 +115,7 @@ let topvars =
     {
       mosmv_name = "rm";
       mosmv_description = "Remove a specific value from a set.";
-      mosmv_intname = 4;
+      mosmv_intname = 5;
       mosmv_type = 
         MOFun_type
         ([ MOSet_type( MOAll_type (-20) );
