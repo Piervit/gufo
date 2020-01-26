@@ -6,6 +6,20 @@ The Set modules defines functions helper for sets.
 variables:
 ----------
 
+cardinal : set ('v) -> int 
+**************************
+
+cardinal aset : return the number of elements in the set.
+
+Exemple:
+^^^^^^^
+.. code-block:: gufo
+
+    % let $mySet = -< "Tintin" , "Haddock" >-
+    % $Set.cardinal $mySet
+    2
+ 
+
 is_in: set ('v) -> 'v -> bool
 ********************************
 
@@ -17,9 +31,9 @@ Exemple:
 .. code-block:: gufo
 
     % let $mySet = -< "Tintin" , "Haddock" >-
-    % $Map.is_in $myMap "Castafiore"
+    % $Set.is_in $myMap "Castafiore"
     False 
-    % $Map.is_in $myMap "Haddock"
+    % $Set.is_in $myMap "Haddock"
     True
     
 union: set ('v) -> set ('v) -> set ('v)

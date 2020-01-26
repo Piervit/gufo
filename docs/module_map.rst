@@ -6,6 +6,20 @@ The Map modules defines functions helper for maps.
 variables:
 ----------
 
+cardinal : map ('v) -> int 
+**************************
+
+cardinal aset : return the number of elements in the set.
+
+Exemple:
+^^^^^^^
+.. code-block:: gufo
+
+    % let $myMap = -< 1: "Tintin" , 2: "Haddock" >-
+    % $Map.cardinal $myMap
+    2
+ 
+
 is_in: map ('k, 'v) -> 'k -> bool
 ********************************
 
