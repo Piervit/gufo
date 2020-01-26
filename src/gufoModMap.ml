@@ -26,6 +26,12 @@ open GufoParsed
 
 let maptypes = IntMap.empty
 
+let cardinal args scope =  
+  match args with 
+    |  [MOSimple_val (MOMap_val(mmap)) ] ->
+        MOSimple_val (MOBase_val (MOTypeIntVal (MMap.cardinal  mmap)))
+    | _ -> assert false 
+
 let is_in args scope =  
   match args with 
     |  [MOSimple_val (MOMap_val(mmap)); key_val ] ->
@@ -62,9 +68,22 @@ let rm args scope =
 let topvars = 
   [
     {
+      mosmv_name = "cardinal";
+      mosmv_description = "Return the number of elements in the map.";
+      mosmv_intname = 1;
+      mosmv_type = 
+        MOFun_type
+        ([ MOMap_type( MOAll_type (-20), MOAll_type (-21) );
+        ], MOBase_type(MTypeInt))
+        
+        ;
+      mosmv_action= cardinal;
+    };
+
+    {
       mosmv_name = "is_in";
       mosmv_description = "Return true if the element is in the map. Else, return false.";
-      mosmv_intname = 1;
+      mosmv_intname = 2;
       mosmv_type = 
         MOFun_type
         ([ MOMap_type( MOAll_type (-20), MOAll_type (-21) );
@@ -77,7 +96,7 @@ let topvars =
     {
       mosmv_name = "get";
       mosmv_description = "Get the element of the map pointed by the key.";
-      mosmv_intname = 2;
+      mosmv_intname = 3;
       mosmv_type = 
         MOFun_type
         ([ MOMap_type( MOAll_type (-20), MOAll_type (-21) );
@@ -91,7 +110,7 @@ let topvars =
       mosmv_name = "union";
       mosmv_description = "Do the union of two maps. In case key already
                            exists, the value of the second map is used.";
-      mosmv_intname = 3;
+      mosmv_intname = 4;
       mosmv_type = 
         MOFun_type
         ([ MOMap_type( MOAll_type (-20), MOAll_type (-21) );
@@ -104,7 +123,7 @@ let topvars =
     {
       mosmv_name = "add";
       mosmv_description = "Add a (key, value) to a map.";
-      mosmv_intname = 4;
+      mosmv_intname = 5;
       mosmv_type = 
         MOFun_type
         ([ 
@@ -119,7 +138,7 @@ let topvars =
     {
       mosmv_name = "rm";
       mosmv_description = "remove a key and its associated value from the map.";
-      mosmv_intname = 5;
+      mosmv_intname = 6;
       mosmv_type = 
         MOFun_type
         ([ 
