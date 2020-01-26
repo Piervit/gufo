@@ -483,7 +483,9 @@ environment 'env'. Raise NotFould if not found.*)
 
   (* return the val as a string *)
   val moval_to_string: motype_val -> string
-  
+ 
+  val topvar_to_string: topvar_val -> string
+ 
   (*Display as a list every modules of the given fullprogopt.*)
   val fulloptiprogModules_to_string: fullprogopt -> string 
   
