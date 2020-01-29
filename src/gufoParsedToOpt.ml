@@ -33,7 +33,6 @@ open Printf
 
 
 
-
 (** transformation from gufoParsed to gufo.core **)
 
 let fresh_int = ref 1
@@ -1089,7 +1088,10 @@ let top_level_types_no_ref var_types past_var_map =
               let $af $i = $Int.toString $i
           For $af, rett is ref 1[0], for newrett, it is (fun int -> string) 
         *)
-       let new_lst_args =  (List.rev new_lst_args) in
+       let new_lst_args =  
+          refine_with_bd_alltyp (List.rev new_lst_args) bd_alltype 
+        in 
+       (*let new_lst_args =  (List.rev new_lst_args) in*)
         bd_alltype, MOFun_type (new_lst_args, newrett)
       | MOAll_type _  -> bd_alltype , typ 
       | MOUnit_type  -> bd_alltype, typ 
