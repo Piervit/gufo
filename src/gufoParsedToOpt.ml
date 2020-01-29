@@ -31,6 +31,44 @@ open Format
 open Printf
 
 
+let debug_var_type var_types = 
+  debug_print "dumping var_types" ; 
+  IntMap.iter
+    (fun i vmap -> 
+      debug_print (sprintf "Module %d \n" i); 
+      IntMap.iter
+        (fun iv typ -> 
+          debug_print (sprintf "var %d : %s \n" iv (type_to_string typ)); 
+        )
+        vmap
+    )
+    var_types
+
+(*POSITION HANDLING *)
+(*This part is a mecanism used to track position of expressions within the code.*)
+
+  type moPosElement = 
+    | PosComposedType of string
+
+  type moPosition = moPosElement list
+
+  let add_to_position curPos posElement = 
+    posElement::curPos
+
+(*This is for MComposed_val(the first kind of val . )*)
+  let add_composedType_to_position curPos fulloptiprog imod idTyp = 
+  let debugname = 
+    match imod with 
+      | None -> ((IntMap.find idTyp fulloptiprog.mofp_mainprog.mopg_types).moct_debugname)
+      | Some (MOUserMod userprog) -> (IntMap.find idTyp userprog.mopg_types).moct_debugname
+      | Some (MOSystemMod sysprog) -> (IntMap.find idTyp sysprog.mosm_types).mosmt_name
+  in
+    add_to_position curPos debugname
+
+(*TODO for other vals.*)
+ 
+(*END POSITION HANDLING *)
+
 (*If debug is enable, dump a full representation the parsed program. *)
 let dump_prog_representation optiprog = 
   match GufoConfig.get_debug_level () with
@@ -223,7 +261,7 @@ let rec determine_refine_type ?id_var:(id_var = None) t1 t2 =
         let ret = determine_refine_type aret bret in
         MOFun_type (lst_args, ret)
     | _,_ -> raise (TypeError 
-              (sprintf "Cannot infer correct type: %s and %s " (type_to_string t1) (type_to_string t2)))
+              (sprintf "Cannot infer correct type between %s and %s " (type_to_string t1) (type_to_string t2)))
     
 (*Determining the type of every top level function *)
     (*Caution, we try here to deduce toplevel type, not to check low level
@@ -1024,6 +1062,7 @@ let top_level_types_no_ref var_types past_var_map =
       | None -> curmodulei 
       | Some mi -> mi
   in
+  (* For a reference to modi.i, provide its type *)
   let rec find_and_get_type modi i deep bd_alltype = 
     let modtopvar_map = IntMap.find modi var_types in
     let typ = IntMap.find i modtopvar_map in
@@ -1490,7 +1529,7 @@ let type_check_has_type_with_allTypeConstraint
     let real_typ, allTypeMap = has_type required_typ real_typ allTypeMap in
     real_typ, allTypeMap
 
-(*expr should have a type copatible with required_typ, else we would throw a
+(*expr should have a type compatible with required_typ, else we would throw a
 TypeError exception.*)
 (*
   allTypeMap has type allType_relation IntMap.t
@@ -2258,10 +2297,25 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
     }
 
 
+  (*
+    This function is the main transformation from the low level representation
+    (gufoParsed) to the high level representation (gufo.Core).
+      
+      topvar: 
+        is an optionnal map, allowing to access other toplevel
+        definition. This is only set when we are in console mod. It allows to
+        retrieve a potential previous id of a variable with same string name.
+      optiprog: 
+        the current (not fully completed) high level representation.
+      locScope: 
+        it is the binding to declared var name to their int counterpart.
+      expr: 
+        the low level expression to convert to a top level expression.
+      position:
+        retrieve the current position of the expr
   
-  (*locScope is the binding to declared var name to their int
-   * counterpart. *)
-  and parsedToOpt_expr ?topvar:(topvar = None) optiprog locScope expr  =
+ *)
+  and parsedToOpt_expr ?topvar:(topvar = None) optiprog locScope expr = (* position =*)
     match expr with
       | MComposed_val mct -> 
           parsedToOpt_composed_val ~topvar optiprog locScope mct
@@ -2787,7 +2841,7 @@ function we used it to not lost informations. *)
         | fd::lst -> (get_type_field_from_field fulloptiprog optiprog fd).motf_type
     in
     
-      debug_print(sprintf "function  ret type before analysis: %s \n"  (type_to_string funtype));
+      debug_print(sprintf "function %d ret type before analysis: %s \n"  funname (type_to_string funtype));
     match args with
       | [] -> 
         (*no args, we return funtype*) (funtype, var_types)
@@ -3085,6 +3139,7 @@ let parsedToOpt fullprog =
   (*Third step, look inside the code*)
    type_check fulloptiprog var_types   ;
   (*PART 4 *)
+  debug_info (debug_title2 "Part4: full type checking");
   let var_types = type_check_bottom_to_top fulloptiprog var_types in
   fulloptiprog, var_types
 
@@ -3245,6 +3300,7 @@ let add_prog_to_optprog fulloptiprog fullprog =
           nfulloptiprog
 
   in
+  debug_info(debug_title2 "PART 1");
   let nfulloptiprog = 
     apply_for_modules step_1_mod_fun fulloptiprog
   in
@@ -3255,7 +3311,8 @@ let add_prog_to_optprog fulloptiprog fullprog =
       mofp_mainprog = add_main_prog_step1 nfulloptiprog nfulloptiprog.mofp_mainprog fullprog.mfp_mainprog
     }
   in
-  (*step2*)
+  (*PART 2 *)
+  debug_info(debug_title2 "ParsedToOpt PART 2");
   (*for topval*)
   let step2_topval_intmap nfulloptiprog imod strmod = 
     let momod = IntMap.find imod nfulloptiprog.mofp_progmodules in
@@ -3327,14 +3384,28 @@ let add_prog_to_optprog fulloptiprog fullprog =
      Maybe it should become a simple Id variable map --> type shared between
      modules with variable id unique within the whole program. This would make
      it easier to get type from this map.*)
+  debug_info(debug_title2 "PART 3");
   let var_types = top_level_types nfulloptiprog in 
   (*PART 3 *)
+  debug_print "dump var_types before top_level_types_no_ref\n";
+  IntMap.iter
+    (fun ivar typ -> debug_print (sprintf "\t\t %d : %s\n" ivar (type_to_string typ)))
+    (IntMap.find 0 var_types);
   let var_types = top_level_types_no_ref var_types past_var_map in
+  debug_print "dump var_types after top_level_types_no_ref\n";
+  IntMap.iter
+    (fun ivar typ -> debug_print (sprintf "\t\t %d : %s\n" ivar (type_to_string typ)))
+    (IntMap.find 0 var_types);
+
+
   (*PART 3 *)
    debug_to_level_type nfulloptiprog var_types ;
   (*PART 3 *)
    type_check nfulloptiprog var_types   ;
   (*PART 4 *)
+  debug_info(debug_title2 "PART 4");
+  debug_print "dumping var_types at beginning of part 4";
+  debug_var_type var_types;
   let var_types = type_check_bottom_to_top nfulloptiprog var_types in
   nfulloptiprog, var_types
 
@@ -3362,6 +3433,7 @@ let add_module_to_optprog progname fulloptiprog moduleprog =
 (*   let  = search_modules moduleprog in *)
   (*FROM PART 1*)
   (*do the provide_type_id for the moduleprog*)
+  debug_info(debug_title2 "PART 1");
   let omoduleprog = (provide_type_id moduleprog empty_oprog) in
   let omoduleprog = {omoduleprog with mopg_name=module_key} in 
   (*fully check type for the prog *)
@@ -3370,6 +3442,7 @@ let add_module_to_optprog progname fulloptiprog moduleprog =
   let fulloptiprog = {fulloptiprog with mofp_progmodules = modul_progs}  in
   (*END PART 1*)
   (*FROM PART 2*)
+  debug_info(debug_title2 "PART 2");
   let omoduleprog = parsedToOpt_topval_intmap moduleprog omoduleprog in
   let omoduleprog = parsedToOpt_topval fulloptiprog moduleprog omoduleprog false None in
   let omoduleprog = moref_to_moctype fulloptiprog omoduleprog in
@@ -3377,12 +3450,14 @@ let add_module_to_optprog progname fulloptiprog moduleprog =
   let modul_progs = IntMap.add module_key (MOUserMod omoduleprog) fulloptiprog.mofp_progmodules in
   let fulloptiprog = {fulloptiprog with mofp_progmodules = modul_progs} in
   (*FROM PART 3*)
+  debug_info(debug_title2 "PART 3");
   let var_types = top_level_types fulloptiprog in 
   let var_types = top_level_types_no_ref var_types None in
   debug_to_level_type fulloptiprog var_types ;
    type_check fulloptiprog var_types   ;
   (*END PART 3*)
   (*PART 4 *)
+  debug_info(debug_title2 "PART 4");
   let var_types = type_check_bottom_to_top fulloptiprog var_types in
   debug_print (sprintf "Dumping fulloptiprog modules after adding modules: %s \n"
           (fulloptiprogModules_to_string fulloptiprog));
