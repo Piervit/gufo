@@ -1369,8 +1369,125 @@ let moval_to_type aval =
     )
 
 
+  let rec moval_to_string_basic v = 
+    match v with 
+        | MOSimple_val sv ->
+            (match sv with
+              | MOBase_val MOTypeStringVal str -> str
+              | MOBase_val MOTypeBoolVal true -> "True"
+              | MOBase_val MOTypeBoolVal false -> "False"
+              | MOBase_val MOTypeIntVal i -> sprintf "%d" i
+              | MOBase_val MOTypeFloatVal f -> sprintf "%f" f
+              | MOBase_val MOTypeCmdVal cmdseq -> 
+                  (match cmdseq with
+                    | MOSimpleCmd cmd -> 
+                        (match cmd.mocm_print with
+                          | None -> ""
+                          | Some res -> sprintf "%s\n" res
+                        )
+                    | _ -> sprintf "" 
+                  )
+              | MOTuple_val tuplst ->
+                  sprintf " ( %s) " 
+                  (List.fold_left 
+                    (fun str el -> sprintf "%s -- %s " str (moval_to_string_basic el) ) 
+                    (sprintf "%s" (moval_to_string_basic (List.hd tuplst)))
+                    (List.tl tuplst))
+              | MOList_val [] ->
+                  sprintf " [ ] " 
+              | MOList_val lst ->
+(*                   sprintf " [%s] " (List.fold_left (fun str el -> sprintf "%s %s, " str (moval_to_string_basic el) ) "" lst) *)
+                  sprintf " [ %s] " 
+                  (List.fold_left 
+                    (fun str el -> sprintf "%s , %s " str (moval_to_string_basic el) ) 
+                    (sprintf "%s" (moval_to_string_basic (List.hd lst)))
+                    (List.tl lst))
+              | MONone_val -> "None"
+              | MOSome_val sv -> sprintf "Some (%s)" (moval_to_string_basic sv)
+              | MOSet_val mset when MSet.is_empty mset -> 
+                  sprintf " -< >- " 
+              | MOSet_val mset -> 
+                  let lst = MSet.elements mset in
+                  sprintf " -< %s>- " 
+                  (List.fold_left
+                    (fun str el -> sprintf "%s , %s " str (moval_to_string_basic (simple_to_core_val el)) ) 
+                    (sprintf "%s" (moval_to_string_basic (simple_to_core_val (List.hd lst))))
+                    (List.tl lst))
+              | MOMap_val amap when MMap.is_empty amap -> 
+                  sprintf " -< : >- "
+              | MOMap_val amap ->
+                  let lst = MMap.bindings amap in
+                  sprintf " -< %s>- " 
+                  (List.fold_left
+                    (fun str (key, el) -> 
+                      sprintf "%s , %s : %s " str
+                        (moval_to_string_basic (simple_to_core_val key)) 
+                        (moval_to_string_basic el))
+                    (let key, el = List.hd lst in
+                      (sprintf "%s : %s" 
+                        (moval_to_string_basic (simple_to_core_val key)))
+                        (moval_to_string_basic el)
+                    )
+                    (List.tl lst))
+
+              | MOFun_val _fv -> "-fun-"
+              | MOEmpty_val -> ""
+            )
+        | MOComposed_val mct -> "-composed-"
+        | MORef_val (ref, args) -> 
+            let modu_i = 
+              (match ref.morv_module with
+                | None -> -1
+                | Some i -> i
+              )
+            in
+            let varname_i, _ =  ref.morv_varname in
+            let varname_str = ref.morv_debugname in
+            let args_str = 
+              List.fold_left 
+                (fun acc arg -> acc ^ " -> " ^ (moval_to_string_basic arg) ) 
+              "" args
+            in
+            sprintf "ref %d.%d (%s): %s" modu_i varname_i varname_str args_str
+
+        | MOEnvRef_val (var) -> var
+        | MOBasicFunBody_val (op, arga, argb) -> "-basicfun-"
+        | MOBind_val bd -> "-binding-"
+        | MOIf_val (cond, thn, els) -> "-if-"
+        | MOComp_val (op, left, right) -> "-comp-"
+        | MOBody_val lstbodies -> "-body-"
+
+
+
 
   let rec moval_to_string v = 
+    (*Allows to print the mobd_name part of an mobinding *)
+    let print_mobinding_name name =
+      let rec print_name (curpos, acc) name = 
+        match name with
+          | [] -> acc 
+          | (id, pos)::next_name -> 
+            (
+              match (List.length curpos) - (List.length pos) with
+                | 0 -> 
+                  (*same len*)
+                  let acc = sprintf "%s -- $%d (%s)" acc id (List.fold_left (fun acc i -> (sprintf "%s, %d" acc i) ) ""pos)  in
+                
+                  print_name (pos, acc) next_name
+                | i when i > 0 -> 
+                  (*curpos has more el*)
+                  let acc = sprintf "%s ) " acc in
+                  print_name (GenUtils.list_starts curpos ((List.length curpos) - 1), acc) name
+                | i when i < 0 -> 
+                  (*curpos has less el*)
+                  let acc = sprintf "%s ( " acc in
+                  print_name (GenUtils.list_append_at_end curpos 0 , acc) name
+            )
+          | _  ->  assert false
+      in
+      print_name ([],"") name
+    in 
+ 
     match v with 
         | MOSimple_val sv ->
             (match sv with
@@ -1431,7 +1548,12 @@ let moval_to_type aval =
                     )
                     (List.tl lst))
 
-              | MOFun_val _fv -> "-fun-"
+              | MOFun_val fv -> 
+                sprintf "(fun %s %s )" 
+                  (StringMap.fold 
+                    (fun str i acc ->  sprintf "%s $%d(%s) ->" acc i str) 
+                    fv.mofv_args_name "")
+                  (moval_to_string fv.mofv_body)
               | MOEmpty_val -> ""
             )
         | MOComposed_val mct -> "-composed-"
@@ -1446,22 +1568,61 @@ let moval_to_type aval =
             let varname_str = ref.morv_debugname in
             let args_str = 
               List.fold_left 
-                (fun acc arg -> acc ^ ", " ^ (moval_to_string arg) ) 
+                (fun acc arg -> acc ^ " -> " ^ (moval_to_string arg) ) 
               "" args
             in
-            sprintf "ref %d.%d (%s) %s" modu_i varname_i varname_str args_str
+            sprintf "($%d.%d($%s) %s)" modu_i varname_i varname_str args_str
 
         | MOEnvRef_val (var) -> var
-        | MOBasicFunBody_val (op, arga, argb) -> "-basicfun-"
-        | MOBind_val bd -> "-binding-"
-        | MOIf_val (cond, thn, els) -> "-if-"
-        | MOComp_val (op, left, right) -> "-comp-"
-        | MOBody_val lstbodies -> "-body-"
+        | MOBasicFunBody_val (op, arga, argb) -> 
+            let symbol = 
+            (
+              match op with
+                | MConcatenation -> "^"
+                | MAddition -> "+"
+                | MAdditionFloat -> ".+"
+                | MSoustraction -> "-"
+                | MSoustractionFloat -> ".-"
+                | MMultiplication -> "*"
+                | MMultiplicationFLoat -> ".*"
+                | MDivision -> "/"
+                | MDivisionFloat -> "./"
+                | MModulo -> "%"
+                | MModuloFloat -> ".%"
+                | MWithList -> "With"
+                | MWithSet -> "SWith"
+                | MWithMap -> "MWith"
+                | MWithoutSet -> "SWout"
+                | MWithoutMap -> "MWout"
+                | MHasSet -> "SHas"
+                | MHasMap -> "MHas"
+            )
+            in sprintf "(%s %s %s )" (moval_to_string arga) symbol (moval_to_string argb)
+        | MOBind_val bd -> 
+          sprintf "let %s " (print_mobinding_name bd.mobd_name)
+        | MOIf_val (cond, thn, els) -> 
+            sprintf "if (%s) then (%s) else (%s)" 
+              (moval_to_string cond)  (moval_to_string thn) (moval_to_string els)
+        | MOComp_val (op, left, right) -> 
+            let op_symb = 
+              match op with
+                | Egal -> "=="
+                | NotEqual -> "!=" 
+                | LessThan -> "<" 
+                | LessOrEq  -> "<=" 
+                | GreaterThan -> ">"
+                | GreaterOrEq -> ">="
+            in
+            sprintf "%s %s %s" (moval_to_string left) op_symb (moval_to_string right)
+        | MOBody_val lstbodies -> 
+          List.fold_left
+            (fun acc bd -> sprintf "%s ; %s" acc (moval_to_string bd)) 
+            "" lstbodies
 
 
 let topvar_to_string v = 
   match v with 
-    | MOTop_val v -> sprintf "Topval %s" (moval_to_string v)
+    | MOTop_val v -> sprintf "%s" (moval_to_string v)
     | MOTupEl_val (i, pos) -> sprintf "MOTupEl %d pos : [%s] " i 
                                       (List.fold_left
                                         (fun acc p -> sprintf "%s %d," acc p) 

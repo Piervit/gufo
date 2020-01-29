@@ -233,6 +233,11 @@ val list_ends: 'a list -> int -> 'a list
 (*  
  * This function has slow performance.
  * *)
+val list_append_at_end : 'a list -> 'a -> 'a list
+
+(*  
+ * This function has slow performance.
+ * *)
 val list_split_at_idx : 'a list -> int -> 'a list * 'a list
 
 (*Compare two lists, using the first argument as a comparison functions between

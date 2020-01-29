@@ -135,6 +135,10 @@ let list_ends lst n =
   in
 lst_ends_ lst n  
 
+let list_append_at_end lst el = 
+  List.rev (el::(List.rev lst))
+
+
 (*  
  * This function has slow performance.
  * *)
