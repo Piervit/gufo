@@ -31,6 +31,24 @@ open Format
 open Printf
 
 
+(*If debug is enable, dump a full representation the parsed program. *)
+let dump_prog_representation optiprog = 
+  match GufoConfig.get_debug_level () with
+    | GufoConfig.DBG_NO_DEBUG -> ()
+    | GufoConfig.DBG_INFO
+    | GufoConfig.DBG_FULL ->
+        (debug_print "Dumping program representation\n");
+        (debug_print "*** Topvars \n");
+        IntMap.iter
+        (fun i topv -> 
+          debug_print (sprintf "let $%d = %s \n" i (topvar_to_string topv))
+        )
+        optiprog.mopg_topvar;
+        (debug_print "*** Topcall \n");
+        (debug_print (sprintf "%s \n"(moval_to_string optiprog.mopg_topcal)))
+ 
+
+
 
 
 (** transformation from gufoParsed to gufo.core **)
@@ -3302,6 +3320,7 @@ let add_prog_to_optprog fulloptiprog fullprog =
       mofp_mainprog = add_main_prog_step2_moref_to_moctype nfulloptiprog nfulloptiprog.mofp_mainprog
     }
   in
+  dump_prog_representation nfulloptiprog.mofp_mainprog;
   (*PART 3 *)
   (* var_types contains every type of every defined var, not only toplevel.
      Currently var_types is a IdModule map --> (Id varable map --> type).
