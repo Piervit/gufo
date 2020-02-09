@@ -2180,13 +2180,24 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
                   | None -> raise (VarError (sprintf "Trying to use undefined variable %s ." vname))
                 )
       in 
+        let using_a_topvar topvars past_var_map ires =
+          IntSet.find_first_opt(fun topvar -> topvar - ires = 0 ) topvars
+        in
         match topvar with
-          | Some (topvar, past_var_map) when (topvar - ires = 0) -> 
-              (match IntMap.find_opt topvar past_var_map with
-                | None -> raise (VarError (sprintf "Trying to use undefined variable %s ." vname))
-                | Some i -> i 
+          | None -> ires
+          | Some (topvars, past_var_map) ->
+              (
+                match using_a_topvar topvars past_var_map ires with
+                  | None -> ires
+                  | Some topvar -> 
+                      (*When topvar is the same id as the one found (we want to
+                        take value from past_var_map if available in it.)*)
+                      (match IntMap.find_opt topvar past_var_map with
+                        | None -> raise (VarError (sprintf "Trying to use undefined variable %s ." vname))
+                        | Some i -> i 
+                      )
               )
-          | _ -> ires
+
     in
     let resolve_fields ref = 
       let fields = 
@@ -2368,7 +2379,11 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
                 | _  ->
                     (match past_var_map with 
                       | None -> parsedToOpt_expr ~topvar:(None) optiprog StringMap.empty mvar.mva_value 
-                      | Some past_var_map -> parsedToOpt_expr ~topvar:(Some (iname, past_var_map)) optiprog StringMap.empty mvar.mva_value 
+                      | Some past_var_map -> 
+                          parsedToOpt_expr ~topvar:(Some ((IntSet.singleton iname), 
+                                                          past_var_map)) 
+                                           optiprog StringMap.empty 
+                                           mvar.mva_value 
                     )
               in
               IntMap.add iname
@@ -2400,7 +2415,31 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
                         map, List.tl new_position
               in
               (*we compute the value affected to the whole tuple.*)
-              let tup_val = (MOTop_val (parsedToOpt_expr optiprog StringMap.empty mvar.mva_value))
+              let tup_val = 
+                (match past_var_map with 
+                  | None -> (MOTop_val (parsedToOpt_expr optiprog StringMap.empty mvar.mva_value))
+                  | Some past_var_map -> 
+                    (*We have to compute the topvar elements *)
+                    let inames =
+                      let rec find_inames acc decl_lst = 
+                        (match decl_lst with
+                          | [] -> acc
+                          | decl::decl_lst ->
+                           (match decl with
+                            | MBaseDecl aname -> 
+                              find_inames 
+                                (IntSet.add (StringMap.find aname
+                                              optiprog.mopg_topvar2int) acc) 
+                                decl_lst
+                            | MTupDecl lst_vardecl ->
+                                let acc = find_inames acc lst_vardecl in
+                                find_inames acc decl_lst
+                           )
+                        )
+                      in find_inames IntSet.empty decl_lst
+                    in 
+                    (MOTop_val (parsedToOpt_expr ~topvar:(Some (inames, past_var_map)) optiprog StringMap.empty mvar.mva_value))
+                )
               in 
               let tup_id = get_fresh_int () in
               let map = IntMap.add tup_id tup_val map in
@@ -3229,8 +3268,8 @@ let add_prog_to_optprog fulloptiprog fullprog =
                           mopg_topvar_debugname = topvar_debug}
           in oprog, Some (!past_map)
   in 
-  let add_main_prog_step2_intmap nfulloptiprog oprog mprog =
-    parsedToOpt_topval nfulloptiprog mprog oprog true
+  let add_main_prog_step2_intmap nfulloptiprog oprog mprog past_var_map =
+    parsedToOpt_topval nfulloptiprog mprog oprog true past_var_map
   in
   let add_main_prog_step2_moref_to_moctype nfulloptiprog oprog = 
 
