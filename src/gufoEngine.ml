@@ -27,6 +27,14 @@ open Array
 open Printf
 
 
+let print_debug_arg2valMap arg2valMap = 
+  debug_print "DUMPING arg2ValMap";
+  IntMap.iter 
+    (fun i topvar_val -> 
+      debug_print (sprintf "%d:  %s" i (topvar_to_string topvar_val))
+    )
+    arg2valMap
+
 (*DUPLICATED FROM GufoOptUtils, we cannot use for cyclic compilation reaseon*)
 (*for a funarg type, return the type unfolded list of arguments. *)
 let rec unstack_args arg = 
