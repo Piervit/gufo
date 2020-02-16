@@ -25,15 +25,20 @@ open GenUtils
 
 let listtypes = IntMap.empty
 
-(*The code of iter is directly in GufoEngine, because modules cannot directly
-call GufoEngine to avoid circular dependancies.*)
+(*The code of iter and filter is directly in GufoEngine, because modules cannot
+directly call GufoEngine to avoid circular dependancies.*)
 let iter args scope = assert false 
+let filter args scope = assert false
 
 let length args scope =
   match args with
     | [MOSimple_val (MOList_val mtvlist);] ->
       MOSimple_val (MOBase_val (MOTypeIntVal (List.length mtvlist)))
     | _ -> assert false
+
+
+
+
 
 
 let topvars = 
@@ -61,6 +66,20 @@ let topvars =
         
         ;
       mosmv_action= length;
+    };
+    {
+      mosmv_name = "filter";
+      mosmv_description = "Return a new list with only the element of the list
+                          respecting the predicate.";
+      mosmv_intname = 3;
+      mosmv_type = 
+        MOFun_type
+        ([ MOList_type( MOAll_type 1 );
+           MOFun_type ([MOAll_type 1], MOBase_type (MTypeBool))
+         ], 
+         MOList_type( MOAll_type 1 ))
+        ;
+      mosmv_action= filter;
     };
 
   ]

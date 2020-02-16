@@ -555,7 +555,7 @@ let find_var_in_prog varname scope =
       | [i] -> 
         (match tup_val with
           | MOSimple_val (MOTuple_val lst) -> List.nth lst i 
-          | _ -> raise (ExecutionError "internal error"))
+            | _ -> raise (ExecutionError (sprintf "internal error(expecting tuple value but found %s \n" (moval_to_string tup_val))))
       | i::lst -> 
           (match tup_val with
             | MOSimple_val (MOTuple_val tuplst) -> find_with_pos lst (List.nth tuplst i)
@@ -585,10 +585,6 @@ let find_var_in_prog varname scope =
           )
         in
         find_val_from_field fields from_var
-
-
-
-
 
 let find_var_in_sysmod varname sysmod = 
   match varname with 
@@ -699,6 +695,29 @@ and iter args scope =
         mtvlist
         in MOSimple_val (MOEmpty_val)
     | _ -> assert false 
+
+
+(*Apply the special function $List.filter*)
+and filter args scope =
+    match args with
+      | [MOSimple_val (MOList_val mtvlist);
+         MOSimple_val (MOFun_val fval)
+        ] ->
+        MOSimple_val (MOList_val 
+        (List.filter 
+          (fun el -> 
+            let fun_res = 
+              apply_fun true scope (MOSimple_val (MOFun_val fval)) [el] 
+            in
+            (match fun_res with
+              | MOSimple_val (MOBase_val (MOTypeBoolVal true)) -> true
+              | _ -> false
+            )
+          )
+          mtvlist
+        ))
+      | _ -> 
+        assert false
 
 
 
@@ -1293,6 +1312,7 @@ and apply_motype_val toplevel arg2valMap aval =
                    *)
                   (match (find_var_in_sysmod ref.morv_varname msymodule).mosmv_name with
                     | "iter" -> iter argslst arg2valMap
+                    | "filter" -> filter argslst arg2valMap
                     | _ -> assert false 
                   )
               | MOSystemMod msymodule -> 
