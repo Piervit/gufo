@@ -227,8 +227,11 @@ let rec determine_refine_type ?id_var:(id_var = None) t1 t2 =
         MOComposed_type (determine_refine_type_composed i j )
     | MOBase_type i , MOBase_type j  -> 
         MOBase_type (determine_refine_base_type i j )
-    | MOTuple_type ilst , MOTuple_type jlst  -> 
-        MOTuple_type (List.map2 (determine_refine_type ~id_var:None) ilst jlst )
+    | MOTuple_type ilst , MOTuple_type jlst  ->
+        (match (List.length ilst - List.length jlst ) with 
+          | 0 -> MOTuple_type (List.map2 (determine_refine_type ~id_var:None) ilst jlst )
+          | _ -> raise (TypeError "Cannot merge together tuple types of different lengths. ")
+        )
     | MOList_type i , MOList_type j  -> 
         MOList_type (determine_refine_type i j)
     | MOOption_type i, MOOption_type j -> 
@@ -370,8 +373,9 @@ and determine_type_comp fulloptiprog optiprog locScope const op arga argb =
           ], get_fresh_int()))
   in 
 *)
-    let _typ, locScope = determine_type fulloptiprog optiprog locScope None arga in
-    let _typ, locScope = determine_type fulloptiprog optiprog locScope None argb in
+    let typa, locScope = determine_type fulloptiprog optiprog locScope None arga in
+    let typb, locScope = determine_type fulloptiprog optiprog locScope None argb in
+      determine_refine_type typa typb;
           MOBase_type (MTypeBool), locScope
     
 and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb = 
@@ -876,7 +880,9 @@ and determine_type fulloptiprog optiprog locScope const e =
 
                 let locScope, nargs = add_args_to_scope lstargtyp_const fv.mofv_args_id locScope in  
                 let body_type, locScope = 
-                  determine_type fulloptiprog optiprog locScope rettyp_const fv.mofv_body in
+                  determine_type fulloptiprog optiprog locScope rettyp_const 
+                                 fv.mofv_body 
+                in
                 let nargs = refine_args_from_scope locScope fv.mofv_args_id in
                 MOFun_type (nargs, body_type), locScope 
             | MOEmpty_val ->
@@ -1266,7 +1272,7 @@ let type_check_has_type fulloptiprog optiprog var_types required_typ expr =
       | _ -> typ 
   in
   let typ_from_expr, _locScope = determine_type fulloptiprog optiprog 
-                        (IntMap.find optiprog.mopg_name var_types) None expr in
+                        (IntMap.find optiprog.mopg_name var_types) (Some required_typ) expr in
   let found_type = get_type_from_ref_ typ_from_expr in
   let _ = has_type required_typ found_type in
   found_type
@@ -1377,19 +1383,45 @@ let create_relation_if_not_exist t1 map =
     IntMap.add t1 rel map
 
 let allType_addRelation t1 t2 map =
+  debug_print (sprintf "Adding relation between %d and %d \n" t1 t2);
+  (*we should create the relation in the map only we there is no conflict
+    between t1 and tonly we there is no conflict between t1 and t2*)
   let map = create_relation_if_not_exist t1 map in 
   let map = create_relation_if_not_exist t2 map in 
   let relation1 = IntMap.find t1 map in
   let relation2 = IntMap.find t2 map in
-  let relation1 = 
-    { relation1 with at_linked_type = IntSet.add t2 relation1.at_linked_type;
-    } in
-  let relation2 = 
-    { relation2 with at_linked_type = IntSet.add t2 relation2.at_linked_type;
-    } in
-  let map = IntMap.add t1 relation1 map in
-  let map = IntMap.add t2 relation2 map in
-  map
+  match allType_getRealType (MOAll_type t1) map , allType_getRealType (MOAll_type t2) map with
+    | MOAll_type t1, MOAll_type t2 -> 
+      debug_print (sprintf "Linking types");
+      let relation1 = 
+        { relation1 with at_linked_type = IntSet.add t2 relation1.at_linked_type;
+        } in
+      let relation2 = 
+        { relation2 with at_linked_type = IntSet.add t2 relation2.at_linked_type;
+        } in
+      let map = IntMap.add t1 relation1 map in
+      let map = IntMap.add t2 relation2 map in
+      map
+    | realType1, MOAll_type t2 -> 
+      debug_print (sprintf "%d take type %s" t2 (type_to_string realType1));
+      let relation2 =
+        { relation2 with at_real_type = Some realType1} in 
+        IntMap.add t2 relation2 map 
+    | MOAll_type t1, realType2 -> 
+      debug_print (sprintf "%d take type %s" t1 (type_to_string realType2));
+      let relation1 =
+        { relation1 with at_real_type = Some realType2} in 
+        IntMap.add t1 relation1 map 
+    | realType1, realType2 -> 
+        let realType =  determine_refine_type realType1 realType2 in
+        debug_print (sprintf "realtypes %s and %s are merged in %s"  (type_to_string realType1) (type_to_string realType2) (type_to_string realType) );
+        let relation1 ={ relation1 with at_real_type = Some realType} in 
+        let relation2 ={ relation2 with at_real_type = Some realType} in 
+        let map = IntMap.add t1 relation1 map in
+        let map = IntMap.add t2 relation2 map in
+        map
+
+
 
 let allType_addRealType t1 real_typ map = 
   let map = create_relation_if_not_exist t1 map in 
@@ -1553,7 +1585,7 @@ let expr_check_has_type_with_allTypeConstraint
   in
   debug_print (sprintf "checking expr '%s' has type '%s'\n" (moval_to_string expr) (type_to_string required_typ));
   let typ_from_expr, _locScope = determine_type fulloptiprog optiprog 
-                        (IntMap.find optiprog.mopg_name var_types) None expr in
+                        (IntMap.find optiprog.mopg_name var_types) (Some required_typ) expr in
   let found_type = get_type_from_ref_ typ_from_expr in
   type_check_has_type_with_allTypeConstraint 
       fulloptiprog optiprog var_types required_typ found_type allTypeMap
@@ -2794,7 +2826,7 @@ function we used it to not lost informations. *)
           do_analyse_cmd (do_analyse_cmd var_types cmd1) cmd2 
   in
   (*Specific function for funcall*)
-  let do_analyse_funcall var_types refval args =
+  let do_analyse_funcall var_types refval args args_typ =
     let allTypeMap = IntMap.empty in
     (*Check if a real arguments is compatible with the expected one and return the resulting type.*)
     let check_arg required real allTypeMap = 
@@ -2837,13 +2869,21 @@ function we used it to not lost informations. *)
                     let cur_fun_required_types, _ = 
                       list_split_at_idx args_required_type (List.length args_types) 
                     in
-                    let allTypeMap = 
-                    List.fold_left2 (fun allTypeMap required real -> 
-                                      let _,allTypeMap = 
-                                        check_arg required real allTypeMap in
-                                      allTypeMap
-                                    ) 
-                      allTypeMap
+                    let allTypeMap,_ = 
+                    List.fold_left2 
+                      (fun (allTypeMap,args) required real -> 
+                        let _,allTypeMap = 
+                          check_arg required real allTypeMap in
+                        let cur_arg::args = args in
+                        let required = refine_allTypeConstraint required allTypeMap
+                        in
+                        let _, allTypeMap =
+                        expr_check_has_type_with_allTypeConstraint
+                          fulloptiprog optiprog var_types required cur_arg allTypeMap
+                        in
+                        allTypeMap, args
+                      ) 
+                      (allTypeMap, args)
                       cur_fun_required_types
                       args_types
                     in
@@ -2881,11 +2921,11 @@ function we used it to not lost informations. *)
     in
     
       debug_print(sprintf "function %d ret type before analysis: %s \n"  funname (type_to_string funtype));
-    match args with
+    match args_typ with
       | [] -> 
         (*no args, we return funtype*) (funtype, var_types)
       | lst -> 
-          let funtyp, allTypeMap = do_analyse_funcall_ var_types funtype args allTypeMap
+          let funtyp, allTypeMap = do_analyse_funcall_ var_types funtype args_typ allTypeMap
           in  funtyp, var_types
   in
 
@@ -2911,7 +2951,7 @@ function we used it to not lost informations. *)
           (var_types, [] ) vallist
       in var_types, MOTuple_type (List.rev(rev_lstType))
     | MOSimple_val (MOList_val vallist) -> 
-      List.fold_left 
+      let var_types, res = List.fold_left 
         (fun (var_types, res_typ) aval -> 
           let var_types, res = 
             type_check_val_to_top fulloptiprog optiprog modi aval var_types 
@@ -2919,6 +2959,8 @@ function we used it to not lost informations. *)
             var_types, determine_refine_type res_typ res
         )
         (var_types, (MOAll_type (get_fresh_int ()))) vallist
+      in
+      var_types, MOList_type res
     | MOSimple_val (MONone_val) -> 
       var_types, MOOption_type (MOAll_type (get_fresh_int ()))
     | MOSimple_val (MOSome_val v) -> 
@@ -2973,9 +3015,11 @@ function we used it to not lost informations. *)
             var_types, typ::args_types
           )
           (var_types, []) args
-          in
-      let ret,_  = do_analyse_funcall var_types refval (List.rev rev_args_types) in
+      in
+      let ret,allTypeMap  = do_analyse_funcall var_types refval args (List.rev rev_args_types) in
       debug_print(sprintf "function  has type ret: %s \n"  (type_to_string ret));
+
+
       var_types, ret
     | MOEnvRef_val _ -> 
         var_types, MOBase_type (MTypeString)
@@ -3006,6 +3050,7 @@ function we used it to not lost informations. *)
           type_check_val_to_top fulloptiprog optiprog modi v1 var_types in
         let var_types, v2_typ = 
           type_check_val_to_top fulloptiprog optiprog modi v2 var_types in
+          determine_refine_type v1_typ v2_typ;
         var_types, MOBase_type MTypeBool
     | MOBody_val (lst) -> 
         List.fold_left 
