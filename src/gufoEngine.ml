@@ -1313,7 +1313,8 @@ and apply_motype_val toplevel arg2valMap aval =
                   (match (find_var_in_sysmod ref.morv_varname msymodule).mosmv_name with
                     | "iter" -> iter argslst arg2valMap
                     | "filter" -> filter argslst arg2valMap
-                    | _ -> assert false 
+                    | _ -> 
+                      (apply_core_fun arg2valMap (find_var_in_sysmod ref.morv_varname msymodule) (List.map (apply_motype_val toplevel arg2valMap) argslst) )
                   )
               | MOSystemMod msymodule -> 
               (apply_core_fun arg2valMap (find_var_in_sysmod ref.morv_varname msymodule) (List.map (apply_motype_val toplevel arg2valMap) argslst) )
