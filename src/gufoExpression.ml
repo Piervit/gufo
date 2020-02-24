@@ -95,9 +95,12 @@ let get_current_word expr =
       | _ -> 
       (let curchar = Zed_rope.get rop pos in
       match UChar.uint_code (Zed_char.core curchar) with
-        | 32 (* space *) -> curword
-        | _ -> get_word rop 
+        | i when ((i > 47 && i < 123) 
+                  || i = 36 
+                  || i = 46
+                  || i = 47) -> get_word rop 
                  (pos - 1)(Zed_utf8.insert curword 0 (Zed_utf8.singleton (Zed_char.core curchar)))
+        | _  -> curword
       )
   in
   get_word curline (col - 1 ) curword, (row, col)
