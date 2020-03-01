@@ -1146,6 +1146,7 @@ let top_level_types_no_ref var_types past_var_map =
         in
         
         let bd_alltype, newrett = _recRemoveRef bd_alltype modi rett in
+
         (*we can need to refine args type using the ret type.
           As in the following exemple
               let $af $i = $Int.toString $i
@@ -1154,6 +1155,7 @@ let top_level_types_no_ref var_types past_var_map =
        let new_lst_args =  
           refine_with_bd_alltyp (List.rev new_lst_args) bd_alltype 
         in 
+
        (*let new_lst_args =  (List.rev new_lst_args) in*)
         bd_alltype, MOFun_type (new_lst_args, newrett)
       | MOAll_type _  -> bd_alltype , typ 
@@ -1178,22 +1180,23 @@ let top_level_types_no_ref var_types past_var_map =
       var_types
     *)
 
-    let bd_alltype, new_topvar_types = 
+    let new_topvar_types = 
     IntMap.fold
-      (fun modi topvar_map (bd_alltype, newtopvar_map) ->
-        let bd_alltype, newMap = 
+      (fun modi topvar_map newtopvar_map ->
+        (*For every module in topvar map*)
+        let newMap = 
           IntMap.fold
-          (fun i typ (bd_alltype, newMap )-> 
-            let bd_alltype, newtyp = _recRemoveRef bd_alltype modi typ in
-            bd_alltype, IntMap.add i newtyp newMap
+          (fun i typ  newMap -> 
+            let _, newtyp = _recRemoveRef IntMap.empty modi typ in
+            IntMap.add i newtyp newMap
           )
-          topvar_map (bd_alltype, IntMap.empty)
+          topvar_map IntMap.empty
         in 
-        bd_alltype, IntMap.add modi newMap newtopvar_map
+        IntMap.add modi newMap newtopvar_map
       )
-      var_types (IntMap.empty , IntMap.empty)
-      in 
-      new_topvar_types
+      var_types (IntMap.empty)
+    in 
+    new_topvar_types
 
 
 
@@ -1751,8 +1754,7 @@ and type_check_val fulloptiprog optiprog typScope v =
             allTypeMap will check that the first and the second argument are
             compatibles.
             *)
-            let allTypeMap = IntMap.empty in
-            let check_ref reft args pos allTypeMap = 
+            let check_ref reft args = 
               (match reft with
                 | MORef_type (modul, id_ref,deep,nargs) ->
                     (*There should be no ref type at this level.*)
@@ -1780,7 +1782,7 @@ and type_check_val fulloptiprog optiprog typScope v =
                             (debug_print (sprintf "arg should have type %s \n" (type_to_string arg_req_type)));
                             (debug_print (sprintf "arg has type %s \n" (type_to_string typ)));
                             (b && (type_check_val fulloptiprog optiprog typScope arg)), pos+1, allTypeMap
-                        ) (true,pos, allTypeMap) args 
+                        ) (true,0, IntMap.empty) args 
                       in res
                     )
                 | _ -> 
@@ -1788,7 +1790,7 @@ and type_check_val fulloptiprog optiprog typScope v =
               )
             in
             let ftyp = get_type_from_ref fulloptiprog optiprog typScope ref in 
-            check_ref ftyp args 0 allTypeMap
+            check_ref ftyp args  
          )
     | MOEnvRef_val (_) -> 
       true
