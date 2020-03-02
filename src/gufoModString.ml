@@ -136,7 +136,7 @@ let topvars =
          MOBase_type (MTypeString); 
          MOBase_type (MTypeString); 
          ], 
-         MOList_type (MOBase_type (MTypeBool)))
+         MOBase_type (MTypeBool))
         
         ;
       mosmv_action= contains;
