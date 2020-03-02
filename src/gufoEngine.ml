@@ -657,8 +657,16 @@ and apply_in_body toplevel arg2valMap bodieslst =
     | body::lst -> let _ = apply_motype_val toplevel arg2valMap body in 
     apply_in_body toplevel arg2valMap lst
 
-and apply_core_fun arg2valMap msysmodvar argslst = 
-  msysmodvar.mosmv_action argslst arg2valMap
+(*apply a core module function *)
+and apply_core_fun msymodule fname arg2valMap msysmodvar argslst = 
+
+  match msymodule.mosm_name with
+    | "List"-> 
+      (match modList_to_apply fname argslst arg2valMap with
+       | None -> msysmodvar.mosmv_action argslst arg2valMap
+       | Some res -> res
+      )
+    | _ -> msysmodvar.mosmv_action argslst arg2valMap
 
 (*apply the special function $Base.load --> load a new module into the current 
   one.*)
@@ -682,8 +690,10 @@ and apply_load_fun args =
   with e -> 
     MOSimple_val (MOBase_val (MOTypeStringVal (Printexc.to_string e )))
 
+(****************** Runtime function of the list module  ******************)
+
 (*Apply the special function $List.iter *)
-and iter args scope =  
+and list_iter args scope =  
   match args with 
     |  [MOSimple_val (MOFun_val fv); MOSimple_val (MOList_val mtvlist)] ->
         let _ = List.iter 
@@ -698,10 +708,10 @@ and iter args scope =
 
 
 (*Apply the special function $List.filter*)
-and filter args scope =
+and list_filter args scope =
     match args with
-      | [MOSimple_val (MOList_val mtvlist);
-         MOSimple_val (MOFun_val fval)
+      | [MOSimple_val (MOFun_val fval);
+         MOSimple_val (MOList_val mtvlist);
         ] ->
         MOSimple_val (MOList_val 
         (List.filter 
@@ -719,7 +729,46 @@ and filter args scope =
       | _ -> 
         assert false
 
+and list_map args scope = 
+    match args with
+      | [MOSimple_val (MOFun_val fval);
+         MOSimple_val (MOList_val mtvlist);
+        ] ->
+        MOSimple_val (MOList_val 
+        (List.map
+          (fun el -> 
+              apply_fun true scope (MOSimple_val (MOFun_val fval)) [el] 
+          )
+          mtvlist
+        ))
+      | _ -> 
+        assert false
 
+and list_fold_left args scope = 
+    match args with
+      | [MOSimple_val (MOFun_val fval);
+         acc;
+         MOSimple_val (MOList_val mtvlist);
+        ] ->
+        
+        (List.fold_left
+          (fun acc el -> 
+              apply_fun true scope (MOSimple_val (MOFun_val fval)) [acc; el] 
+          )
+          acc mtvlist
+        )
+      | _ -> 
+        assert false
+
+and modList_to_apply funname args scope = 
+  match funname with
+    | "iter" -> Some (list_iter args scope )
+    | "filter" -> Some (list_filter args scope )
+    | "map" -> Some (list_map args scope )
+    | "fold_left" -> Some (list_fold_left args scope )
+    | _ -> None
+
+(****************** END function of the list module  ******************)
 
 (*it can be a partial application*)
 and apply_fun toplevel arg2valMap funval arglst = 
@@ -1119,7 +1168,7 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
             (** Modulo **)
   | MModulo, MOSimple_val (MOBase_val (MOTypeIntVal el1)),
                         MOSimple_val (MOBase_val (MOTypeIntVal el2)) -> 
-      MOSimple_val(MOBase_val (MOTypeIntVal (el1/el2)))
+      MOSimple_val(MOBase_val (MOTypeIntVal (el1 mod el2)))
   | MModuloFloat, MOSimple_val (MOBase_val (MOTypeFloatVal el1)),
                           MOSimple_val (MOBase_val (MOTypeFloatVal el2)) -> 
       MOSimple_val (MOBase_val (MOTypeFloatVal (mod_float el1 el2)))
@@ -1303,21 +1352,11 @@ and apply_motype_val toplevel arg2valMap aval =
                     | "load" -> apply_load_fun argslst
                     | _ -> assert false 
                   )
-              | MOSystemMod msymodule when msymodule.mosm_name = "List"-> 
-                  (*$List.iter : this is specific code which
-                    do not work like others modules: 
-                      - it does not use mosmv_action because it need to access
-                        the gufoEngine which cannot be accessed from
-                        within a module.
-                   *)
-                  (match (find_var_in_sysmod ref.morv_varname msymodule).mosmv_name with
-                    | "iter" -> iter argslst arg2valMap
-                    | "filter" -> filter argslst arg2valMap
-                    | _ -> 
-                      (apply_core_fun arg2valMap (find_var_in_sysmod ref.morv_varname msymodule) (List.map (apply_motype_val toplevel arg2valMap) argslst) )
-                  )
               | MOSystemMod msymodule -> 
-              (apply_core_fun arg2valMap (find_var_in_sysmod ref.morv_varname msymodule) (List.map (apply_motype_val toplevel arg2valMap) argslst) )
+              let fname = 
+                (find_var_in_sysmod ref.morv_varname msymodule).mosmv_name 
+              in
+              (apply_core_fun msymodule fname arg2valMap (find_var_in_sysmod ref.morv_varname msymodule) (List.map (apply_motype_val toplevel arg2valMap) argslst) )
               )
       )
     | MOEnvRef_val (var) ->
