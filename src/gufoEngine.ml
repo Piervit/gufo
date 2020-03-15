@@ -195,7 +195,7 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
         try 
           Sys.chdir path;
           0,
-          {shenv with 
+          {
             mose_curdir = Sys.getcwd ();
           },
           {cmd with mocm_res = Some 0;}
@@ -657,16 +657,81 @@ and apply_in_body toplevel arg2valMap bodieslst =
     | body::lst -> let _ = apply_motype_val toplevel arg2valMap body in 
     apply_in_body toplevel arg2valMap lst
 
-(*apply a core module function *)
-and apply_core_fun msymodule fname arg2valMap msysmodvar argslst = 
 
-  match msymodule.mosm_name with
-    | "List"-> 
-      (match modList_to_apply fname argslst arg2valMap with
-       | None -> msysmodvar.mosmv_action argslst arg2valMap
-       | Some res -> res
-      )
-    | _ -> msysmodvar.mosmv_action argslst arg2valMap
+(*Create a specific anonymous function to manager partial interpretation of a
+sys function.
+Let say f is a system function taking two arguments $a and $b.
+The program is "f 1"
+The interpretation will be:
+  (fun $b -> $f 1 $b)
+
+*)
+and systemvar_partial_interpretation ref sysmodulevar argslst =
+  let sysfun_nb_args = GufoModuleUtils.getNbArgsFromCoreFunction sysmodulevar in
+  let anofun_args_id = List.init (sysfun_nb_args - (List.length argslst)) 
+    (fun i -> GufoParsedToOpt.get_fresh_int ())
+  in
+  let anofun_args = List.map (fun i -> MOBaseArg i ) anofun_args_id
+  in
+  let body_binding =
+    let bd_name = 
+      List.init (List.length argslst) 
+        (fun i -> GufoParsedToOpt.get_fresh_int ( ), [i])
+    in
+    let bd_value = MOSimple_val (MOTuple_val (argslst)) in
+    let bd_body = 
+      let args_from_binding = List.map (fun (i,_) -> i ) bd_name in
+      let ref_args = 
+        List.map 
+          (fun i -> MORef_val ({
+                                morv_module = None;
+                                morv_varname = i, [];
+                                morv_index = None;
+                                morv_debugname = "generated";
+                               },
+                               []))  
+          (List.append args_from_binding anofun_args_id) 
+      in
+      MORef_val (ref,ref_args)
+    in
+      {
+        mobd_name = bd_name;
+        mobd_debugnames = IntMap.empty ; (*at this level, we don't care about debug*)
+        mobd_value= bd_value;
+        mobd_body= bd_body;
+      }
+
+  in
+  let anofun_body = MOBind_val body_binding in 
+  let anofun = {
+    mofv_args_name = StringMap.empty;
+    mofv_args_id = anofun_args;
+    mofv_body = anofun_body;
+  } 
+  in MOSimple_val (MOFun_val anofun)
+
+
+(*apply a core module function *)
+and apply_core_fun ref msymodule fname arg2valMap msysmodvar argslst = 
+  let expected_args = 
+    match msysmodvar.mosmv_type with
+      | MOFun_type(argstyp, retyp) -> argstyp
+      | _ -> assert false
+  in
+  match ((List.length expected_args) - (List.length argslst)) with
+    | 0 -> 
+        (*this is concrete execution*)
+        (match msymodule.mosm_name with
+          | "List"-> 
+            (match modList_to_apply fname argslst arg2valMap with
+             | None -> msysmodvar.mosmv_action argslst arg2valMap
+             | Some res -> res
+            )
+          | _ -> msysmodvar.mosmv_action argslst arg2valMap
+        )
+    | _ -> 
+        systemvar_partial_interpretation ref msysmodvar argslst 
+         
 
 (*apply the special function $Base.load --> load a new module into the current 
   one.*)
@@ -1356,7 +1421,10 @@ and apply_motype_val toplevel arg2valMap aval =
               let fname = 
                 (find_var_in_sysmod ref.morv_varname msymodule).mosmv_name 
               in
-              (apply_core_fun msymodule fname arg2valMap (find_var_in_sysmod ref.morv_varname msymodule) (List.map (apply_motype_val toplevel arg2valMap) argslst) )
+
+              (apply_core_fun ref msymodule fname arg2valMap 
+                (find_var_in_sysmod ref.morv_varname msymodule) 
+                (List.map (apply_motype_val toplevel arg2valMap) argslst) )
               )
       )
     | MOEnvRef_val (var) ->
