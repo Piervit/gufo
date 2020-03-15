@@ -415,7 +415,7 @@ typetupelseq :
     { el:: seq }
 
 
-varassign_one_term: 
+leaf_expr: 
   | NONE
     {GufoParsed.MSimple_val (GufoParsed.MNone_val)}
   | i = INT
@@ -448,8 +448,8 @@ varassign_one_term:
   |  anonf = anonymousfun ; 
     {anonf}
 
-varassign_internal_no_bracket:
-  | res = varassign_one_term 
+basic_expr:
+  | res = leaf_expr 
     { res }
   | LET ; binding_name = var_tuple_decl ; argnames = funargs_top ; AFFECTATION ; binding_value = topvarassign; IN ; OPEN_BRACKET; body = topvarassign ; CLOSE_BRACKET;
     {let open GufoParsed in 
@@ -465,7 +465,7 @@ varassign_internal_no_bracket:
     }
   | SOME;  varassign = varassign_in_expr;
     {GufoParsed.MSimple_val (GufoParsed.MSome_val varassign)}
-  | IF ; cond = varassign_no_bracket ; THEN; thn = varassign_no_bracket ELSE; els = varassign_no_bracket; 
+  | IF ; cond = top_expr ; THEN; thn = top_expr ELSE; els = top_expr; 
   {GufoParsed.MIf_val (cond, thn, els)}
 
   | OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
@@ -489,12 +489,17 @@ varassign_internal_no_bracket:
     {let open GufoParsed in
       MSimple_val (MList_val lst)
     }
-  | OPEN_BRACKET; a = varassign_no_bracket ;CLOSE_BRACKET;
+  | OPEN_BRACKET; a = top_expr ;CLOSE_BRACKET;
     {a}
 
-
-varassign_no_bracket : 
-  | var = varassign_internal_no_bracket
+(*top_expr is a "toplevel" expresion:
+    it can be:
+      - a basic expression
+      - a tuple expression
+      - a sequence of exprsssion
+*)
+top_expr : 
+  | var = basic_expr
     {var}
   | var1 = varassign_in_expr ; DOUBLE_MINUS; seq=tupleassign
     { GufoParsed.MSimple_val (GufoParsed.MTuple_val  (var1 :: seq)) }
@@ -502,9 +507,11 @@ varassign_no_bracket :
     { GufoParsed.MBody_val (assign1 ::assign2) }
 
 varassign_in_expr : 
-  | a = varassign_one_term
+  | a = leaf_expr
     {a}
-  | OPEN_BRACKET; a = varassign_no_bracket ; CLOSE_BRACKET;
+  | OPEN_BRACKET; CLOSE_BRACKET;
+    { GufoParsed.MSimple_val (MEmpty_val) }
+  | OPEN_BRACKET; a = top_expr ; CLOSE_BRACKET;
     {a}
     
   | OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
@@ -539,7 +546,7 @@ comp_expr :
     {GufoParsed.MComp_val (GufoParsed.LessOrEq, expr1, expr2) }
 
 anonymousfun: 
-  | OPEN_BRACKET; FUN; args = funargs_top; ARROW;   body =topvarassign; CLOSE_BRACKET;
+  | OPEN_BRACKET; FUN; args = funargs_top; ARROW;   body =topvarassign; CLOSE_BRACKET; 
     {let open GufoParsed in 
     MSimple_val (MFun_val (List.rev args, body))
     }
@@ -547,69 +554,71 @@ anonymousfun:
 
 
 topvarassign : 
-  | assign = varassign_no_bracket
+  | assign = top_expr
     { assign }
 
 
 operation : 
-  | i1 = varassign_no_bracket; PLUS_STR; i2 = varassign_no_bracket
+  | OPEN_BRACKET; CLOSE_BRACKET;
+    { GufoParsed.MSimple_val (MEmpty_val) }
+  | i1 = top_expr; PLUS_STR; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MConcatenation, [i1; i2])}
-  | i1 = varassign_no_bracket; PLUS; i2 = varassign_no_bracket
+  | i1 = top_expr; PLUS; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MAddition, [i1; i2])}
-  | i1 = varassign_no_bracket; PLUS_DOT; i2 = varassign_no_bracket 
+  | i1 = top_expr; PLUS_DOT; i2 = top_expr 
     {GufoParsed.MBasicFunBody_val (GufoParsed.MAdditionFloat, [i1; i2])}
-  | i1 = varassign_no_bracket ; MINUS ; i2 = varassign_no_bracket
+  | i1 = top_expr ; MINUS ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MSoustraction, [i1; i2])}
-  | i1 = varassign_no_bracket ; MINUS_DOT ; i2 = varassign_no_bracket
+  | i1 = top_expr ; MINUS_DOT ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MSoustractionFloat, [i1; i2])}
-  | i1 = varassign_no_bracket ; STAR ; i2 = varassign_no_bracket
+  | i1 = top_expr ; STAR ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MMultiplication, [i1; i2])}
-  | i1 = varassign_no_bracket ; STAR_DOT ; i2 = varassign_no_bracket
+  | i1 = top_expr ; STAR_DOT ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MMultiplicationFLoat, [i1; i2])}
-  | i1 = varassign_no_bracket ; DIVISION ; i2 = varassign_no_bracket
+  | i1 = top_expr ; DIVISION ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MDivision , [i1; i2])}
-  | i1 = varassign_no_bracket ; DIVISION_DOT ; i2 = varassign_no_bracket
+  | i1 = top_expr ; DIVISION_DOT ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MDivisionFloat , [i1; i2])}
-  | i1 = varassign_no_bracket; MODULO ; i2 = varassign_no_bracket
+  | i1 = top_expr; MODULO ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MModulo, [i1; i2])}
-  | i1 = varassign_no_bracket; MODULO_DOT ; i2 = varassign_no_bracket
+  | i1 = top_expr; MODULO_DOT ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MModuloFloat, [i1; i2])}
-  | i1 = varassign_no_bracket; WITH ; i2 = varassign_no_bracket
+  | i1 = top_expr; WITH ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MWithList, [i1; i2])}
-  | i1 = varassign_no_bracket; WITH_SET ; i2 = varassign_no_bracket
+  | i1 = top_expr; WITH_SET ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MWithSet, [i1; i2])}
-  | i1 = varassign_no_bracket; WITH_MAP ; i2 = varassign_no_bracket
+  | i1 = top_expr; WITH_MAP ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MWithMap, [i1; i2])}
-  | i1 = varassign_no_bracket; WITHOUT_SET ; i2 = varassign_no_bracket
+  | i1 = top_expr; WITHOUT_SET ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MWithoutSet, [i1; i2])}
-  | i1 = varassign_no_bracket; WITHOUT_MAP ; i2 = varassign_no_bracket
+  | i1 = top_expr; WITHOUT_MAP ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MWithoutMap, [i1; i2])}
-  | i1 = varassign_no_bracket; SHAS ; i2 = varassign_no_bracket
+  | i1 = top_expr; SHAS ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MHasSet, [i1; i2])}
-  | i1 = varassign_no_bracket; MHAS ; i2 = varassign_no_bracket
+  | i1 = top_expr; MHAS ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MHasMap, [i1; i2])}
   |  cmdas = simple_cmd;
     { GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeCmdVal cmdas)) }
-  | acmds = varassign_no_bracket ; SIMPLE_AND 
+  | acmds = top_expr ; SIMPLE_AND 
     {let open GufoParsed in
       MSimple_val (MBase_val 
       (MTypeCmdVal (ForkedCmd (mval_to_cmd acmds))))}
-  | acmds = varassign_no_bracket ; AND ; bcmds = varassign_no_bracket
+  | acmds = top_expr ; AND ; bcmds = top_expr
     {
       let open GufoParsed in
       MSimple_val (MBase_val (MTypeCmdVal (AndCmd (mval_to_cmd acmds, mval_to_cmd bcmds))))
     }
-  | acmds = varassign_no_bracket ; OR ; bcmds = varassign_no_bracket
+  | acmds = top_expr ; OR ; bcmds = top_expr
     {
       let open GufoParsed in
       MSimple_val (MBase_val (MTypeCmdVal (OrCmd (mval_to_cmd acmds, mval_to_cmd bcmds))))
     }
-  | acmds = varassign_no_bracket ; PIPE ; bcmds = varassign_no_bracket
+  | acmds = top_expr ; PIPE ; bcmds = top_expr
     {
       let open GufoParsed in
       MSimple_val (MBase_val (MTypeCmdVal (PipedCmd(mval_to_cmd acmds, mval_to_cmd bcmds))))
     }
-  | acmds = varassign_no_bracket ; SEMICOLON; bcmds = varassign_no_bracket
+  | acmds = top_expr ; SEMICOLON; bcmds = top_expr
     {
       let open GufoParsed in
       MSimple_val (MBase_val (MTypeCmdVal (SequenceCmd(mval_to_cmd acmds, mval_to_cmd bcmds))))
@@ -797,7 +806,7 @@ modulVar:
 
 lst_index:
   | {None}
-  | prev_idx = lst_index; OPEN_SQRIDXBRACKET;elkey = varassign_no_bracket; CLOSE_SQRBRACKET;
+  | prev_idx = lst_index; OPEN_SQRIDXBRACKET;elkey = top_expr; CLOSE_SQRBRACKET;
     {match prev_idx with
       | None -> Some [elkey]
       | Some lst -> Some (elkey::lst)
@@ -806,15 +815,15 @@ lst_index:
 
 
 listSetEl:
-  | el = varassign_no_bracket;
+  | el = top_expr;
     {[el]}
-  | el = varassign_no_bracket; COMMA; lst = listSetEl;
+  | el = top_expr; COMMA; lst = listSetEl;
     {el::lst}
 
 mapEl:
-  | key = varassign_no_bracket; COLON ; el = varassign_no_bracket;
+  | key = top_expr; COLON ; el = top_expr;
     {[key, el]}
-      | key = varassign_no_bracket; COLON ; el = varassign_no_bracket; COMMA; lst = mapEl;
+      | key = top_expr; COLON ; el = top_expr; COMMA; lst = mapEl;
     {(key,el)::lst}
 
 
@@ -824,7 +833,7 @@ modulVarOrExpr:
     {GufoParsed.MEnvRef_val (GenUtils.rm_first_char a)}
   | a = modulVar
     {GufoParsed.MRef_val (a,[])}
-  | OPEN_BRACKET ; varassign = varassign_no_bracket; CLOSE_BRACKET;
+  | OPEN_BRACKET ; varassign = top_expr; CLOSE_BRACKET;
     { varassign }
 
 
