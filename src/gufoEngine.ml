@@ -163,11 +163,15 @@ let rewrite_arg shenv arg =
     with  _ -> [str_arg]
   in
   let str_arg  = 
-    match String.get arg 0 with
-      | '~' -> 
-          let user_dir = get_var shenv "HOME" in
-          Str.replace_first (Str.regexp "~") user_dir arg
-      | _ -> arg 
+    match String.length arg with
+      | 0 -> arg
+      | _ -> 
+        (match String.get arg 0 with
+          | '~' -> 
+              let user_dir = get_var shenv "HOME" in
+              Str.replace_first (Str.regexp "~") user_dir arg
+          | _ -> arg 
+        )
   in apply_star_pattern str_arg
 
 (*what happen on the execution of the exit command. *)
