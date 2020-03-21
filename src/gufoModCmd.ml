@@ -27,6 +27,8 @@ open GufoParsed
 
 let listtypes = IntMap.empty
 
+let text args scope = assert false
+
 let types = 
   [
   {
@@ -54,6 +56,23 @@ let types =
     mosmt_internal_val = StringMap.empty; 
   };
   ]
+
+(*TODO: topvar is not implement for this module now*)
+let topvars = 
+  [
+    {
+      (*split a string into a list *)
+      mosmv_name = "text";
+      mosmv_description = "Return the text from the output of the program executed in first argument.";
+      mosmv_intname = 1;
+      mosmv_type = 
+        MOFun_type
+        ([MOList_type (MOBase_type (MTypeCmd)); ], 
+         MOList_type (MOBase_type (MTypeString)));
+      mosmv_action= text;
+    };
+  ]
+
 
 
 let mosysmodule =
