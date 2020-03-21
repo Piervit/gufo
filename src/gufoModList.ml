@@ -29,6 +29,8 @@ let listtypes = IntMap.empty
 directly call GufoEngine to avoid circular dependancies.*)
 let iter args scope = assert false 
 let filter args scope = assert false
+let map args scope = assert false
+let fold_left args scope = assert false
 
 let length args scope =
   match args with
@@ -67,6 +69,7 @@ let topvars =
         ;
       mosmv_action= length;
     };
+
     {
       mosmv_name = "filter";
       mosmv_description = "Return a new list with only the element of the list
@@ -74,12 +77,40 @@ let topvars =
       mosmv_intname = 3;
       mosmv_type = 
         MOFun_type
-        ([ MOList_type( MOAll_type 1 );
-           MOFun_type ([MOAll_type 1], MOBase_type (MTypeBool))
+        ([MOFun_type ([MOAll_type 1], MOBase_type (MTypeBool));
+          MOList_type( MOAll_type 1 );
          ], 
          MOList_type( MOAll_type 1 ))
         ;
       mosmv_action= filter;
+    };
+    {
+      mosmv_name = "map";
+      mosmv_description = "Apply the given function to elements of the list.";
+      mosmv_intname = 4;
+      mosmv_type = 
+        MOFun_type
+        ([MOFun_type ([MOAll_type 1], MOAll_type 2 );
+          MOList_type( MOAll_type 1 );
+         ], 
+         MOList_type( MOAll_type 2 ))
+        ;
+      mosmv_action= map;
+    };
+    {
+      mosmv_name = "fold_left";
+      mosmv_description = "";
+      mosmv_intname = 4;
+      mosmv_type = 
+        MOFun_type
+        ([ 
+           MOFun_type ([MOAll_type 2; MOAll_type 1], MOAll_type 2 );
+           MOAll_type 2 ;
+           MOList_type( MOAll_type 1 );
+         ], 
+         MOAll_type 2 )
+        ;
+      mosmv_action= fold_left;
     };
 
   ]
