@@ -124,7 +124,6 @@ issue for commands such as 'ls *'.
 %token OPEN_BRACKET
 %token CLOSE_BRACKET
 %token SEMICOLON (* ; *)
-%token DOUBLE_SEMICOLON (* ;; *)
 %token <string> FREETYPE
 %token <string> VARNAME 
 %token <string> ENVVAR
@@ -151,6 +150,7 @@ issue for commands such as 'ls *'.
 %left SHAS
 %left MHAS
 
+%token DOUBLE_SEMICOLON (* ;; *)
 
 
 %left SEMICOLON
@@ -491,6 +491,12 @@ basic_expr:
     }
   | OPEN_BRACKET; a = top_expr ;CLOSE_BRACKET;
     {a}
+(*
+  | OPEN_BRACKET; funcall = modulVar; funargs = funcallargs ;CLOSE_BRACKET; funargs2 = funcallargs
+    {GufoParsed.MRef_val (funcall, List.append funargs funargs2 )}
+
+*)
+
 
 (*top_expr is a "toplevel" expresion:
     it can be:
@@ -631,8 +637,7 @@ funcallargs :
     { funarg :: funargs }
 
 
-
-  funargs_top:
+funargs_top:
   |  { [] }
   | varname = VARNAME; funargs = funargs_top;
     { 
