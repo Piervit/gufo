@@ -33,4 +33,5 @@ val filename_to_module : string -> string
 (*return the module name from a valid path file.*)
 val getModuleNameFromPath : string -> string
 
+val getNbArgsFromCoreFunction: Gufo.MCore.mosysmodulemvar  -> int
 

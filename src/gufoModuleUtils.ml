@@ -91,4 +91,8 @@ let filename_to_module filename =
 let getModuleNameFromPath path =
   let last_file = List.hd (List.rev (String.split_on_char '/' path)) in
   filename_to_module last_file
-  
+
+let getNbArgsFromCoreFunction sysmodVar =
+  match sysmodVar.mosmv_type with
+    | MOFun_type (args, ret) ->
+        List.length args
