@@ -509,11 +509,14 @@ let analyse_and_print term cur_expr =
           )
           with | TypeError msg 
                | InternalError msg 
-               | Sys_error msg 
+               | Sys_error msg  
                | VarError msg 
-               | SyntaxError msg ->
+               | SyntaxError msg as e ->
                   print_expr term cur_expr >>=
-                  (fun () -> print_err term cur_expr msg)
+                  (fun () -> print_err term cur_expr (Printexc.to_string e)) >>=
+                  (fun () -> print_err term cur_expr (Printexc.get_backtrace ()))
+
+
                | Not_found as e -> 
                   print_expr term cur_expr >>=
                   (fun () -> print_err term cur_expr (Printexc.to_string e)) >>=
