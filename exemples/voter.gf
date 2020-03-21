@@ -1,6 +1,6 @@
-let $votes = -< "M. Dupond" : 0 , "Mme. Michoux" : 0, "M.Dudulle" : 0>-
+let $init_votes = -< "M. Dupond" : 0 , "Mme. Michoux" : 0, "M.Dudulle" : 0>-
 
-let $listVoted = -<>-
+let $init_listVoted = -<>-
 
 #update the vote for a candidate if $candidat represent a valid candidate.
 let $incrvote $votes $candidat = 
@@ -12,7 +12,7 @@ let $incrvote $votes $candidat =
   
 let $funvote $votes $listVoted $codevotant $candidat = 
   if($Set.is_in $listVoted $codevotant) 
-  then (False -- $listVoted -- $votes) 
+  then (False -- $listVoted -- $votes ) 
   else(
     let $listVoted = $Set.add $listVoted $codevotant in (
     let $votes = $incrvote $votes $candidat in(
@@ -20,5 +20,6 @@ let $funvote $votes $listVoted $codevotant $candidat =
     )
     )
   )
+
 
 
