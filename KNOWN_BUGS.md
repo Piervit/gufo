@@ -1,37 +1,41 @@
+This file track potential bugs and issues of Gufo.
+Information here might be transfered to github issues.
 
-BUG 6:
-let $checkset $aset $aval = $aset has? $aval in $checkset -< 1 -> "toto"
+#### BUG 8 ####
 
-BUG 7:
-let $a = $Int.toString
-
-BUG 8: this is not really a bug, but a strong interogation
+This is not sure it is really a bug, but a strong interogation
 
 % let $echofun $a = echo ("hello " + $a)
 % $echofun "Alain"; echo "toto"
 
-BUG 9:
-
-% let $afunction $i = $i
-% $afunction 3 4
-
-BUG 10:
+#### BUG 10 ####
 
 Maybe for later:
 gufoModules.ml:72 TODO: can raise bugs.
 
-BUG 11:
+#### BUG 11 ####
 
 "oo" > "pp"
 
-BUG 12:
-
-let $a = $Opt.get ($Int.fromString "3") 23 fonctionne mais pas  
-($Opt.get ($Int.fromString "3") 3 ) ^ "STR2"
-
-Selon que la chaine $x soit convertible en int ou non, $a sera de type int ou string -> il devrait y avoir une erreur de type.
-
-BUG 13:
+#### BUG 13 ####
 
 Try tiping:
 git commit _oasis
+
+#### BUG 15 ####
+echo ( $List.fold_left (fun $acc $el  -> $acc ^ $el )  )
+
+#### BUG 16 ####
+let _ = echo $str in (()) )
+
+#### BUG 17 ####
+let $f $a $b = $a + $b
+
+($f 5) 6
+
+#### BUG 18 ####
+(priorité d'opérateur)
+
+1 + 1 ;; 3
+4
+
