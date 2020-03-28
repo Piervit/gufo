@@ -620,7 +620,6 @@ let search_hist term shell_env hist cur_expr =
   means we don't exploit the last lines but don't have issues with tem.
 *)
 let prepare_term term cur_expr = 
-  let expr_cursor_row, expr_cursor_col = get_cursor_coord cur_expr in
   LTerm.fprints term (eval [ S "\n"]) >>=
   (fun () ->  LTerm.fprints term (eval [ S "\n"]) )>>=
   (fun () ->  LTerm.fprints term (eval [ S "\n"]) )>>=
@@ -724,9 +723,11 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
           LTerm.leave_raw_mode term tmod) >>=
         (fun () -> 
           let redprog ,shell_env = (GufoEngine.exec opt_prog shell_env) in
-          ( LTerm.enter_raw_mode term >>= (fun tmod -> term_rawmod:=Some tmod; Lwt.return () ));
+          ( LTerm.enter_raw_mode term >>= (fun tmod -> term_rawmod:=Some tmod;
+             Lwt.return () )) >>=
+          (fun () -> 
           fulloprog := redprog;
-          print_res term (Gufo.MCore.moval_to_string redprog.mofp_mainprog.mopg_topcal)
+          print_res term (Gufo.MCore.moval_to_string redprog.mofp_mainprog.mopg_topcal))
           >>=
         (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id)))))
     | None ->
@@ -745,7 +746,9 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
              print_expr term cur_expr >>=
              (fun () -> 
                let err_msg = string_of_ParseError (fname, line, col, tok, reason) in
-               print_err term cur_expr err_msg; return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
+               print_err term cur_expr err_msg >>=
+               (fun () ->  return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
+              )
 
 
 let new_line_search_mod term shell_env (hist, hist_id) cur_expr search_expr = 
@@ -771,7 +774,7 @@ let delete term shell_env hist cur_expr =
     | Some search_expr ->
         let search_expr = 
           try (Zed_utf8.sub  search_expr 0 (Zed_utf8.length search_expr -1 )) 
-          with Zed_utf8.Out_of_bounds _ -> search_expr
+          with Zed_utf8.Out_of_bounds  -> search_expr
         in 
         let new_expr = find_hist_expr cur_expr hist search_expr in
         term_search_mod := Some search_expr;
@@ -875,9 +878,8 @@ let completion term shell_env hist cur_expr =
   clear_res_err_and_comple term cur_expr >>=  
     (fun () -> analyse_and_print term cur_expr ) >>=
     (fun () -> 
-    print_completion term shell_env hist cur_expr posibilities;
-    Lwt.return (Some (cur_expr, shell_env, hist))
-    )
+    print_completion term shell_env hist cur_expr posibilities) >>=
+    (fun () -> Lwt.return (Some (cur_expr, shell_env, hist)))
 
 
 let handle_key_event term shell_env hist cur_expr akey = 
