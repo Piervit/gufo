@@ -728,17 +728,17 @@ cmd_arg :
   | arg = ARG
   | arg = FILE
     { GufoParsed.SORString arg}
-  | arg = TILDE
+  | TILDE
     {GufoParsed.SORString "~" }
-  | arg = DOT
+  | DOT
     {GufoParsed.SORString "." }
   | arg = modulVarOrExpr
     { GufoParsed.SORExpr arg}
 (** Commenting the STAR and DOT here will solve the states conflicts of * and .
 but will make commands such as ls * to fail. *)
-  | arg = STAR
+  | STAR
     {GufoParsed.SORString "*" }
-  | arg = DOT
+  | DOT
     {GufoParsed.SORString "." }
 
 redirs :

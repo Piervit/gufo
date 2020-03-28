@@ -190,10 +190,12 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
   in 
   match error, path with
     | Some (ecode, msg), _ -> 
-        write_substring outerr_fd (msg ^ "\n") 0 ((String.length msg)+1);
-      ecode,
-      shenv, 
-      {cmd with mocm_res = Some ecode; 
+        let _nb_written = 
+          write_substring outerr_fd (msg ^ "\n") 0 ((String.length msg)+1)
+        in
+        ecode,
+        shenv, 
+        {cmd with mocm_res = Some ecode; 
                 mocm_print_error = Some msg}
     | None, path -> 
         try 
@@ -204,7 +206,9 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
           },
           {cmd with mocm_res = Some 0;}
         with Sys_error msg -> 
-        write_substring outerr_fd (msg ^ "\n") 0 ((String.length msg)+1);
+        let _nb_written = 
+          write_substring outerr_fd (msg ^ "\n") 0 ((String.length msg)+1)
+        in
           1,
           shenv ,
           {cmd with mocm_res = Some 1;

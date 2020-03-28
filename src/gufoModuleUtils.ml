@@ -96,3 +96,4 @@ let getNbArgsFromCoreFunction sysmodVar =
   match sysmodVar.mosmv_type with
     | MOFun_type (args, ret) ->
         List.length args
+    | _ -> 0

@@ -118,6 +118,7 @@ let fold_over_obinding_val apply_fun acc expr =
       mtyp1
       | MOBody_val (lst) ->
           List.fold_left fold_over_obinding_val_ acc lst
+      | MOEnvRef_val str -> acc
   in
     fold_over_obinding_val_ acc expr
 

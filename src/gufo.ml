@@ -1478,12 +1478,11 @@ let moval_to_type aval =
                   (*curpos has more el*)
                   let acc = sprintf "%s ) " acc in
                   print_name (GenUtils.list_starts curpos ((List.length curpos) - 1), acc) name
-                | i when i < 0 -> 
+                | i -> (* when i < 0 *)
                   (*curpos has less el*)
                   let acc = sprintf "%s ( " acc in
                   print_name (GenUtils.list_append_at_end curpos 0 , acc) name
             )
-          | _  ->  assert false
       in
       print_name ([],"") name
     in 

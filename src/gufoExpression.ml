@@ -145,7 +145,7 @@ let exprList_to_splittedMessage list_expr max_line_size split_size =
           match  max_line_size - (cursize + lenExpr + split_size) with
             | i when i <= 0 -> (*negative size, we have to split. *) 
               (lenExpr+ split_size , str ^ "\n" ^ expr ^ separator)
-            | i when i > 0 -> (*no need to split to split. *)
+            | i -> (* when i > 0 , no need to split to split. *)
               (cursize + lenExpr+ split_size, str ^ expr ^ separator)
       )
       (0, "") list_expr

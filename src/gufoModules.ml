@@ -116,7 +116,7 @@ let write_type stream typ =
 
   
   (*This part should be rewritten. It is only basic draft, never has been called. *)
-let generate_stdlib_doc () = 
+(*let generate_stdlib_doc () = 
   List.iter
     (fun modul -> 
       let mosysmodule = parse_system_module modul in
@@ -136,7 +136,7 @@ let generate_stdlib_doc () =
       (*TODO*)
     )
     system_modules
-
+*)
 
 let get_system_modules = 
   let _ , sysmap = 

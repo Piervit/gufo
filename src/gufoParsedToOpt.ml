@@ -375,8 +375,8 @@ and determine_type_comp fulloptiprog optiprog locScope const op arga argb =
 *)
     let typa, locScope = determine_type fulloptiprog optiprog locScope None arga in
     let typb, locScope = determine_type fulloptiprog optiprog locScope None argb in
-      determine_refine_type typa typb;
-          MOBase_type (MTypeBool), locScope
+    let _typ = determine_refine_type typa typb in
+      MOBase_type (MTypeBool), locScope
     
 and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb = 
   let for_basic_op expectedType arga argb =
@@ -1252,7 +1252,7 @@ let type_check_has_type fulloptiprog optiprog var_types required_typ expr =
       | MOUnit_type, _ -> true (*TODO : this should be discussed. *)
       | MOAll_type i, _ -> true
       | _, MOAll_type i2 -> true
-      | MORef_type (_,_,_,_), _ -> raise (InternalError "Gufo internal error (ref should not exist)") false (*because we should have no more ref at this point *)
+      | MORef_type (_,_,_,_), _ -> raise (InternalError "Gufo internal error (ref should not exist)") (*because we should have no more ref at this point *)
       | _, MORef_type(_,_,_,_) -> raise (InternalError "Gufo internal error (ref should not exist)")
       | MOTupel_type (_,_,_,_,_), _ -> raise (InternalError "unexpected tupel)")
       | _, MOTupel_type (_,_,_,_,_) ->  raise (InternalError "unexpected tupel)")
@@ -1479,6 +1479,7 @@ let rec refine_allTypeConstraint typ allTypeMap =
       allType_getRealType (MOAll_type i) allTypeMap
    | MOUnit_type -> MOUnit_type
    | MORef_type (_,_,_, _ ) -> raise (InternalError "type checker error.")
+   | MOTupel_type _ -> raise (InternalError "type checker error.")
 
 
 (*This function check an exepected type and an effectively found one, using it
@@ -2876,7 +2877,12 @@ function we used it to not lost informations. *)
                       (fun (allTypeMap,args) required real -> 
                         let _,allTypeMap = 
                           check_arg required real allTypeMap in
-                        let cur_arg::args = args in
+                        let cur_arg, args =
+                          match args with
+                            | [] -> assert false
+                            | [a] -> a, []
+                            | a::b -> a, b
+                        in
                         let required = refine_allTypeConstraint required allTypeMap
                         in
                         let _, allTypeMap =
@@ -3041,7 +3047,7 @@ function we used it to not lost informations. *)
         let var_types, cond_typ = 
           type_check_val_to_top fulloptiprog optiprog modi cond var_types in 
         (*TODO: ok? *)
-        determine_refine_type cond_typ (MOBase_type (MTypeBool));
+        let _typ = determine_refine_type cond_typ (MOBase_type (MTypeBool)) in
         let var_types, v1_typ = 
           type_check_val_to_top fulloptiprog optiprog modi v1 var_types in
         let var_types, v2_typ = 
@@ -3052,7 +3058,7 @@ function we used it to not lost informations. *)
           type_check_val_to_top fulloptiprog optiprog modi v1 var_types in
         let var_types, v2_typ = 
           type_check_val_to_top fulloptiprog optiprog modi v2 var_types in
-          determine_refine_type v1_typ v2_typ;
+        let _typ = determine_refine_type v1_typ v2_typ in
         var_types, MOBase_type MTypeBool
     | MOBody_val (lst) -> 
         List.fold_left 

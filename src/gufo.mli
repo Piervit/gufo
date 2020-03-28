@@ -310,7 +310,7 @@ sig
     | MOSimple_val of mosimple_type_val
     | MOComposed_val of mocomposed_type_val
     | MORef_val of moref_val * motype_val list (*ref , varname args*)
-    | MOEnvRef_val of string
+    | MOEnvRef_val of string (*Environnement variable.*)
     | MOBasicFunBody_val of mo_expr_operation * motype_val * motype_val
     | MOBind_val of mobinding
     | MOIf_val of motype_val * motype_val * motype_val

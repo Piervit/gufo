@@ -33,5 +33,7 @@ val filename_to_module : string -> string
 (*return the module name from a valid path file.*)
 val getModuleNameFromPath : string -> string
 
+(*Return the number of argument of a core function. If the given type is not a
+function, return 0. *)
 val getNbArgsFromCoreFunction: Gufo.MCore.mosysmodulemvar  -> int
 
