@@ -19,7 +19,23 @@ Author: Pierre Vittet
 Gufo knows it exists because of the help of others.
 ===================================================
 
+First supporter
+---------------
 
-Financial support
------------------
+First, I need to thanks my first donator :Sylvain Ductor. 
+Thanks, Sylvain, for the very early discussion we had and all your support.
+
+Intellectual support
+-------------------
+Thanks to the INRIA celtique team and especially to Frederic Besson thanks to
+who I have discover ocaml and dived into functionnal programming.
+
+Special thanks to Basile Starynkevich which has also be an initiator full a
+idea and dreams.
+
+
+
+
+
+
 
