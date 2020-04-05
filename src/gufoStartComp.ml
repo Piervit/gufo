@@ -45,11 +45,8 @@ let parse_shell content =
     raise e
 
 let parse_file filename =
-      try(
         let inx = open_in filename in
         let lexbuf = create_lexbuf ~file:filename (Sedlexing.Utf8.from_channel inx) in
         let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.prog lexbuf in
         close_in inx;
         prog
-      )
-      with _ -> None
