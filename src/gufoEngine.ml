@@ -178,6 +178,9 @@ let rewrite_arg shenv arg =
 let play_exit cmd red_args shenv input_fd output_fd outerr_fd = 
   (exit 0)
 
+let play_assert_false cmd red_args shenv input_fd output_fd outerr_fd =
+  (exit 1)
+
 
 let play_cd cmd red_args shenv input_fd output_fd outerr_fd = 
   (*cd will write an error and do nothing else if it has more than 1 arg.*)
@@ -1027,6 +1030,7 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
       match cmd.mocm_cmd with
         | "cd" -> Some (play_cd cmd red_args shenv input_fd output_fd outerr_fd)
         | "exit" -> Some (play_exit cmd red_args shenv input_fd output_fd outerr_fd)
+        | "assert_false" -> Some (play_assert_false cmd red_args shenv input_fd output_fd outerr_fd)
         | _ -> None
   in
 
