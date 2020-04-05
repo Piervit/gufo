@@ -4,13 +4,8 @@ CAN BE DONE QUICKLY
 NEEDED FOR A FIRST USABLE RELEASE
 ===================================
 
-Add non-regression tests system
-Character '\*' as file wildcard, '.' as curdir, '..' as upper dir, '~' as home dir.
 Provide documentation.
 Add standard libraries (type transformations, iterator, various utility functions).
-Test advanced functionalities (structure,list, set, map, tuple).
-Improve shell completion.
-improve coloration.
 Debug and improve the console(user interface): multiline commands and errors.
 Test the module system
 
