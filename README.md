@@ -1,5 +1,4 @@
 # Gufo
-A modern shell language!
+An experimental shell language!
 
-TO BE SOON RELEASED: http://gufo.pvittet.com/
-
+Some documentations here: [https://gufo.pvittet.com/doc/](https://gufo.pvittet.com/doc/).
