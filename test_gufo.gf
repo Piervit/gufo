@@ -83,5 +83,6 @@ let $run_valid_tests $file =
 
 #$run_test 2
 ($run_valid_tests "tests/basic_affectations.gf") ;;
-($run_valid_tests "tests/valid_exprs.gf");;
-($run_valid_tests "tests/valid_commands.gf")
+($run_valid_tests "tests/valid_exprs.gf") ;;
+($run_valid_tests "tests/valid_commands.gf") ;;
+($run_valid_tests "tests/basic_operation.gf")
