@@ -76,7 +76,6 @@ issue for commands such as 'ls *'.
 %token PLUS
 %token PLUS_DOT
 %token PLUS_STR
-%token DOUBLE_MINUS
 %token MINUS
 %token MINUS_DOT
 %token DIVISION
@@ -131,6 +130,7 @@ issue for commands such as 'ls *'.
 %token <string> MODULVAR
 %token <string> MODUL
 %token <string> WORD 
+%token DOUBLE_MINUS
 
 %token DOT
 %token NONE
@@ -139,19 +139,27 @@ issue for commands such as 'ls *'.
 %token COMMA
 %token EOF
 
+%token DOUBLE_SEMICOLON (* ;; *)
+%left DOUBLE_SEMICOLON
 
 %left PLUS
 %left MINUS
-%right STAR
-%right DIVISION
+%left STAR
+%left DIVISION
 %left MODULO
 %left WITH
 %left WITHOUT
 %left SHAS
 %left MHAS
-
-%token DOUBLE_SEMICOLON (* ;; *)
-
+%left PLUS_STR
+%left PLUS_DOT
+%left STAR_DOT
+%left DIVISION_DOT
+%left MODULO_DOT
+%left WITH_SET
+%left WITH_MAP
+%left WITHOUT_SET
+%left WITHOUT_MAP
 
 %left SEMICOLON
 %left SIMPLE_AND
@@ -161,7 +169,6 @@ issue for commands such as 'ls *'.
 
 
 %right ELSE
-%left DOUBLE_MINUS
 (*
 %left LOWER_THAN
 %left LOWER_OR_EQUAL
@@ -244,13 +251,9 @@ mtopels:
 
 
 var_tuple_decl:
-  | name = VARNAME; 
-    {let open GenUtils in 
-     let open GufoParsed in
-      let name = rm_first_char name in
-      MBaseDecl (name)
-    }
-  | left = var_tuple_decl ; DOUBLE_MINUS ;right = var_tuple_decl ;
+  | simple = base_var_tuple_decl;
+    {simple}
+  | left = base_var_tuple_decl; DOUBLE_MINUS ;right = var_tuple_decl ;
     {
      let open GufoParsed in
       match left,right with
@@ -265,6 +268,13 @@ var_tuple_decl:
      MTupDecl [decl]
     }
 
+base_var_tuple_decl:
+  | name = VARNAME; 
+    {let open GenUtils in 
+     let open GufoParsed in
+      let name = rm_first_char name in
+      MBaseDecl (name)
+    }
 
 rev_mtypes_or_topvals:
   | { GenUtils.StringMap.empty,[] }
@@ -445,6 +455,8 @@ leaf_expr:
     {let open GufoParsed in
       MSimple_val (MMap_val map)
     }
+  |  cmdas = simple_cmd;
+    { GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeCmdVal cmdas)) }
   |  anonf = anonymousfun ; 
     {anonf}
 
@@ -507,10 +519,8 @@ basic_expr:
 top_expr : 
   | var = basic_expr
     {var}
-  | var1 = varassign_in_expr ; DOUBLE_MINUS; seq=tupleassign
+  | var1 = varassign_in_expr ; DOUBLE_MINUS; seq=in_tuple_assign
     { GufoParsed.MSimple_val (GufoParsed.MTuple_val  (var1 :: seq)) }
-  | assign1 = varassign_in_expr; DOUBLE_SEMICOLON ;assign2 = exprseqeassign; 
-    { GufoParsed.MBody_val (assign1 ::assign2) }
 
 varassign_in_expr : 
   | a = leaf_expr
@@ -603,8 +613,7 @@ operation :
     {GufoParsed.MBasicFunBody_val (GufoParsed.MHasSet, [i1; i2])}
   | i1 = top_expr; MHAS ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MHasMap, [i1; i2])}
-  |  cmdas = simple_cmd;
-    { GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeCmdVal cmdas)) }
+
   | acmds = top_expr ; SIMPLE_AND 
     {let open GufoParsed in
       MSimple_val (MBase_val 
@@ -629,6 +638,9 @@ operation :
       let open GufoParsed in
       MSimple_val (MBase_val (MTypeCmdVal (SequenceCmd(mval_to_cmd acmds, mval_to_cmd bcmds))))
     }
+  | assign1 = top_expr; DOUBLE_SEMICOLON ;assign2 = exprseqeassign; 
+    { GufoParsed.MBody_val (assign1 ::assign2)}
+
 
 
 funcallargs :
@@ -665,13 +677,17 @@ funargs:
 exprseqeassign:
   | var1 =varassign_in_expr
     {[var1]}
-  | var1 = varassign_in_expr; DOUBLE_SEMICOLON ; seq=tupleassign
+  | var1 = tupleassign; DOUBLE_SEMICOLON ; seq=exprseqeassign
     {var1 :: seq}
 
 tupleassign:
   | var1 =varassign_in_expr
+    {var1}
+
+in_tuple_assign:
+  | var1 =varassign_in_expr
     {[var1]}
-  | var1 = varassign_in_expr; DOUBLE_MINUS; seq=tupleassign
+  | var1 = varassign_in_expr; DOUBLE_MINUS; seq=in_tuple_assign
     {var1 :: seq}
 
 (******* CMD PARSING ********)
