@@ -144,8 +144,7 @@ issue for commands such as 'ls *'.
 
 %left PLUS
 %left MINUS
-%left STAR
-%left DIVISION
+%left STAR, DIVISION
 %left MODULO
 %left WITH
 %left WITHOUT
@@ -153,8 +152,7 @@ issue for commands such as 'ls *'.
 %left MHAS
 %left PLUS_STR
 %left PLUS_DOT
-%left STAR_DOT
-%left DIVISION_DOT
+%left STAR_DOT, DIVISION_DOT
 %left MODULO_DOT
 %left WITH_SET
 %left WITH_MAP
