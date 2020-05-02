@@ -302,12 +302,6 @@ let ref_to_string var =
     | None -> String.concat "." var.mrv_varname
     | Some modul -> String.concat "." (modul :: var.mrv_varname)
 
-let mval_to_cmd sv = 
-  match sv with 
-    | MSimple_val (MBase_val (MTypeCmdVal cmdseq))
-      -> cmdseq
-    | _ -> raise (TypeError "Expecting a command.")
-
 
 let rec dump_mtype_short mytype = 
       match mytype with

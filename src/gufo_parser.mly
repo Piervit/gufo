@@ -453,8 +453,8 @@ leaf_expr:
     {let open GufoParsed in
       MSimple_val (MMap_val map)
     }
-  |  cmdas = simple_cmd;
-    { GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeCmdVal cmdas)) }
+  |  cmdas = cmd_expr;
+    { MSimple_val (MBase_val (MTypeCmdVal cmdas)) }
   |  anonf = anonymousfun ; 
     {anonf}
 
@@ -611,33 +611,32 @@ operation :
     {GufoParsed.MBasicFunBody_val (GufoParsed.MHasSet, [i1; i2])}
   | i1 = top_expr; MHAS ; i2 = top_expr
     {GufoParsed.MBasicFunBody_val (GufoParsed.MHasMap, [i1; i2])}
-
-  | acmds = top_expr ; SIMPLE_AND 
-    {let open GufoParsed in
-      MSimple_val (MBase_val 
-      (MTypeCmdVal (ForkedCmd (mval_to_cmd acmds))))}
-  | acmds = top_expr ; AND ; bcmds = top_expr
-    {
-      let open GufoParsed in
-      MSimple_val (MBase_val (MTypeCmdVal (AndCmd (mval_to_cmd acmds, mval_to_cmd bcmds))))
-    }
-  | acmds = top_expr ; OR ; bcmds = top_expr
-    {
-      let open GufoParsed in
-      MSimple_val (MBase_val (MTypeCmdVal (OrCmd (mval_to_cmd acmds, mval_to_cmd bcmds))))
-    }
-  | acmds = top_expr ; PIPE ; bcmds = top_expr
-    {
-      let open GufoParsed in
-      MSimple_val (MBase_val (MTypeCmdVal (PipedCmd(mval_to_cmd acmds, mval_to_cmd bcmds))))
-    }
-  | acmds = top_expr ; SEMICOLON; bcmds = top_expr
-    {
-      let open GufoParsed in
-      MSimple_val (MBase_val (MTypeCmdVal (SequenceCmd(mval_to_cmd acmds, mval_to_cmd bcmds))))
-    }
   | assign1 = top_expr; DOUBLE_SEMICOLON ;assign2 = exprseqeassign; 
     { GufoParsed.MBody_val (assign1 ::assign2)}
+
+cmd_expr:
+  |  cmdas = simple_cmd;
+    { cmdas }
+  | acmds = cmd_expr ; SIMPLE_AND 
+    {
+      (ForkedCmd (acmds))
+    }
+  | acmds = cmd_expr; AND ; bcmds = cmd_expr
+    {
+      (AndCmd (acmds, bcmds))
+    }
+  | acmds = cmd_expr; OR ; bcmds = cmd_expr
+    {
+      (OrCmd (acmds, bcmds))
+    }
+  | acmds = cmd_expr; PIPE ; bcmds = cmd_expr
+    {
+      (PipedCmd(acmds, bcmds))
+    }
+  | acmds = cmd_expr ; SEMICOLON; bcmds = cmd_expr
+    {
+      (SequenceCmd(acmds, bcmds))
+    }
 
 
 
