@@ -36,6 +36,12 @@ issue for commands such as 'ls *'.
 
 *)
 
+%{
+
+  open GufoParsed
+
+%}
+
 %token STRUCT 
 %token LET
 %token FUN
@@ -176,8 +182,8 @@ issue for commands such as 'ls *'.
 %left TILDE
 
 
-%start <GufoParsed.mprogram option> prog
-%start <GufoParsed.mprogram option> shell
+%start <mprogram option> prog
+%start <mprogram option> shell
 %%
 
 (**
@@ -187,23 +193,22 @@ issue for commands such as 'ls *'.
 shell:
     |  EOF
     {   
-      Some GufoParsed.{mpg_types = GenUtils.StringMap.empty; mpg_topvar = []; mpg_topcal = MSimple_val(MEmpty_val)} 
+      Some {mpg_types = GenUtils.StringMap.empty; mpg_topvar = []; mpg_topcal = MSimple_val(MEmpty_val)} 
     }
     |  main_expr = topvarassign; EOF
     {   
-      Some GufoParsed.{mpg_types = GenUtils.StringMap.empty; mpg_topvar = []; mpg_topcal = main_expr} 
+      Some {mpg_types = GenUtils.StringMap.empty; mpg_topvar = []; mpg_topcal = main_expr} 
     }
     | LET ; varnames = var_tuple_decl; argnames = funargs_top ; AFFECTATION; funbody = topvarassign; EOF
 	{
-          let open GufoParsed in 
           let open GenUtils in 
           (match argnames, varnames with
             | [], _ -> 
               let mvar = {mva_name = varnames; mva_value = funbody} in
-              Some (GufoParsed.{mpg_types = GenUtils.StringMap.empty; mpg_topvar = [mvar];  mpg_topcal = MSimple_val(MEmpty_val)} )
+              Some ({mpg_types = GenUtils.StringMap.empty; mpg_topvar = [mvar];  mpg_topcal = MSimple_val(MEmpty_val)} )
             | argnames, MBaseDecl varname ->
                 let mvar = {mva_name = MBaseDecl varname; mva_value = MSimple_val (MFun_val (List.rev argnames, funbody))} in
-                Some (GufoParsed.{mpg_types = GenUtils.StringMap.empty; mpg_topvar = [mvar];  mpg_topcal = MSimple_val(MEmpty_val)} )
+                Some ({mpg_types = GenUtils.StringMap.empty; mpg_topvar = [mvar];  mpg_topcal = MSimple_val(MEmpty_val)} )
             | argnames, MTupDecl _ -> 
                 (*TODO: improve error message *)
                 raise (VarError "Error, impossible to gives arguments to tuple element of a let declaration. ")
@@ -215,12 +220,12 @@ shell:
           let (typ, internal_val) = fields_decl in
           let name = rm_first_char name in
           let ctyp = 
-                  (GufoParsed.MComposed_type 
-                              {GufoParsed.mct_name = name; 
-                               GufoParsed.mct_fields = typ; 
-                               GufoParsed.mct_internal_val = internal_val})
+                  (MComposed_type 
+                              {mct_name = name; 
+                               mct_fields = typ; 
+                               mct_internal_val = internal_val})
           in
-          Some GufoParsed.{mpg_types = StringMap.singleton name ctyp; mpg_topvar = []; mpg_topcal = MSimple_val(MEmpty_val) } 
+          Some {mpg_types = StringMap.singleton name ctyp; mpg_topvar = []; mpg_topcal = MSimple_val(MEmpty_val) } 
 	}
 
 
@@ -235,12 +240,12 @@ mfile:
   |  topels = mtopels; EOF
     {
       let (types, variables) = topels in
-      GufoParsed.{mpg_types = types; mpg_topvar = variables;  mpg_topcal = MSimple_val(MEmpty_val)} 
+      {mpg_types = types; mpg_topvar = variables;  mpg_topcal = MSimple_val(MEmpty_val)} 
     }
   |  topels = mtopels; START; main_expr = topvarassign;EOF
     {   
       let (types, variables) = topels in
-      GufoParsed.{mpg_types = types; mpg_topvar = variables; mpg_topcal = main_expr} 
+      {mpg_types = types; mpg_topvar = variables; mpg_topcal = main_expr} 
     }
 
 
@@ -253,7 +258,7 @@ var_tuple_decl:
     {simple}
   | left = base_var_tuple_decl; DOUBLE_MINUS ;right = var_tuple_decl ;
     {
-     let open GufoParsed in
+     
       match left,right with
         | MBaseDecl lf, MBaseDecl rg -> MTupDecl [MBaseDecl lf;MBaseDecl rg]
         | MBaseDecl lf, MTupDecl rg -> MTupDecl ((MBaseDecl lf) :: rg)
@@ -262,14 +267,14 @@ var_tuple_decl:
     }
   | OPEN_BRACKET; decl = var_tuple_decl ; CLOSE_BRACKET
     {
-     let open GufoParsed in
+     
      MTupDecl [decl]
     }
 
 base_var_tuple_decl:
   | name = VARNAME; 
     {let open GenUtils in 
-     let open GufoParsed in
+     
       let name = rm_first_char name in
       MBaseDecl (name)
     }
@@ -284,13 +289,13 @@ rev_mtypes_or_topvals:
           let name = rm_first_char name in
           match StringMap.mem name types with
             | true -> 
-                raise (GufoParsed.TypeError ("The type "^name^" is already declared."))
+                raise (TypeError ("The type "^name^" is already declared."))
             | false ->
                 ( GenUtils.StringMap.add name
-                  (GufoParsed.MComposed_type 
-                              {GufoParsed.mct_name = name; 
-                               GufoParsed.mct_fields = typ; 
-                               GufoParsed.mct_internal_val = internal_val})
+                  (MComposed_type 
+                              {mct_name = name; 
+                               mct_fields = typ; 
+                               mct_internal_val = internal_val})
                   types , topvals)
 	}
 
@@ -298,7 +303,7 @@ rev_mtypes_or_topvals:
 
   | topels= rev_mtypes_or_topvals; LET ; varnames = var_tuple_decl; argnames = funargs_top ; AFFECTATION; funbody = topvarassign;
 	{
-          let open GufoParsed in 
+           
           let open GenUtils in 
       	  let (types, topvals) = topels in
           (match argnames, varnames with
@@ -328,9 +333,9 @@ rev_fields_decl:
   | vars = rev_fields_decl; varname = WORD ; COLON; typename = toptypedecl ; COMMA
     { 
       let lst_field, lst_val = vars in
-      GufoParsed.{mtf_name = varname; mtf_type = typename; mtf_extend = None} :: lst_field, lst_val }
+      {mtf_name = varname; mtf_type = typename; mtf_extend = None} :: lst_field, lst_val }
   | vars = rev_fields_decl; EXTENDS; fieldname= modulVar; COMMA
-    {let open GufoParsed in 
+    { 
       let lst_field, lst_val = vars in
       let fieldnameStr = ref_to_string fieldname in 
       { mtf_name = String.concat "_" ["ext"; fieldnameStr]; 
@@ -340,11 +345,11 @@ rev_fields_decl:
       lst_val 
     }
   | vars = rev_fields_decl; EXTENDS; fieldname= modulVar; WITH; anofun = anonymousfun; COMMA
-    {let open GufoParsed in 
+    { 
       let lst_field, lst_val = vars in
       let fieldnameStr = ref_to_string fieldname in 
       {mtf_name = String.concat "_" ["ext"; fieldnameStr]; 
-       mtf_type = (GufoParsed.MRef_type fieldname);
+       mtf_type = (MRef_type fieldname);
        mtf_extend = Some fieldnameStr
       } :: lst_field , 
      (String.concat "_" ["extfun"; fieldnameStr], anofun) ::lst_val }
@@ -352,54 +357,54 @@ rev_fields_decl:
 
 toptypedecl:
   | ft = FREETYPE;
-    {GufoParsed.MAll_type ft }
+    {MAll_type ft }
   | STRINGTYPE
-    { GufoParsed.MBase_type GufoParsed.MTypeString }
+    { MBase_type MTypeString }
   | INTTYPE
-    { GufoParsed.MBase_type GufoParsed.MTypeInt }
+    { MBase_type MTypeInt }
   | FLOATTYPE
-    { GufoParsed.MBase_type GufoParsed.MTypeFloat }
+    { MBase_type MTypeFloat }
   | BOOLTYPE
-    { GufoParsed.MBase_type GufoParsed.MTypeBool }
+    { MBase_type MTypeBool }
   | CMDTYPE
-    { GufoParsed.MBase_type GufoParsed.MTypeCmd }
+    { MBase_type MTypeCmd }
   | internal_type = typedecl; LISTTYPE
-    { GufoParsed.MList_type internal_type }
+    { MList_type internal_type }
   | args = funargdecl ; 
     { 
       let rev_args = List.rev args in
       let ret_type = List.hd rev_args in
       let args = List.rev (List.tl rev_args) in
-      GufoParsed.MFun_type (args, ret_type) }
+      MFun_type (args, ret_type) }
   | name = modulVar
-    { GufoParsed.MRef_type name }
+    { MRef_type name }
   | first_tupel = typedecl ; DOUBLE_MINUS; tupel_suite= typetupelseq;
-    { GufoParsed.MTuple_type (first_tupel:: tupel_suite)}
+    { MTuple_type (first_tupel:: tupel_suite)}
   | tdec = typedecl; OPTIONTYPE; 
-    {GufoParsed.MOption_type tdec}
+    {MOption_type tdec}
   | tdec = typedecl ;SETTYPE
-    { GufoParsed.MSet_type tdec }
+    { MSet_type tdec }
   | OPEN_BRACKET; tdec = typedecl; COMMA; tdec2 = typedecl; CLOSE_BRACKET ;MAPTYPE
-    { GufoParsed.MMap_type (tdec, tdec2)}
+    { MMap_type (tdec, tdec2)}
 
 
 typedecl:
   | ft = FREETYPE;
-    {GufoParsed.MAll_type ft }
+    {MAll_type ft }
   | STRINGTYPE
-    { GufoParsed.MBase_type GufoParsed.MTypeString }
+    { MBase_type MTypeString }
   | INTTYPE
-    { GufoParsed.MBase_type GufoParsed.MTypeInt }
+    { MBase_type MTypeInt }
   | FLOATTYPE
-    { GufoParsed.MBase_type GufoParsed.MTypeFloat }
+    { MBase_type MTypeFloat }
   | BOOLTYPE
-    { GufoParsed.MBase_type GufoParsed.MTypeBool }
+    { MBase_type MTypeBool }
   | CMDTYPE
-    { GufoParsed.MBase_type GufoParsed.MTypeCmd }
+    { MBase_type MTypeCmd }
   | internal_type = typedecl; LISTTYPE
-    { GufoParsed.MList_type internal_type }
+    { MList_type internal_type }
   | name = modulVar
-    {GufoParsed.MRef_type name}
+    {MRef_type name}
   | OPEN_BRACKET; typ = toptypedecl ; CLOSE_BRACKET;
     { typ }
   ;
@@ -425,32 +430,32 @@ typetupelseq :
 
 leaf_expr: 
   | NONE
-    {GufoParsed.MSimple_val (GufoParsed.MNone_val)}
+    {MSimple_val (MNone_val)}
   | i = INT
-    {GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeIntVal i))}
+    {MSimple_val (MBase_val (MTypeIntVal i))}
   | s = STRING 
-    {GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeStringVal s))}
+    {MSimple_val (MBase_val (MTypeStringVal s))}
   | FALSE
-    {GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeBoolVal false))}
+    {MSimple_val (MBase_val (MTypeBoolVal false))}
   | TRUE
-    {GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeBoolVal true))}
+    {MSimple_val (MBase_val (MTypeBoolVal true))}
   | f = FLOAT
-    {GufoParsed.MSimple_val (GufoParsed.MBase_val (GufoParsed.MTypeFloatVal f))}
+    {MSimple_val (MBase_val (MTypeFloatVal f))}
   | MINUS_OPENING_CHEVRON; set = listSetEl; MINUS_CLOSING_CHEVRON
-    {let open GufoParsed in
+    {
       MSimple_val (MSet_val set)
     }
   | MINUS_OPENING_CHEVRON;  MINUS_CLOSING_CHEVRON
     {
-      GufoParsed.MSimple_val (GufoParsed.MSet_val [])
+      MSimple_val (MSet_val [])
     }
 
   | MINUS_OPENING_CHEVRON; COLON;   MINUS_CLOSING_CHEVRON
     {
-      GufoParsed.MSimple_val (GufoParsed.MMap_val[])
+      MSimple_val (MMap_val[])
     }
   | MINUS_OPENING_CHEVRON; map = mapEl; MINUS_CLOSING_CHEVRON
-    {let open GufoParsed in
+    {
       MSimple_val (MMap_val map)
     }
   |  cmdas = cmd_expr;
@@ -462,7 +467,7 @@ basic_expr:
   | res = leaf_expr 
     { res }
   | LET ; binding_name = var_tuple_decl ; argnames = funargs_top ; AFFECTATION ; binding_value = topvarassign; IN ; OPEN_BRACKET; body = topvarassign ; CLOSE_BRACKET;
-    {let open GufoParsed in 
+    { 
      let open GenUtils in
       MBind_val {mbd_name = binding_name; 
                   mbd_value = 
@@ -474,36 +479,36 @@ basic_expr:
                   }
     }
   | SOME;  varassign = varassign_in_expr;
-    {GufoParsed.MSimple_val (GufoParsed.MSome_val varassign)}
+    {MSimple_val (MSome_val varassign)}
   | IF ; cond = top_expr ; THEN; thn = top_expr ELSE; els = top_expr; 
-  {GufoParsed.MIf_val (cond, thn, els)}
+  {MIf_val (cond, thn, els)}
 
   | OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
-    {GufoParsed.MComposed_val GufoParsed.{mcv_module_def = None; mcv_fields=fds} }
+    {MComposed_val {mcv_module_def = None; mcv_fields=fds} }
   | md = MODUL;DOT ; OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
     {let open GenUtils in 
-    GufoParsed.MComposed_val 
-      GufoParsed.{mcv_module_def = Some (rm_first_char md); mcv_fields=fds} 
+    MComposed_val 
+      {mcv_module_def = Some (rm_first_char md); mcv_fields=fds} 
     }
   | comp = comp_expr; 
     {comp}
   |  envvar = ENVVAR; 
-     {GufoParsed.MEnvRef_val (GenUtils.rm_first_char envvar)}
+     {MEnvRef_val (GenUtils.rm_first_char envvar)}
   |  funcall = modulVar; funargs = funcallargs ; 
-     {GufoParsed.MRef_val (funcall, funargs)}
+     {MRef_val (funcall, funargs)}
   | op = operation ; 
     {op}
   | OPEN_SQRBRACKET ; CLOSE_SQRBRACKET
-      {GufoParsed.MSimple_val (GufoParsed.MList_val [])}
+      {MSimple_val (MList_val [])}
   | OPEN_SQRBRACKET ; lst = listSetEl; CLOSE_SQRBRACKET
-    {let open GufoParsed in
+    {
       MSimple_val (MList_val lst)
     }
   | OPEN_BRACKET; a = top_expr ;CLOSE_BRACKET;
     {a}
 (*
   | OPEN_BRACKET; funcall = modulVar; funargs = funcallargs ;CLOSE_BRACKET; funargs2 = funcallargs
-    {GufoParsed.MRef_val (funcall, List.append funargs funargs2 )}
+    {MRef_val (funcall, List.append funargs funargs2 )}
 
 *)
 
@@ -518,50 +523,50 @@ top_expr :
   | var = basic_expr
     {var}
   | var1 = varassign_in_expr ; DOUBLE_MINUS; seq=in_tuple_assign
-    { GufoParsed.MSimple_val (GufoParsed.MTuple_val  (var1 :: seq)) }
+    { MSimple_val (MTuple_val  (var1 :: seq)) }
 
 varassign_in_expr : 
   | a = leaf_expr
     {a}
   | OPEN_BRACKET; CLOSE_BRACKET;
-    { GufoParsed.MSimple_val (MEmpty_val) }
+    { MSimple_val (MEmpty_val) }
   | OPEN_BRACKET; a = top_expr ; CLOSE_BRACKET;
     {a}
     
   | OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
-    {GufoParsed.MComposed_val GufoParsed.{mcv_module_def = None; mcv_fields=fds} }
+    {MComposed_val {mcv_module_def = None; mcv_fields=fds} }
   | md = MODUL;DOT ; OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
     {let open GenUtils in 
-    GufoParsed.MComposed_val 
-      GufoParsed.{mcv_module_def = Some (rm_first_char md); mcv_fields=fds} 
+    MComposed_val 
+      {mcv_module_def = Some (rm_first_char md); mcv_fields=fds} 
     }
   | OPEN_SQRBRACKET ; CLOSE_SQRBRACKET
-      {GufoParsed.MSimple_val (GufoParsed.MList_val [])}
+      {MSimple_val (MList_val [])}
   | OPEN_SQRBRACKET ; lst = listSetEl; CLOSE_SQRBRACKET
-    {let open GufoParsed in
+    {
       MSimple_val (MList_val lst)
     }
   | var = modulVar; 
-     {GufoParsed.MRef_val (var, [])}
+     {MRef_val (var, [])}
 
 
 comp_expr :
   | expr1 = varassign_in_expr ; EQUALITY; expr2 = varassign_in_expr
-    {GufoParsed.MComp_val (GufoParsed.Egal, expr1, expr2) }
+    {MComp_val (Egal, expr1, expr2) }
   | expr1 = varassign_in_expr ; INEQUALITY; expr2 = varassign_in_expr
-    {GufoParsed.MComp_val (GufoParsed.NotEqual, expr1, expr2) }
+    {MComp_val (NotEqual, expr1, expr2) }
   | expr1 = varassign_in_expr ; CLOSING_CHEVRON ; expr2 = varassign_in_expr
-    {GufoParsed.MComp_val (GufoParsed.GreaterThan, expr1, expr2) }
+    {MComp_val (GreaterThan, expr1, expr2) }
   | expr1 = varassign_in_expr ; EQ_CLOSING_CHEVRON; expr2 = varassign_in_expr
-    {GufoParsed.MComp_val (GufoParsed.GreaterOrEq, expr1, expr2) }
+    {MComp_val (GreaterOrEq, expr1, expr2) }
   | expr1 = varassign_in_expr ; OPENING_CHEVRON ; expr2 = varassign_in_expr
-    {GufoParsed.MComp_val (GufoParsed.LessThan, expr1, expr2) }
+    {MComp_val (LessThan, expr1, expr2) }
   | expr1 = varassign_in_expr ; EQ_OPENING_CHEVRON; expr2 = varassign_in_expr
-    {GufoParsed.MComp_val (GufoParsed.LessOrEq, expr1, expr2) }
+    {MComp_val (LessOrEq, expr1, expr2) }
 
 anonymousfun: 
   | OPEN_BRACKET; FUN; args = funargs_top; ARROW;   body =topvarassign; CLOSE_BRACKET; 
-    {let open GufoParsed in 
+    { 
     MSimple_val (MFun_val (List.rev args, body))
     }
 
@@ -574,45 +579,45 @@ topvarassign :
 
 operation : 
   | OPEN_BRACKET; CLOSE_BRACKET;
-    { GufoParsed.MSimple_val (MEmpty_val) }
+    { MSimple_val (MEmpty_val) }
   | i1 = top_expr; PLUS_STR; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MConcatenation, [i1; i2])}
+    {MBasicFunBody_val (MConcatenation, [i1; i2])}
   | i1 = top_expr; PLUS; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MAddition, [i1; i2])}
+    {MBasicFunBody_val (MAddition, [i1; i2])}
   | i1 = top_expr; PLUS_DOT; i2 = top_expr 
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MAdditionFloat, [i1; i2])}
+    {MBasicFunBody_val (MAdditionFloat, [i1; i2])}
   | i1 = top_expr ; MINUS ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MSoustraction, [i1; i2])}
+    {MBasicFunBody_val (MSoustraction, [i1; i2])}
   | i1 = top_expr ; MINUS_DOT ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MSoustractionFloat, [i1; i2])}
+    {MBasicFunBody_val (MSoustractionFloat, [i1; i2])}
   | i1 = top_expr ; STAR ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MMultiplication, [i1; i2])}
+    {MBasicFunBody_val (MMultiplication, [i1; i2])}
   | i1 = top_expr ; STAR_DOT ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MMultiplicationFLoat, [i1; i2])}
+    {MBasicFunBody_val (MMultiplicationFLoat, [i1; i2])}
   | i1 = top_expr ; DIVISION ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MDivision , [i1; i2])}
+    {MBasicFunBody_val (MDivision , [i1; i2])}
   | i1 = top_expr ; DIVISION_DOT ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MDivisionFloat , [i1; i2])}
+    {MBasicFunBody_val (MDivisionFloat , [i1; i2])}
   | i1 = top_expr; MODULO ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MModulo, [i1; i2])}
+    {MBasicFunBody_val (MModulo, [i1; i2])}
   | i1 = top_expr; MODULO_DOT ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MModuloFloat, [i1; i2])}
+    {MBasicFunBody_val (MModuloFloat, [i1; i2])}
   | i1 = top_expr; WITH ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithList, [i1; i2])}
+    {MBasicFunBody_val (MWithList, [i1; i2])}
   | i1 = top_expr; WITH_SET ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithSet, [i1; i2])}
+    {MBasicFunBody_val (MWithSet, [i1; i2])}
   | i1 = top_expr; WITH_MAP ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithMap, [i1; i2])}
+    {MBasicFunBody_val (MWithMap, [i1; i2])}
   | i1 = top_expr; WITHOUT_SET ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithoutSet, [i1; i2])}
+    {MBasicFunBody_val (MWithoutSet, [i1; i2])}
   | i1 = top_expr; WITHOUT_MAP ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MWithoutMap, [i1; i2])}
+    {MBasicFunBody_val (MWithoutMap, [i1; i2])}
   | i1 = top_expr; SHAS ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MHasSet, [i1; i2])}
+    {MBasicFunBody_val (MHasSet, [i1; i2])}
   | i1 = top_expr; MHAS ; i2 = top_expr
-    {GufoParsed.MBasicFunBody_val (GufoParsed.MHasMap, [i1; i2])}
+    {MBasicFunBody_val (MHasMap, [i1; i2])}
   | assign1 = top_expr; DOUBLE_SEMICOLON ;assign2 = exprseqeassign; 
-    { GufoParsed.MBody_val (assign1 ::assign2)}
+    { MBody_val (assign1 ::assign2)}
 
 cmd_expr:
   |  cmdas = simple_cmd;
@@ -651,25 +656,25 @@ funargs_top:
   | varname = VARNAME; funargs = funargs_top;
     { 
       let open GenUtils in 
-      (GufoParsed.MBaseArg (rm_first_char varname)) ::funargs }
+      (MBaseArg (rm_first_char varname)) ::funargs }
   | OPEN_BRACKET ; subargs = funargs; CLOSE_BRACKET; funargs = funargs_top
-    { (GufoParsed.MTupleArg subargs) ::funargs }
+    { (MTupleArg subargs) ::funargs }
 
 funargs:
   | arg = VARNAME
     { 
       let open GenUtils in 
-      [GufoParsed.MBaseArg (rm_first_char arg)] }
+      [MBaseArg (rm_first_char arg)] }
   |  OPEN_BRACKET; arg = funargs ; CLOSE_BRACKET;
     { 
-      [GufoParsed.MTupleArg arg] }
+      [MTupleArg arg] }
   | arg = VARNAME ; DOUBLE_MINUS ; funargs = funargs
     { 
       let open GenUtils in 
-      (GufoParsed.MBaseArg (rm_first_char arg)):: funargs }
+      (MBaseArg (rm_first_char arg)):: funargs }
   | OPEN_BRACKET arg = funargs; CLOSE_BRACKET; DOUBLE_MINUS ; funargs = funargs
     { 
-      (GufoParsed.MTupleArg arg):: funargs }
+      (MTupleArg arg):: funargs }
 
 exprseqeassign:
   | var1 =varassign_in_expr
@@ -694,7 +699,6 @@ simple_cmd:
   | str_cmd = WORD; args = cmd_args; redirs = redirs; 
   | str_cmd = FILE; args = cmd_args; redirs = redirs; 
     {
-      let open GufoParsed in
       let stdout,stdouterr, stdin = List.fold_left 
         (fun (stdout, stdouterr, stdin) redir -> 
           match redir with 
@@ -719,13 +723,14 @@ simple_cmd:
                 mcm_input_src = stdin; 
                }
     in
-     GufoParsed.SimpleCmd cmd
+     SimpleCmd cmd
     }
 
 cmd_args :
   | arg = cmd_arg; args = cmd_args ; 
     {arg :: args}
   | {[]}
+
 
 cmd_arg :
   | arg = INT
@@ -758,6 +763,7 @@ redirs :
   | {[]}
   | redir = redir; redirs = redirs;  
     { List.concat [redir; redirs] }
+
 
 redir : 
   | CLOSING_CHEVRON; file = WORD;
@@ -799,7 +805,7 @@ redir :
 fields_assign:
   | { [] }
   | fields = fields_assign ; fieldname = WORD ; AFFECTATION; value=  topvarassign; COMMA
-    { GufoParsed.{mtfv_name = fieldname; mtfv_val = value} :: fields }
+    { {mtfv_name = fieldname; mtfv_val = value} :: fields }
   ;
 
 
@@ -807,19 +813,19 @@ modulVar:
   | var = VARNAME; idx = lst_index; 
     {
       let open GenUtils in 
-      GufoParsed.{mrv_module = None; mrv_varname= [(rm_first_char var)]; mrv_index = idx}}
+      {mrv_module = None; mrv_varname= [(rm_first_char var)]; mrv_index = idx}}
   |  varfield = VARFIELD; idx = lst_index; 
     {
      let open GenUtils in 
      let lst = Str.split (Str.regexp "\\.") (rm_first_char varfield)  in
-    GufoParsed.{mrv_module = None; mrv_varname= lst ; mrv_index = idx}
+    {mrv_module = None; mrv_varname= lst ; mrv_index = idx}
     }
   | var = MODULVAR; idx = lst_index; 
     {
     let open GenUtils in 
     let lst = Str.split (Str.regexp "\\.") (rm_first_char var) in
     let (modul, lst) = (List.hd lst, List.tl lst) in
-      GufoParsed.{mrv_module = Some modul; mrv_varname= lst ; mrv_index = idx}
+      {mrv_module = Some modul; mrv_varname= lst ; mrv_index = idx}
     }
 
 lst_index:
@@ -848,9 +854,9 @@ mapEl:
 
 modulVarOrExpr:
   | a = ENVVAR
-    {GufoParsed.MEnvRef_val (GenUtils.rm_first_char a)}
+    {MEnvRef_val (GenUtils.rm_first_char a)}
   | a = modulVar
-    {GufoParsed.MRef_val (a,[])}
+    {MRef_val (a,[])}
   | OPEN_BRACKET ; varassign = top_expr; CLOSE_BRACKET;
     { varassign }
 
