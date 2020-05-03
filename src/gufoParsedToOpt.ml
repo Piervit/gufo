@@ -2069,7 +2069,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
   
   and parsedToOpt_cmd_val ?topvar:(topvar = None) optiprog locScope cseq = 
     {
-      mocm_cmd = cseq.mcm_cmd;
+      mocm_cmd = cseq.mcm_cmd.loc_val;
       mocm_args = List.map (parsedToOpt_stringOrRef ~topvar optiprog locScope) cseq.mcm_args;
       mocm_output = parsedToOpt_cmd_output ~topvar optiprog locScope cseq.mcm_output;
       mocm_outputerr = parsedToOpt_cmd_outputerr ~topvar optiprog locScope cseq.mcm_outputerr;

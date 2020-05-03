@@ -696,8 +696,8 @@ in_tuple_assign:
 
 
 simple_cmd:
-  | str_cmd = WORD; args = cmd_args; redirs = redirs; 
-  | str_cmd = FILE; args = cmd_args; redirs = redirs; 
+  | str_cmd = located(WORD); args = cmd_args; redirs = redirs; 
+  | str_cmd = located(FILE); args = cmd_args; redirs = redirs; 
     {
       let stdout,stdouterr, stdin = List.fold_left 
         (fun (stdout, stdouterr, stdin) redir -> 

@@ -90,7 +90,7 @@ and mstringOrRef_val =
   | SORExpr of mtype_val located
 
 and mcmd_val = {
-  mcm_cmd : string;
+  mcm_cmd : string located;
   mcm_args : mstringOrRef_val list;
   mcm_output : mcmd_output; 
   mcm_outputerr : mcmd_outputerr; 

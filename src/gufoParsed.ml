@@ -90,7 +90,7 @@ and mstringOrRef_val =
   | SORExpr of mtype_val located
 
 and mcmd_val = {
-  mcm_cmd : string;
+  mcm_cmd : string located;
   mcm_args : mstringOrRef_val list;
   mcm_output : mcmd_output; 
   mcm_outputerr : mcmd_outputerr; 
@@ -426,7 +426,7 @@ let rec print_stringOrRef s =
 
 and dump_cmd_val cmdval = 
   let dump_cmd cmd = 
-    print_string cmd.mcm_cmd; 
+    print_string cmd.mcm_cmd.loc_val; 
     print_space ();
     List.iter (fun a -> 
         match a with 
