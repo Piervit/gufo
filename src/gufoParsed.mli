@@ -87,7 +87,7 @@ and mcmd_input =
 
 and mstringOrRef_val =
   | SORString of string located
-  | SORExpr of mtype_val
+  | SORExpr of mtype_val located
 
 and mcmd_val = {
   mcm_cmd : string;

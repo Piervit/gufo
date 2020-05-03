@@ -775,7 +775,7 @@ cmd_arg :
         loc_pos = t.loc_pos;
       }
     }
-  | arg = modulVarOrExpr
+  | arg = located(modulVarOrExpr)
     { 
       SORExpr arg;
     }
@@ -806,34 +806,34 @@ redir :
   | CLOSING_CHEVRON; file = located(WORD);
   | CLOSING_CHEVRON; file = located(FILE);
     { [MRedirOFile (SORString file)] }
-  | CLOSING_CHEVRON; file = modulVarOrExpr;
+  | CLOSING_CHEVRON; file = located (modulVarOrExpr);
     { [MRedirOFile (SORExpr file)] }
   | DOUBLE_CLOSING_CHEVRON; file = located(WORD)
   | DOUBLE_CLOSING_CHEVRON; file = located(FILE)
     { [MRedirOFileAppend (SORString file)] }
-  | DOUBLE_CLOSING_CHEVRON; file = modulVarOrExpr
+  | DOUBLE_CLOSING_CHEVRON; file = located (modulVarOrExpr)
     { [MRedirOFileAppend (SORExpr file)] }
   | WRITE_ERROR_TO; file = located(WORD)
   | WRITE_ERROR_TO; file = located(FILE)
     { [MRedirEFile (SORString file)] }
-  | WRITE_ERROR_TO; file = modulVarOrExpr
+  | WRITE_ERROR_TO; file = located(modulVarOrExpr)
     { [MRedirEFile (SORExpr file)] }
   | WRITE_ERROR_NEXT_TO; file = located(WORD)
   | WRITE_ERROR_NEXT_TO; file = located(FILE)
     { [MRedirEFileAppend (SORString file)] }
-  | WRITE_ERROR_NEXT_TO; file = modulVarOrExpr
+  | WRITE_ERROR_NEXT_TO; file = located(modulVarOrExpr)
     { [MRedirEFileAppend (SORExpr file)] }
   | WRITE_ERROR_TO_STD
     { [MRedirEStdOut] }
   | WRITE_ALL_TO ; file  = located(WORD)
   | WRITE_ALL_TO ; file  = located(FILE)
     { [MRedirOFile (SORString file); MRedirEFile (SORString file)] }
-  | WRITE_ALL_TO ; file  = modulVarOrExpr
+  | WRITE_ALL_TO ; file  = located(modulVarOrExpr)
     { [MRedirOFile (SORExpr file); MRedirEFile (SORExpr file)] }
   | OPENING_CHEVRON; file = located(WORD)
   | OPENING_CHEVRON; file = located(FILE)
     { [MRedirIFile (SORString file)] }
-  | OPENING_CHEVRON; file = modulVarOrExpr
+  | OPENING_CHEVRON; file = located(modulVarOrExpr)
     { [MRedirIFile (SORExpr file)] }
 
 (******* CMD PARSING END ********)

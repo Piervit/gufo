@@ -2045,7 +2045,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
   and parsedToOpt_stringOrRef ?topvar:(topvar = None) optiprog locScope sor = 
     match sor with 
     | SORString s -> MOSORString s.loc_val
-    | SORExpr tval -> MOSORExpr (parsedToOpt_expr ~topvar optiprog locScope tval)
+    | SORExpr tval -> MOSORExpr (parsedToOpt_expr ~topvar optiprog locScope tval.loc_val)
   
   and parsedToOpt_cmd_output ?topvar:(topvar = None) optiprog locScope cout = 
     match cout with 

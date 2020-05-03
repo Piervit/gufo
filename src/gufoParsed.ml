@@ -87,7 +87,7 @@ and mcmd_input =
 
 and mstringOrRef_val =
   | SORString of string located
-  | SORExpr of mtype_val
+  | SORExpr of mtype_val located
 
 and mcmd_val = {
   mcm_cmd : string;
@@ -421,8 +421,8 @@ let print_loc locpos =
 
 let rec print_stringOrRef s = 
   match s with
-    | SORString ls -> print_string ls.loc_val; print_loc ls.loc_pos
-    | SORExpr s -> dump_mtype_val s
+    | SORString ls -> print_string ls.loc_val 
+    | SORExpr s -> dump_mtype_val s.loc_val
 
 and dump_cmd_val cmdval = 
   let dump_cmd cmd = 
@@ -430,8 +430,8 @@ and dump_cmd_val cmdval =
     print_space ();
     List.iter (fun a -> 
         match a with 
-          | SORString a -> print_string a.loc_val;print_loc a.loc_pos; print_space ()
-          | SORExpr a -> dump_mtype_val a; print_space ())
+          | SORString a -> print_string a.loc_val; print_space ()
+          | SORExpr a -> dump_mtype_val a.loc_val; print_space ())
       cmd.mcm_args;
     (match cmd.mcm_output with 
       | MCMDOStdErr -> print_string ">& "

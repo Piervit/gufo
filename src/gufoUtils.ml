@@ -90,7 +90,7 @@ open GufoParsed
               let fold_in_stringOrRef acc sor = 
                 match sor with
                   | SORString _ -> acc
-                  | SORExpr e -> fold_over_composed_type_val apply_fun acc e
+                  | SORExpr e -> fold_over_composed_type_val apply_fun acc e.loc_val
               in
               let acc = List.fold_left (fun acc arg -> fold_in_stringOrRef acc arg) acc cmd.mcm_args
               in
@@ -162,7 +162,7 @@ open GufoParsed
               let fold_in_stringOrRef acc sor = 
                 match sor with
                   | SORString _ -> acc
-                  | SORExpr e -> fold_over_mref_val apply_fun acc e
+                  | SORExpr e -> fold_over_mref_val apply_fun acc e.loc_val
               in
               let acc = List.fold_left (fun acc arg -> fold_in_stringOrRef acc arg) acc cmd.mcm_args
               in
@@ -260,7 +260,7 @@ open GufoParsed
               let fold_in_stringOrRef acc sor = 
                 match sor with
                   | SORString _ -> acc
-                  | SORExpr e -> fold_over_binding_val apply_fun acc e
+                  | SORExpr e -> fold_over_binding_val apply_fun acc e.loc_val
               in
               let acc = List.fold_left (fun acc arg -> fold_in_stringOrRef acc arg) acc cmd.mcm_args
               in
