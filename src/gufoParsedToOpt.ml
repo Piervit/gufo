@@ -2104,12 +2104,12 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
   
   and parsedToOpt_base_val ?topvar:(topvar = None) optiprog locScope bv = 
     match bv with
-      | MTypeStringVal s -> MOTypeStringVal s
-      | MTypeBoolVal b -> MOTypeBoolVal b
-      | MTypeIntVal i -> MOTypeIntVal i
-      | MTypeFloatVal f-> MOTypeFloatVal f
+      | MTypeStringVal s -> MOTypeStringVal s.loc_val
+      | MTypeBoolVal b -> MOTypeBoolVal b.loc_val
+      | MTypeIntVal i -> MOTypeIntVal i.loc_val
+      | MTypeFloatVal f-> MOTypeFloatVal f.loc_val
       | MTypeCmdVal cseq -> 
-          MOTypeCmdVal (parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq)
+          MOTypeCmdVal (parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq.loc_val)
   
   and parsedToOpt_funarg nameMap locScope funarg =
    match funarg with  
@@ -2136,9 +2136,9 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
     | MBase_val bv -> 
         MOBase_val (parsedToOpt_base_val ~topvar optiprog locScope bv)
     | MTuple_val tup -> 
-        MOTuple_val (List.map (parsedToOpt_expr ~topvar optiprog locScope) tup)
+        MOTuple_val (List.map (fun v -> parsedToOpt_expr ~topvar optiprog locScope v.loc_val) tup)
     | MList_val lst -> 
-        MOList_val (List.map (parsedToOpt_expr ~topvar optiprog locScope) lst)
+        MOList_val (List.map (fun v -> parsedToOpt_expr ~topvar optiprog locScope v.loc_val) lst)
     | MNone_val -> MONone_val
     | MSome_val s -> 
         MOSome_val (parsedToOpt_expr ~topvar optiprog locScope s)
@@ -2147,7 +2147,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
           List.fold_left 
             (fun set el -> 
               MSet.add (core_to_simple_val
-                        (parsedToOpt_expr ~topvar optiprog locScope el)) set
+                        (parsedToOpt_expr ~topvar optiprog locScope el.loc_val)) set
             ) 
             MSet.empty slst
         in MOSet_val set

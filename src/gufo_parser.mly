@@ -431,15 +431,24 @@ typetupelseq :
 leaf_expr: 
   | NONE
     {MSimple_val (MNone_val)}
-  | i = INT
+  | i = located(INT)
     {MSimple_val (MBase_val (MTypeIntVal i))}
-  | s = STRING 
+  | s = located(STRING)
     {MSimple_val (MBase_val (MTypeStringVal s))}
-  | FALSE
-    {MSimple_val (MBase_val (MTypeBoolVal false))}
-  | TRUE
-    {MSimple_val (MBase_val (MTypeBoolVal true))}
-  | f = FLOAT
+
+  | f = located(FALSE)
+    {MSimple_val (MBase_val (MTypeBoolVal 
+        {
+          loc_val = false;
+          loc_pos = f.loc_pos;
+        }))}
+  | t = located (TRUE)
+    {MSimple_val (MBase_val (MTypeBoolVal 
+        {
+          loc_val = true;
+          loc_pos = t.loc_pos;
+        }))}
+  | f = located (FLOAT)
     {MSimple_val (MBase_val (MTypeFloatVal f))}
   | MINUS_OPENING_CHEVRON; set = listSetEl; MINUS_CLOSING_CHEVRON
     {
@@ -458,7 +467,7 @@ leaf_expr:
     {
       MSimple_val (MMap_val map)
     }
-  |  cmdas = cmd_expr;
+  |  cmdas = located(cmd_expr);
     { MSimple_val (MBase_val (MTypeCmdVal cmdas)) }
   |  anonf = anonymousfun ; 
     {anonf}
@@ -522,7 +531,7 @@ basic_expr:
 top_expr : 
   | var = basic_expr
     {var}
-  | var1 = varassign_in_expr ; DOUBLE_MINUS; seq=in_tuple_assign
+  | var1 = located(varassign_in_expr) ; DOUBLE_MINUS; seq=in_tuple_assign
     { MSimple_val (MTuple_val  (var1 :: seq)) }
 
 varassign_in_expr : 
@@ -687,9 +696,9 @@ tupleassign:
     {var1}
 
 in_tuple_assign:
-  | var1 =varassign_in_expr
+  | var1 =located(varassign_in_expr)
     {[var1]}
-  | var1 = varassign_in_expr; DOUBLE_MINUS; seq=in_tuple_assign
+  | var1 = located(varassign_in_expr); DOUBLE_MINUS; seq=in_tuple_assign
     {var1 :: seq}
 
 (******* CMD PARSING ********)
@@ -876,9 +885,9 @@ lst_index:
 
 
 listSetEl:
-  | el = top_expr;
+  | el = located(top_expr);
     {[el]}
-  | el = top_expr; COMMA; lst = listSetEl;
+  | el = located(top_expr); COMMA; lst = listSetEl;
     {el::lst}
 
 mapEl:

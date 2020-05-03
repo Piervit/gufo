@@ -117,11 +117,11 @@ and mbase_type =
   | MTypeCmd
 
 and mbase_type_val = 
-  | MTypeStringVal of string
-  | MTypeBoolVal of bool
-  | MTypeIntVal of int
-  | MTypeFloatVal of float
-  | MTypeCmdVal of mcmd_seq
+  | MTypeStringVal of string located
+  | MTypeBoolVal of bool located
+  | MTypeIntVal of int located
+  | MTypeFloatVal of float located
+  | MTypeCmdVal of mcmd_seq located
 (*      | MTypeFileVal of mfile_val *) 
 
 and mtype_field = {
@@ -179,12 +179,12 @@ and msimple_type =
 
 and msimple_type_val = 
   | MBase_val of mbase_type_val 
-  | MTuple_val of mtype_val list
-  | MList_val of mtype_val list
+  | MTuple_val of mtype_val located list
+  | MList_val of mtype_val located list
   | MEmpty_val
   | MNone_val 
   | MSome_val of mtype_val
-  | MSet_val of  mtype_val list
+  | MSet_val of  mtype_val located list
   | MMap_val of (mtype_val * mtype_val) list (*(key * value list ) Type info will come next. *)
   | MFun_val of mfunarg list * mtype_val (* args name * body_expr *)
 

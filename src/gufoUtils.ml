@@ -42,14 +42,14 @@ open GufoParsed
         | MNone_val -> acc
         | MBase_val bv -> 
             (match bv with 
-              | MTypeCmdVal cseq -> fold_over_cmd_val_from_cmdseq apply_fun acc cseq 
+              | MTypeCmdVal cseq -> fold_over_cmd_val_from_cmdseq apply_fun acc cseq.loc_val 
               | MTypeStringVal _ | MTypeBoolVal _ | MTypeIntVal _ | MTypeFloatVal _ -> acc
             )
         | MEmpty_val -> acc
         | MList_val mtyplst
         | MSet_val mtyplst
         | MTuple_val mtyplst ->
-            List.fold_left (fold_over_cmd_val apply_fun) acc mtyplst
+            List.fold_left (fun acc v -> fold_over_cmd_val apply_fun acc v.loc_val) acc mtyplst
         | MFun_val (_, mtype) 
         | MSome_val mtype -> fold_over_cmd_val apply_fun acc mtype
         | MMap_val keyValLst ->
@@ -114,13 +114,13 @@ open GufoParsed
                  | MCMDIFile sor -> fold_in_stringOrRef acc sor
               in acc
             in
-            fold_over_cmd_val_from_cmdseq cmd_apply_fun acc cmdseq
+            fold_over_cmd_val_from_cmdseq cmd_apply_fun acc cmdseq.loc_val
         | MBase_val _ -> acc
         | MEmpty_val -> acc
         | MList_val mtypelst
         | MSet_val mtypelst
         | MTuple_val mtypelst ->
-            List.fold_left (fold_over_composed_type_val apply_fun) acc mtypelst
+            List.fold_left (fun acc v -> fold_over_composed_type_val apply_fun acc v.loc_val) acc mtypelst
         | MFun_val (_, mtype) 
         | MSome_val mtype -> fold_over_composed_type_val apply_fun acc mtype
         | MMap_val keyValLst ->
@@ -186,12 +186,12 @@ open GufoParsed
                  | MCMDIFile sor -> fold_in_stringOrRef acc sor
               in acc
             in
-            fold_over_cmd_val_from_cmdseq cmd_apply_fun acc cmdseq
+            fold_over_cmd_val_from_cmdseq cmd_apply_fun acc cmdseq.loc_val
         | MBase_val _ -> acc
         | MList_val mtypelst
         | MSet_val mtypelst
         | MTuple_val mtypelst ->
-            List.fold_left (fold_over_mref_val apply_fun) acc mtypelst
+            List.fold_left (fun acc v -> fold_over_mref_val apply_fun acc v.loc_val) acc mtypelst
         | MFun_val (_, mtype) 
         | MSome_val mtype -> fold_over_mref_val apply_fun acc mtype
         | MMap_val keyValLst ->
@@ -284,12 +284,12 @@ open GufoParsed
                  | MCMDIFile sor -> fold_in_stringOrRef acc sor
               in acc
             in
-            fold_over_cmd_val_from_cmdseq cmd_apply_fun acc cmdseq
+            fold_over_cmd_val_from_cmdseq cmd_apply_fun acc cmdseq.loc_val
         | MBase_val _ -> acc
         | MList_val mtypelst
         | MSet_val mtypelst
         | MTuple_val mtypelst ->
-            List.fold_left (fold_over_binding_val apply_fun) acc mtypelst
+            List.fold_left (fun acc v -> fold_over_binding_val apply_fun acc v.loc_val) acc mtypelst
         | MFun_val (_, mtype) 
         | MSome_val mtype -> fold_over_binding_val apply_fun acc mtype
         | MMap_val keyValLst ->

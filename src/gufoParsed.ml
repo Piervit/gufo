@@ -117,11 +117,11 @@ and mbase_type =
   | MTypeCmd
 
 and mbase_type_val = 
-  | MTypeStringVal of string
-  | MTypeBoolVal of bool
-  | MTypeIntVal of int
-  | MTypeFloatVal of float
-  | MTypeCmdVal of mcmd_seq
+  | MTypeStringVal of string located
+  | MTypeBoolVal of bool located
+  | MTypeIntVal of int located
+  | MTypeFloatVal of float located
+  | MTypeCmdVal of mcmd_seq located
 (*      | MTypeFileVal of mfile_val *) 
 
 and mtype_field = {
@@ -172,12 +172,12 @@ and msimple_type =
 
 and msimple_type_val = 
   | MBase_val of mbase_type_val 
-  | MTuple_val of mtype_val list
-  | MList_val of mtype_val list
+  | MTuple_val of mtype_val located list
+  | MList_val of mtype_val located list
   | MEmpty_val
   | MNone_val 
   | MSome_val of mtype_val
-  | MSet_val of  mtype_val list
+  | MSet_val of  mtype_val located list
   | MMap_val of (mtype_val * mtype_val) list (*(key * value list ) Type info will come next. *)
   | MFun_val of mfunarg list * mtype_val (* args name * body_expr *)
 
@@ -412,9 +412,9 @@ let print_loc locpos =
   let str_pos = 
     Printf.sprintf "Starting at line %d char %d until line %d char %d" 
                     locpos.ppos_start.pos_lnum 
-                    locpos.ppos_start.pos_cnum
+                    (locpos.ppos_start.pos_cnum - locpos.ppos_start.pos_bol)
                     locpos.ppos_end.pos_lnum
-                    locpos.ppos_end.pos_cnum
+                    (locpos.ppos_end.pos_cnum - locpos.ppos_end.pos_bol)
   in 
   print_string str_pos
 
@@ -430,7 +430,7 @@ and dump_cmd_val cmdval =
     print_space ();
     List.iter (fun a -> 
         match a with 
-          | SORString a -> print_string a.loc_val; print_space ()
+          | SORString a -> print_string a.loc_val;  print_space ()
           | SORExpr a -> dump_mtype_val a.loc_val; print_space ())
       cmd.mcm_args;
     (match cmd.mcm_output with 
@@ -455,7 +455,7 @@ and dump_cmd_val cmdval =
     print_string "(" ; dump_cmd_val operand1; print_string symbol; dump_cmd_val operand2; print_string ")"
   in
   match cmdval with
-    | SimpleCmd cmdval -> dump_cmd cmdval.loc_val
+    | SimpleCmd cmdval -> dump_cmd cmdval.loc_val ; print_space () ; print_loc cmdval.loc_pos; print_space ()
     | ForkedCmd cmdval -> dump_cmd_val cmdval.loc_val; print_string " & "
     | AndCmd (cmdval1, cmdval2)-> dump_2op " && " cmdval1.loc_val cmdval2.loc_val
     | OrCmd (cmdval1, cmdval2)-> dump_2op " || " cmdval1.loc_val cmdval2.loc_val
@@ -487,28 +487,29 @@ and dump_cmd_val cmdval =
          |  MSome_val v->
            print_string "some"; dump_mtype_val v; print_space () 
          | MBase_val MTypeStringVal v ->
-         print_string v; print_space () 
-         | MBase_val MTypeBoolVal true ->
-         print_string "True"; print_space () 
-         | MBase_val MTypeBoolVal false ->
-         print_string "False"; print_space () 
+         print_string v.loc_val; print_space () 
+         | MBase_val MTypeBoolVal b ->
+            (match b.loc_val with
+              | true -> print_string "True"; print_space () 
+              | false -> print_string "False"; print_space () 
+            )
          | MBase_val MTypeIntVal v ->
-         print_int v ; print_space () 
+         print_int v.loc_val ; print_space () 
          | MBase_val MTypeFloatVal v -> 
-         print_float v ; print_space () 
+         print_float v.loc_val ; print_space () 
          | MBase_val MTypeCmdVal v ->
-         dump_cmd_val v 
+         dump_cmd_val v.loc_val 
          | MTuple_val lvals ->
            print_string "tuple [ ";
-           List.iter dump_mtype_val lvals;
+           List.iter (fun v -> dump_mtype_val v.loc_val) lvals;
            print_string "] "
          | MList_val lvals ->
            print_string "list [ ";
-           List.iter (fun arg -> dump_mtype_val arg; print_string ", ") lvals;
+           List.iter (fun arg -> dump_mtype_val arg.loc_val; print_string ", ") lvals;
            print_string "] "
          | MSet_val vals ->
            print_string "set [ ";
-           List.iter (fun arg -> dump_mtype_val arg; print_string ", ") vals;
+           List.iter (fun arg -> dump_mtype_val arg.loc_val; print_string ", ") vals;
            print_string "] ";
          | MMap_val vals ->
            print_string "map[ ";
