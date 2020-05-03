@@ -1,89 +1,77 @@
-(* Lexer / parser integration from
- * https://github.com/unhammer/ocaml_cg_streamparse/blob/match-singlechar-example/sedlex_menhir.ml
- * *)
+(*
+  This file is part of Gufo.
 
+    Gufo is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-(** The state of the parser, a stream and a position. *)
-type lexbuf = {
-  stream : Sedlexing.lexbuf ;
-  mutable pos : Lexing.position ;
-}
+    Gufo is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
 
-(** Initialize with the null position. *)
-let create_lexbuf ?(file="") stream =
-  let pos = {Lexing.
-    pos_fname = file;
-    pos_lnum = 1; (* Start lines at 1, not 0 *)
-    pos_bol = 0;
-    pos_cnum = 0;
-  }
-  in { pos ; stream }
+    You should have received a copy of the GNU General Public License
+    along with Gufo. If not, see <http://www.gnu.org/licenses/>. 
 
-(** Register a new line in the lexer's position. *)
-let new_line ?(n=0) lexbuf =
-  let open Lexing in
-  let lcp = lexbuf.pos in
-  lexbuf.pos <-
-    {lcp with
-       pos_lnum = lcp.pos_lnum + 1;
-       pos_bol = lcp.pos_cnum;
-    }
+    Author: Pierre Vittet
+*)
+ 
+  
+(** [ParseError (file, line_start, line_end , col_start, col_end , token, reason)] *)
+exception ParseError of (string * int * int * int * int * string * string option)
 
-(** Update the position with the stream. *)
-let update lexbuf =
-  let new_pos = Sedlexing.lexeme_end lexbuf.stream in
-  let p = lexbuf.pos in
-  lexbuf.pos <- {p with Lexing.pos_cnum = new_pos }
-
-(** The last matched word. *)
-let lexeme { stream } = Sedlexing.Utf8.lexeme stream
-
-
-(** [ParseError (file, line, col, token, reason)] *)
-exception ParseError of (string * int * int * string * string option)
-
-
-let string_of_ParseError (file, line, cnum, tok, reason) =
+let string_of_ParseError (file, line_start, line_end, col_start, col_end , tok, reason) =
   let file_to_string file =
     if file = "" then ""
     else " on file " ^ file
   in
+  
   match reason with
     | None -> 
-  Printf.sprintf
-        "Parse error%s line %i, column %i, token %s"
+        Printf.sprintf
+        "Parse error%s starting at line %i column %i until line %i column %i , token %s"
         (file_to_string file)
-        line cnum tok 
+        line_start col_start line_end col_end tok 
     | Some reason -> 
         Printf.sprintf
-        "Parse error%s line %i, column %i, token %s: %s"
+        "Parse error%s starting at line %i column %i until line %i column %i , token %s: %s"
         (file_to_string file)
-        line cnum tok reason
+        line_start col_start line_end col_end tok reason
+
+
 
 let raise_ParseError lexbuf =
-  let { pos } = lexbuf in
-  let tok = lexeme lexbuf in
+  let tok = Sedlexing.Utf8.lexeme lexbuf in
   let open Lexing in
-  let line = pos.pos_lnum in
-  let col = pos.pos_cnum - pos.pos_bol in
-  raise @@ ParseError (pos.pos_fname, line, col, tok, None)
+  let (start_pos, end_pos) = Sedlexing.lexing_positions lexbuf in 
+  raise @@ ParseError (start_pos.pos_fname, 
+                       start_pos.pos_lnum, 
+                       end_pos.pos_lnum,
+                       start_pos.pos_cnum,
+                       end_pos.pos_cnum, 
+                       tok, None)
+
 
 let raise_ParseErrorWithMsg lexbuf msg =
-  let { pos } = lexbuf in
-  let tok = lexeme lexbuf in
+  let tok = Sedlexing.Utf8.lexeme lexbuf in
   let open Lexing in
-  let line = pos.pos_lnum in
-  let col = pos.pos_cnum - pos.pos_bol in
-  raise @@ ParseError (pos.pos_fname, line, col, tok, Some msg)
+  let (start_pos, end_pos) = Sedlexing.lexing_positions lexbuf in
+  raise @@ ParseError (start_pos.pos_fname, 
+                       start_pos.pos_lnum, 
+                       end_pos.pos_lnum,
+                       start_pos.pos_cnum,
+                       end_pos.pos_cnum, 
+                       tok, Some msg)
 
 
 
 let sedlex_with_menhir lexer parseur lexbuf =
   let thelexer () =
-    let ante_position = lexbuf.pos in
-    let token = lexer lexbuf in
-    let post_position = lexbuf.pos
-    in (token, ante_position, post_position) in
+(*     let ante_position = lexbuf.pos in *)
+    let token, (pos_start, pos_end) = lexer lexbuf in
+    (token, pos_start, pos_end) 
+  in
   let parser =
     MenhirLib.Convert.Simplified.traditional2revised parseur
   in
@@ -94,6 +82,4 @@ let sedlex_with_menhir lexer parseur lexbuf =
     | Sedlexing.MalFormed
     | Sedlexing.InvalidCodepoint _
 -> raise_ParseError lexbuf
-
-
 

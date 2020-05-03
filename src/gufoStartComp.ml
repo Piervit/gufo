@@ -29,8 +29,7 @@ open GenUtils
 let parse_shell content = 
   debug_info (debug_title1 "Start converting file to a gufo program.");
   try(
-    let lexbuf = create_lexbuf (Sedlexing.Utf8.from_stream (Stream.of_string content)) in
-    let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.shell lexbuf in
+    let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.shell (Sedlexing.Utf8.from_stream (Stream.of_string content)) in
   
     match prog with
       | Some _ -> 
@@ -46,7 +45,6 @@ let parse_shell content =
 
 let parse_file filename =
         let inx = open_in filename in
-        let lexbuf = create_lexbuf ~file:filename (Sedlexing.Utf8.from_channel inx) in
-        let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.prog lexbuf in
+        let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.prog (Sedlexing.Utf8.from_channel inx) in
         close_in inx;
         prog

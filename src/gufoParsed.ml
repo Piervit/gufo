@@ -29,6 +29,24 @@ exception InternalError of string
 exception UncatchedError of string
 exception RuntimeError of string
 
+type lexing_position = Stdlib.Lexing.position = {
+  pos_fname : string ;
+  pos_lnum  : int ;
+  pos_bol   : int ;
+  pos_cnum  : int ;
+}
+
+type pars_position = {
+  ppos_start : lexing_position;
+  ppos_end : lexing_position;
+}
+
+
+and 'a located = {
+    loc_val : 'a ;
+    loc_pos : pars_position;
+}
+
 
 type mvar = {
   mva_name: var_decl ; 
@@ -68,7 +86,7 @@ and mcmd_input =
   | MCMDIFile of mstringOrRef_val (*path*)
 
 and mstringOrRef_val =
-  | SORString of string
+  | SORString of string located
   | SORExpr of mtype_val
 
 and mcmd_val = {
@@ -390,10 +408,21 @@ let rec dump_mtype mytype =
     close_box ()
 
 
+let print_loc locpos = 
+  let str_pos = 
+    Printf.sprintf "Starting at line %d char %d until line %d char %d" 
+                    locpos.ppos_start.pos_lnum 
+                    locpos.ppos_start.pos_cnum
+                    locpos.ppos_end.pos_lnum
+                    locpos.ppos_end.pos_cnum
+  in 
+  print_string str_pos
+
+
 let rec print_stringOrRef s = 
   match s with
-    | SORString s -> print_string s 
-    | SORExpr s -> dump_var_val s
+    | SORString ls -> print_string ls.loc_val; print_loc ls.loc_pos
+    | SORExpr s -> dump_mtype_val s
 
 and dump_cmd_val cmdval = 
   let dump_cmd cmd = 
@@ -401,8 +430,8 @@ and dump_cmd_val cmdval =
     print_space ();
     List.iter (fun a -> 
         match a with 
-          | SORString a -> print_string a; print_space ()
-          | SORExpr a -> dump_var_val a; print_space ())
+          | SORString a -> print_string a.loc_val;print_loc a.loc_pos; print_space ()
+          | SORExpr a -> dump_mtype_val a; print_space ())
       cmd.mcm_args;
     (match cmd.mcm_output with 
       | MCMDOStdErr -> print_string ">& "
@@ -439,11 +468,11 @@ and dump_cmd_val cmdval =
           print_string "(";
           List.iter (fun arg -> dump_arg arg; print_string " -- ") arglst;
           print_string ")"
-  and dump_var_val varval = 
+  and dump_mtype_val varval = 
     let print_call op args = 
       print_string "( ";
               print_string op;
-              List.iter (fun arg -> print_string " "; dump_var_val arg) args;
+              List.iter (fun arg -> print_string " "; dump_mtype_val arg) args;
               print_string " ) ";
     in
     (match varval with
@@ -456,7 +485,7 @@ and dump_cmd_val cmdval =
          |  MNone_val ->
            print_string "none"; print_space () 
          |  MSome_val v->
-           print_string "some"; dump_var_val v; print_space () 
+           print_string "some"; dump_mtype_val v; print_space () 
          | MBase_val MTypeStringVal v ->
          print_string v; print_space () 
          | MBase_val MTypeBoolVal true ->
@@ -471,26 +500,26 @@ and dump_cmd_val cmdval =
          dump_cmd_val v 
          | MTuple_val lvals ->
            print_string "tuple [ ";
-           List.iter dump_var_val lvals;
+           List.iter dump_mtype_val lvals;
            print_string "] "
          | MList_val lvals ->
            print_string "list [ ";
-           List.iter (fun arg -> dump_var_val arg; print_string ", ") lvals;
+           List.iter (fun arg -> dump_mtype_val arg; print_string ", ") lvals;
            print_string "] "
          | MSet_val vals ->
            print_string "set [ ";
-           List.iter (fun arg -> dump_var_val arg; print_string ", ") vals;
+           List.iter (fun arg -> dump_mtype_val arg; print_string ", ") vals;
            print_string "] ";
          | MMap_val vals ->
            print_string "map[ ";
-           List.iter (fun (key,aval) -> dump_var_val key ;print_string ": ";dump_var_val aval; print_string ", ") vals;
+           List.iter (fun (key,aval) -> dump_mtype_val key ;print_string ": ";dump_mtype_val aval; print_string ", ") vals;
            print_string "] ";
 
          | MFun_val (fargs, fexpr) ->
            print_string "fun ";
            List.iter dump_arg fargs;
            print_string "= ";
-           dump_var_val fexpr
+           dump_mtype_val fexpr
         )
      |  MComposed_val cvar ->
         (match cvar.mcv_module_def with
@@ -502,7 +531,7 @@ and dump_cmd_val cmdval =
         List.iter (fun fd -> 
           print_string fd.mtfv_name;
           print_string " = ";
-          dump_var_val fd.mtfv_val;
+          dump_mtype_val fd.mtfv_val;
           print_string " , "
           ) cvar.mcv_fields ;
         print_string "}"
@@ -518,9 +547,9 @@ and dump_cmd_val cmdval =
          print_string "let ";
          dump_var_decl bd.mbd_name;
          print_string " = ";
-         dump_var_val bd.mbd_value;
+         dump_mtype_val bd.mbd_value;
          print_string " in ";
-         dump_var_val bd.mbd_body
+         dump_mtype_val bd.mbd_body
      | MBasicFunBody_val (fop, args) ->
          (match fop with
             | MConcatenation -> 
@@ -562,17 +591,17 @@ and dump_cmd_val cmdval =
          )
       | MIf_val (cond, thn, els ) ->
           print_string "if {";
-          dump_var_val cond;
+          dump_mtype_val cond;
           print_string "} then{ ";
-          dump_var_val thn;
+          dump_mtype_val thn;
           print_string "}else{ ";
-          dump_var_val els;
+          dump_mtype_val els;
           print_string "} "
       | MComp_val (comp_op, left, right) ->
           let print_comp op = 
-            dump_var_val left;
+            dump_mtype_val left;
             print_string op;
-            dump_var_val right
+            dump_mtype_val right
           in
           (match comp_op with 
             | Egal ->
@@ -589,7 +618,7 @@ and dump_cmd_val cmdval =
                 print_comp " >= " 
           )
       | MBody_val bodylst -> 
-          List.iter (fun bd -> dump_var_val bd; print_string " ;; ") bodylst
+          List.iter (fun bd -> dump_mtype_val bd; print_string " ;; ") bodylst
     )
 and dump_var_decl decl = 
   match decl with 
@@ -606,12 +635,19 @@ and dump_var var =
   dump_var_decl var.mva_name;
   print_string " = ";
   print_space ();
-  dump_var_val var.mva_value;
+  dump_mtype_val var.mva_value;
   close_box ();
   print_newline ()
 
 
 let dump_fullprog prog = 
+
+      debug_info ("-- mainprog --");
+      
+      debug_info ("---- topcall ----");
+      dump_mtype_val prog.mfp_mainprog.mpg_topcal;
+      
+
       debug_info ("-- mfp_progmodules --");
       IntMap.iter
         (fun i modu -> debug_info (sprintf "%d %s \n" i 

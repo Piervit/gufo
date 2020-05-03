@@ -32,10 +32,25 @@ exception RuntimeError of string
 
 (*TYPES *)
 
+type lexing_position = Stdlib.Lexing.position 
+
+type pars_position = {
+  ppos_start : lexing_position;
+  ppos_end : lexing_position;
+}
+
+and 'a located = {
+    loc_val : 'a ;
+    loc_pos : pars_position;
+}
+
+
 type mvar = {
   mva_name: var_decl ; 
   mva_value: mtype_val;
 }
+
+
 
 and var_decl = 
   | MBaseDecl of string 
@@ -71,7 +86,7 @@ and mcmd_input =
   | MCMDIFile of mstringOrRef_val (*path*)
 
 and mstringOrRef_val =
-  | SORString of string
+  | SORString of string located
   | SORExpr of mtype_val
 
 and mcmd_val = {
@@ -292,8 +307,6 @@ val ref_to_string : mref_val -> string
 val dump_mtype : mtype -> unit
 
 val dump_var :mvar -> unit
-
-val mval_to_cmd: mtype_val -> mcmd_seq
 
 val dump_fullprog : fullprog -> unit
 

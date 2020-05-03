@@ -182,8 +182,8 @@ issue for commands such as 'ls *'.
 %left TILDE
 
 
-%start <mprogram option> prog
-%start <mprogram option> shell
+%start <GufoParsed.mprogram option> prog
+%start <GufoParsed.mprogram option> shell
 %%
 
 (**
@@ -733,31 +733,68 @@ cmd_args :
 
 
 cmd_arg :
-  | arg = INT
-    {GufoParsed.SORString  (string_of_int arg) }
-  | arg = FLOAT
-    {GufoParsed.SORString (string_of_float arg) }
-  | TRUE 
-    {GufoParsed.SORString "true" }
-  | FALSE 
-    {GufoParsed.SORString "false" }
-  | arg = STRING
-  | arg = WORD 
-  | arg = ARG
-  | arg = FILE
-    { GufoParsed.SORString arg}
-  | TILDE
-    {GufoParsed.SORString "~" }
-  | DOT
-    {GufoParsed.SORString "." }
+  | arg = located(INT)
+    {SORString  
+      {
+        loc_val = (string_of_int arg.loc_val) ;
+        loc_pos = arg.loc_pos;
+      }
+    }
+  | arg = located(FLOAT)
+    {SORString 
+      {
+      loc_val = (string_of_float arg.loc_val) ;
+      loc_pos = arg.loc_pos ;
+      }
+    }
+  | t = located(TRUE)
+    {SORString 
+      {
+        loc_val = "true" ;
+        loc_pos = t.loc_pos;
+      }
+    }
+  | f = located(FALSE)
+    {SORString 
+      {
+        loc_val = "false" ;
+        loc_pos = f.loc_pos
+      }
+    }
+  | arg = located(STRING)
+  | arg = located(WORD)
+  | arg = located(ARG)
+  | arg = located(FILE)
+    { SORString arg
+      
+    }
+  | t = located(TILDE)
+    {SORString 
+      {
+        loc_val = "~" ;
+        loc_pos = t.loc_pos;
+      }
+    }
   | arg = modulVarOrExpr
-    { GufoParsed.SORExpr arg}
+    { 
+      SORExpr arg;
+    }
 (** Commenting the STAR and DOT here will solve the states conflicts of * and .
 but will make commands such as ls * to fail. *)
-  | STAR
-    {GufoParsed.SORString "*" }
-  | DOT
-    {GufoParsed.SORString "." }
+  | s = located(STAR)
+    {SORString 
+      {
+        loc_val = "*" ;
+        loc_pos = s.loc_pos;
+      }
+    }
+  | d = located(DOT)
+    {SORString 
+      {
+        loc_val = "." ;
+        loc_pos = d.loc_pos;
+      }
+    }
 
 redirs :
   | {[]}
@@ -766,38 +803,38 @@ redirs :
 
 
 redir : 
-  | CLOSING_CHEVRON; file = WORD;
-  | CLOSING_CHEVRON; file = FILE;
-    { [GufoParsed.MRedirOFile (GufoParsed.SORString file)] }
+  | CLOSING_CHEVRON; file = located(WORD);
+  | CLOSING_CHEVRON; file = located(FILE);
+    { [MRedirOFile (SORString file)] }
   | CLOSING_CHEVRON; file = modulVarOrExpr;
-    { [GufoParsed.MRedirOFile (GufoParsed.SORExpr file)] }
-  | DOUBLE_CLOSING_CHEVRON; file = WORD
-  | DOUBLE_CLOSING_CHEVRON; file = FILE
-    { [GufoParsed.MRedirOFileAppend (GufoParsed.SORString file)] }
+    { [MRedirOFile (SORExpr file)] }
+  | DOUBLE_CLOSING_CHEVRON; file = located(WORD)
+  | DOUBLE_CLOSING_CHEVRON; file = located(FILE)
+    { [MRedirOFileAppend (SORString file)] }
   | DOUBLE_CLOSING_CHEVRON; file = modulVarOrExpr
-    { [GufoParsed.MRedirOFileAppend (GufoParsed.SORExpr file)] }
-  | WRITE_ERROR_TO; file = WORD
-  | WRITE_ERROR_TO; file = FILE
-    { [GufoParsed.MRedirEFile (GufoParsed.SORString file)] }
+    { [MRedirOFileAppend (SORExpr file)] }
+  | WRITE_ERROR_TO; file = located(WORD)
+  | WRITE_ERROR_TO; file = located(FILE)
+    { [MRedirEFile (SORString file)] }
   | WRITE_ERROR_TO; file = modulVarOrExpr
-    { [GufoParsed.MRedirEFile (GufoParsed.SORExpr file)] }
-  | WRITE_ERROR_NEXT_TO; file = WORD
-  | WRITE_ERROR_NEXT_TO; file = FILE
-    { [GufoParsed.MRedirEFileAppend (GufoParsed.SORString file)] }
+    { [MRedirEFile (SORExpr file)] }
+  | WRITE_ERROR_NEXT_TO; file = located(WORD)
+  | WRITE_ERROR_NEXT_TO; file = located(FILE)
+    { [MRedirEFileAppend (SORString file)] }
   | WRITE_ERROR_NEXT_TO; file = modulVarOrExpr
-    { [GufoParsed.MRedirEFileAppend (GufoParsed.SORExpr file)] }
+    { [MRedirEFileAppend (SORExpr file)] }
   | WRITE_ERROR_TO_STD
-    { [GufoParsed.MRedirEStdOut] }
-  | WRITE_ALL_TO ; file  = WORD
-  | WRITE_ALL_TO ; file  = FILE
-    { [GufoParsed.MRedirOFile (GufoParsed.SORString file); GufoParsed.MRedirEFile (GufoParsed.SORString file)] }
+    { [MRedirEStdOut] }
+  | WRITE_ALL_TO ; file  = located(WORD)
+  | WRITE_ALL_TO ; file  = located(FILE)
+    { [MRedirOFile (SORString file); MRedirEFile (SORString file)] }
   | WRITE_ALL_TO ; file  = modulVarOrExpr
-    { [GufoParsed.MRedirOFile (GufoParsed.SORExpr file); GufoParsed.MRedirEFile (GufoParsed.SORExpr file)] }
-  | OPENING_CHEVRON; file = WORD
-  | OPENING_CHEVRON; file = FILE
-    { [GufoParsed.MRedirIFile (GufoParsed.SORString file)] }
+    { [MRedirOFile (SORExpr file); MRedirEFile (SORExpr file)] }
+  | OPENING_CHEVRON; file = located(WORD)
+  | OPENING_CHEVRON; file = located(FILE)
+    { [MRedirIFile (SORString file)] }
   | OPENING_CHEVRON; file = modulVarOrExpr
-    { [GufoParsed.MRedirIFile (GufoParsed.SORExpr file)] }
+    { [MRedirIFile (SORExpr file)] }
 
 (******* CMD PARSING END ********)
 (******* FIELDS PARSING ********)
@@ -865,4 +902,7 @@ modulVarOrExpr:
  ##################### END MAIN LANGUAGE PARSER #####################
 *)
 
+%inline located(X): x=X {
+  GufoParsedHelper.with_poss $startpos $endpos x
+}
 
