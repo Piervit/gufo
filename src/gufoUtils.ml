@@ -25,14 +25,14 @@ open GufoParsed
   (*Tools to iterate over GufoParsed structure *)  
   let rec fold_over_cmd_val_from_cmdseq apply_fun acc seq = 
     match seq with 
-      | SimpleCmd cmd -> apply_fun acc cmd 
-      | ForkedCmd seq -> fold_over_cmd_val_from_cmdseq apply_fun acc seq 
+      | SimpleCmd cmd -> apply_fun acc cmd.loc_val
+      | ForkedCmd seq -> fold_over_cmd_val_from_cmdseq apply_fun acc seq.loc_val
       | OrCmd (seq1, seq2)
       | SequenceCmd (seq1, seq2)
       | PipedCmd (seq1, seq2)
       | AndCmd (seq1, seq2) -> fold_over_cmd_val_from_cmdseq apply_fun 
-                                (fold_over_cmd_val_from_cmdseq apply_fun acc seq2 ) 
-                                seq1
+                                (fold_over_cmd_val_from_cmdseq apply_fun acc seq2.loc_val ) 
+                                seq1.loc_val
 
   let rec fold_over_cmd_val apply_fun acc mtype = 
     match mtype with

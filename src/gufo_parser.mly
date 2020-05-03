@@ -620,25 +620,25 @@ operation :
     { MBody_val (assign1 ::assign2)}
 
 cmd_expr:
-  |  cmdas = simple_cmd;
-    { cmdas }
-  | acmds = cmd_expr ; SIMPLE_AND 
+  |  cmdas = located(simple_cmd);
+    { SimpleCmd cmdas }
+  | acmds = located(cmd_expr) ; SIMPLE_AND 
     {
       (ForkedCmd (acmds))
     }
-  | acmds = cmd_expr; AND ; bcmds = cmd_expr
+  | acmds = located(cmd_expr); AND ; bcmds = located(cmd_expr)
     {
       (AndCmd (acmds, bcmds))
     }
-  | acmds = cmd_expr; OR ; bcmds = cmd_expr
+  | acmds = located(cmd_expr); OR ; bcmds = located(cmd_expr)
     {
       (OrCmd (acmds, bcmds))
     }
-  | acmds = cmd_expr; PIPE ; bcmds = cmd_expr
+  | acmds = located(cmd_expr); PIPE ; bcmds = located(cmd_expr)
     {
       (PipedCmd(acmds, bcmds))
     }
-  | acmds = cmd_expr ; SEMICOLON; bcmds = cmd_expr
+  | acmds = located(cmd_expr) ; SEMICOLON; bcmds = located(cmd_expr)
     {
       (SequenceCmd(acmds, bcmds))
     }
@@ -723,7 +723,7 @@ simple_cmd:
                 mcm_input_src = stdin; 
                }
     in
-     SimpleCmd cmd
+     cmd
     }
 
 cmd_args :

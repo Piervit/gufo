@@ -98,12 +98,12 @@ and mcmd_val = {
 }
 
 and mcmd_seq = 
-  | SimpleCmd of mcmd_val
-  | ForkedCmd of mcmd_seq (*symbol & *)
-  | AndCmd of mcmd_seq * mcmd_seq (*&& : The right side of && will only be evaluated if the exit status of the left side is zero.*)
-  | OrCmd of mcmd_seq * mcmd_seq (*|| : The right side of || will only be evaluated if the exit status of the left side is non-zero.*)
-  | SequenceCmd of mcmd_seq * mcmd_seq (*; *)
-  | PipedCmd of mcmd_seq * mcmd_seq (*; *)
+  | SimpleCmd of mcmd_val located
+  | ForkedCmd of mcmd_seq located (*symbol & *)
+  | AndCmd of mcmd_seq located * mcmd_seq located (*&& : The right side of && will only be evaluated if the exit status of the left side is zero.*)
+  | OrCmd of mcmd_seq located * mcmd_seq located (*|| : The right side of || will only be evaluated if the exit status of the left side is non-zero.*)
+  | SequenceCmd of mcmd_seq located * mcmd_seq located(*; *)
+  | PipedCmd of mcmd_seq located * mcmd_seq located (*; *)
 
 and mfile_val = {
   mfv_path:string;
@@ -455,12 +455,12 @@ and dump_cmd_val cmdval =
     print_string "(" ; dump_cmd_val operand1; print_string symbol; dump_cmd_val operand2; print_string ")"
   in
   match cmdval with
-    | SimpleCmd cmdval -> dump_cmd cmdval
-    | ForkedCmd cmdval -> dump_cmd_val cmdval; print_string " & "
-    | AndCmd (cmdval1, cmdval2)-> dump_2op " && " cmdval1 cmdval2
-    | OrCmd (cmdval1, cmdval2)-> dump_2op " || " cmdval1 cmdval2
-    | SequenceCmd (cmdval1, cmdval2)-> dump_2op " ; " cmdval1 cmdval2
-    | PipedCmd (cmdval1, cmdval2)-> dump_2op " | " cmdval1 cmdval2
+    | SimpleCmd cmdval -> dump_cmd cmdval.loc_val
+    | ForkedCmd cmdval -> dump_cmd_val cmdval.loc_val; print_string " & "
+    | AndCmd (cmdval1, cmdval2)-> dump_2op " && " cmdval1.loc_val cmdval2.loc_val
+    | OrCmd (cmdval1, cmdval2)-> dump_2op " || " cmdval1.loc_val cmdval2.loc_val
+    | SequenceCmd (cmdval1, cmdval2)-> dump_2op " ; " cmdval1.loc_val cmdval2.loc_val
+    | PipedCmd (cmdval1, cmdval2)-> dump_2op " | " cmdval1.loc_val cmdval2.loc_val
   and dump_arg arg = 
     match arg with
       | MBaseArg arg -> print_string arg; print_space ()

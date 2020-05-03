@@ -2085,21 +2085,21 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
   and parsedToOpt_cmd_seq_val ?topvar:(topvar = None) optiprog locScope cseq = 
     match cseq with 
       | SimpleCmd cval -> 
-          MOSimpleCmd (parsedToOpt_cmd_val ~topvar optiprog locScope cval)
+          MOSimpleCmd (parsedToOpt_cmd_val ~topvar optiprog locScope cval.loc_val)
       | ForkedCmd fcmd -> 
-          MOForkedCmd (parsedToOpt_cmd_seq_val ~topvar optiprog locScope fcmd)
+          MOForkedCmd (parsedToOpt_cmd_seq_val ~topvar optiprog locScope fcmd.loc_val)
       | AndCmd (cseq1, cseq2) -> 
-          MOAndCmd (parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq1,
-                    parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq2)
+          MOAndCmd (parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq1.loc_val,
+                    parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq2.loc_val)
       | OrCmd (cseq1, cseq2)-> 
-          MOOrCmd (parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq1,
-                   parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq2)
+          MOOrCmd (parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq1.loc_val,
+                   parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq2.loc_val)
       | SequenceCmd (cseq1, cseq2)-> 
-          MOSequenceCmd (parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq1,
-                         parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq2)
+          MOSequenceCmd (parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq1.loc_val,
+                         parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq2.loc_val)
       | PipedCmd (cseq1, cseq2)-> 
-          MOPipedCmd (parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq1,
-                      parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq2)
+          MOPipedCmd (parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq1.loc_val,
+                      parsedToOpt_cmd_seq_val ~topvar optiprog locScope cseq2.loc_val)
   
   
   and parsedToOpt_base_val ?topvar:(topvar = None) optiprog locScope bv = 

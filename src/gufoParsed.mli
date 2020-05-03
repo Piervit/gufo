@@ -98,12 +98,12 @@ and mcmd_val = {
 }
 
 and mcmd_seq = 
-  | SimpleCmd of mcmd_val
-  | ForkedCmd of mcmd_seq (*symbol & *)
-  | AndCmd of mcmd_seq * mcmd_seq (*&& : The right side of && will only be evaluated if the exit status of the left side is zero.*)
-  | OrCmd of mcmd_seq * mcmd_seq (*|| : The right side of || will only be evaluated if the exit status of the left side is non-zero.*)
-  | SequenceCmd of mcmd_seq * mcmd_seq (*; *)
-  | PipedCmd of mcmd_seq * mcmd_seq (*; *)
+  | SimpleCmd of mcmd_val located
+  | ForkedCmd of mcmd_seq located (*symbol & *)
+  | AndCmd of mcmd_seq located * mcmd_seq located (*&& : The right side of && will only be evaluated if the exit status of the left side is zero.*)
+  | OrCmd of mcmd_seq located * mcmd_seq located (*|| : The right side of || will only be evaluated if the exit status of the left side is non-zero.*)
+  | SequenceCmd of mcmd_seq located * mcmd_seq located (*; *)
+  | PipedCmd of mcmd_seq located * mcmd_seq located (*; *)
 
 and mfile_val = {
   mfv_path:string;
