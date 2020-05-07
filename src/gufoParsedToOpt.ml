@@ -1966,42 +1966,42 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
      * field has name according to the same object.*)
     let parsedToOpt_field def_modul fd =
       let parsedToOpt_field_in_prog prog fd = 
-          match StringMap.find_opt fd.mtfv_name prog.mopg_field2int with 
-            | None -> raise (TypeError ("field "^fd.mtfv_name^" does not belong to a known type"))
+          match StringMap.find_opt fd.mtfv_name.loc_val prog.mopg_field2int with 
+            | None -> raise (TypeError ("field "^fd.mtfv_name.loc_val ^" does not belong to a known type"))
             | Some i -> IntMap.find i prog.mopg_field_to_type
       in
       match def_modul with 
         | None -> parsedToOpt_field_in_prog optiprog fd
         | Some (MOUserMod userprog) -> parsedToOpt_field_in_prog userprog fd
         | Some (MOSystemMod sysmod) -> 
-            (match StringMap.find_opt fd.mtfv_name sysmod.mosm_typstrfield2inttype with
-              | None -> raise (TypeError ("field "^fd.mtfv_name^" does not belong to a known type"))
+            (match StringMap.find_opt fd.mtfv_name.loc_val sysmod.mosm_typstrfield2inttype with
+              | None -> raise (TypeError ("field "^fd.mtfv_name.loc_val ^" does not belong to a known type"))
               | Some i -> i)
     in
     let check_valid_fields def_modul ctype field =
       let check_valid_fields_in_prog prog = 
         (*check the field belong to the given ctype *)
-          match StringMap.find_opt field.mtfv_name prog.mopg_field2int with 
-            | None -> raise (TypeError ("field "^field.mtfv_name^" does not belong to a known type"))
+          match StringMap.find_opt field.mtfv_name.loc_val prog.mopg_field2int with 
+            | None -> raise (TypeError ("field "^field.mtfv_name.loc_val ^" does not belong to a known type"))
             | Some i -> ctype = IntMap.find i prog.mopg_field_to_type
       in
         match def_modul with
           | None -> check_valid_fields_in_prog optiprog 
           | Some (MOUserMod userprog) -> check_valid_fields_in_prog userprog
           | Some (MOSystemMod sysmod) -> 
-            (match StringMap.find_opt field.mtfv_name sysmod.mosm_typstrfield2inttype with 
-              | None ->raise  (TypeError ("field "^field.mtfv_name^" does not belong to a known type")) 
+            (match StringMap.find_opt field.mtfv_name.loc_val sysmod.mosm_typstrfield2inttype with 
+              | None ->raise  (TypeError ("field "^field.mtfv_name.loc_val^" does not belong to a known type")) 
               | Some i -> ctype = i
             )
     in
     let add_to_field_map def_modul locScope fd fieldsmap = 
       let iname = 
         match def_modul with
-          | None -> (StringMap.find fd.mtfv_name optiprog.mopg_field2int)
-          | Some (MOUserMod userprog ) -> (StringMap.find fd.mtfv_name userprog.mopg_field2int)
-          | Some (MOSystemMod sysmod) -> (StringMap.find fd.mtfv_name sysmod.mosm_typstrfield2int)
+          | None -> (StringMap.find fd.mtfv_name.loc_val optiprog.mopg_field2int)
+          | Some (MOUserMod userprog ) -> (StringMap.find fd.mtfv_name.loc_val userprog.mopg_field2int)
+          | Some (MOSystemMod sysmod) -> (StringMap.find fd.mtfv_name.loc_val sysmod.mosm_typstrfield2int)
       in
-      IntMap.add iname (parsedToOpt_expr ~topvar optiprog locScope fd.mtfv_val) fieldsmap
+      IntMap.add iname (parsedToOpt_expr ~topvar optiprog locScope fd.mtfv_val.loc_val) fieldsmap
     in
   
     let def_modul, def_modul_i = 
@@ -2009,34 +2009,35 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
         | None -> None , None
         | Some modstr -> 
           let modulint = 
-            (match StringMap.find_opt modstr fulloptiprog.mofp_progmap with
-              | None -> raise (VarError (modstr^" does not appear to be an available module."))
+            (match StringMap.find_opt modstr.loc_val fulloptiprog.mofp_progmap with
+              | None -> raise (VarError (modstr.loc_val^" does not appear to be an available module."))
               | Some i -> i 
             )
           in
           Some (IntMap.find modulint fulloptiprog.mofp_progmodules ), Some modulint
     in
     let field1 = (List.hd mct.mcv_fields) in
-    let ctype =  parsedToOpt_field def_modul field1 in
+    let ctype =  parsedToOpt_field def_modul field1.loc_val in
     let _check = 
       List.iter 
         (fun fd -> 
-          match check_valid_fields def_modul ctype fd with
+          match check_valid_fields def_modul ctype fd.loc_val with
             | true -> ()
-            | false -> raise (TypeError (fd.mtfv_name^" does not belong to the correct struct."))
+            | false -> raise (TypeError (fd.loc_val.mtfv_name.loc_val^" does not belong to the correct struct."))
         )
         (List.tl mct.mcv_fields)
     in
     let mo_fields = 
       List.fold_left
-        (fun map fd -> add_to_field_map def_modul locScope fd map)
+        (fun map fd -> add_to_field_map def_modul locScope fd.loc_val map)
         IntMap.empty mct.mcv_fields
     in
     MOComposed_val {
         mocv_module_def = 
           (match mct.mcv_module_def with 
             | None -> None
-            | Some mdstring -> Some (StringMap.find mdstring fulloptiprog.mofp_progmap ))
+            | Some mdstring -> 
+                Some (StringMap.find mdstring.loc_val fulloptiprog.mofp_progmap ))
             ;
         mocv_fields = mo_fields;
         mocv_resolved_type = (def_modul_i, ctype);
@@ -2115,17 +2116,17 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
    match funarg with  
     | MBaseArg s -> 
         let i = get_fresh_int () in
-        StringMap.add s i nameMap, MOBaseArg i, StringMap.add s i locScope
+        StringMap.add s.loc_val i nameMap, MOBaseArg i, StringMap.add s.loc_val i locScope
     | MTupleArg arglst ->
         let onames, locScope, newlst = 
           List.fold_left
             (fun (onames,locScope,newlst) arg -> 
               let nonames, el, locScope = 
-                parsedToOpt_funarg nameMap locScope arg 
+                parsedToOpt_funarg nameMap locScope arg
               in
               (StringMap.merge (fun s a b -> a) onames nonames, locScope, el::newlst)
             )
-            (StringMap.empty,locScope,[]) arglst
+            (StringMap.empty,locScope,[]) arglst.loc_val
         in
         onames, MOTupleArg newlst, locScope
     
@@ -2155,8 +2156,8 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
         let map = 
           List.fold_left 
             (fun map (k,el) -> 
-              MMap.add (core_to_simple_val (parsedToOpt_expr ~topvar optiprog locScope k)) 
-                       (parsedToOpt_expr ~topvar optiprog locScope el) map
+              MMap.add (core_to_simple_val (parsedToOpt_expr ~topvar optiprog locScope k.loc_val)) 
+                       (parsedToOpt_expr ~topvar optiprog locScope el.loc_val) map
             ) 
             MMap.empty mlst
         in MOMap_val map

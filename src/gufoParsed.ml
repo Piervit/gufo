@@ -47,7 +47,6 @@ and 'a located = {
     loc_pos : pars_position;
 }
 
-
 type mvar = {
   mva_name: var_decl ; 
   mva_value: mtype_val;
@@ -131,8 +130,8 @@ and mtype_field = {
 }
 
 and mtype_field_val = {
-  mtfv_name : string;
-  mtfv_val: mtype_val;
+  mtfv_name : string located;
+  mtfv_val: mtype_val located;
 }
 
 and mcomposed_type = {
@@ -142,8 +141,8 @@ and mcomposed_type = {
 }
 
 and mcomposed_type_val = {
-  mcv_module_def : string option;
-  mcv_fields: mtype_field_val list;
+  mcv_module_def : string located option;
+  mcv_fields: mtype_field_val located list;
 }
 
 and mref_val = {
@@ -178,12 +177,12 @@ and msimple_type_val =
   | MNone_val 
   | MSome_val of mtype_val located
   | MSet_val of  mtype_val located list
-  | MMap_val of (mtype_val * mtype_val) list (*(key * value list ) Type info will come next. *)
+  | MMap_val of (mtype_val located * mtype_val located) list (*(key * value list ) Type info will come next. *)
   | MFun_val of mfunarg list * mtype_val located (* args name * body_expr *)
 
 and mfunarg = 
-  | MBaseArg of string
-  | MTupleArg of mfunarg list
+  | MBaseArg of string located
+  | MTupleArg of mfunarg list located
 
 and mtype =
   | MComposed_type of mcomposed_type
@@ -463,10 +462,10 @@ and dump_cmd_val cmdval =
     | PipedCmd (cmdval1, cmdval2)-> dump_2op " | " cmdval1.loc_val cmdval2.loc_val
   and dump_arg arg = 
     match arg with
-      | MBaseArg arg -> print_string arg; print_space ()
+      | MBaseArg arg -> print_string arg.loc_val; print_space ()
       | MTupleArg arglst -> 
           print_string "(";
-          List.iter (fun arg -> dump_arg arg; print_string " -- ") arglst;
+          List.iter (fun arg -> dump_arg arg; print_string " -- ") arglst.loc_val;
           print_string ")"
   and dump_mtype_val varval = 
     let print_call op args = 
@@ -513,7 +512,7 @@ and dump_cmd_val cmdval =
            print_string "] ";
          | MMap_val vals ->
            print_string "map[ ";
-           List.iter (fun (key,aval) -> dump_mtype_val key ;print_string ": ";dump_mtype_val aval; print_string ", ") vals;
+           List.iter (fun (key,aval) -> dump_mtype_val key.loc_val ;print_string ": ";dump_mtype_val aval.loc_val; print_string ", ") vals;
            print_string "] ";
 
          | MFun_val (fargs, fexpr) ->
@@ -525,16 +524,16 @@ and dump_cmd_val cmdval =
      |  MComposed_val cvar ->
         (match cvar.mcv_module_def with
           | None -> print_space ()
-          | Some s -> print_string s;
+          | Some s -> print_string s.loc_val;
                       print_string "."
         );
         print_string "{";
         List.iter (fun fd -> 
-          print_string fd.mtfv_name;
+          print_string fd.loc_val.mtfv_name.loc_val;
           print_string " = ";
-          dump_mtype_val fd.mtfv_val;
+          dump_mtype_val fd.loc_val.mtfv_val.loc_val;
           print_string " , "
-          ) cvar.mcv_fields ;
+          ) cvar.mcv_fields;
         print_string "}"
      |  MRef_val (var, args) ->
          (match args with

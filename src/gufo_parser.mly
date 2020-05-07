@@ -494,10 +494,10 @@ basic_expr:
 
   | OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
     {MComposed_val {mcv_module_def = None; mcv_fields=fds} }
-  | md = MODUL;DOT ; OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
+  | md = located(MODUL);DOT ; OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
     {let open GenUtils in 
     MComposed_val 
-      {mcv_module_def = Some (rm_first_char md); mcv_fields=fds} 
+      {mcv_module_def = Some ({md with loc_val = rm_first_char md.loc_val}); mcv_fields=fds} 
     }
   | comp = comp_expr; 
     {comp}
@@ -544,10 +544,10 @@ varassign_in_expr :
     
   | OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
     {MComposed_val {mcv_module_def = None; mcv_fields=fds} }
-  | md = MODUL;DOT ; OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
+  | md = located(MODUL);DOT ; OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
     {let open GenUtils in 
     MComposed_val 
-      {mcv_module_def = Some (rm_first_char md); mcv_fields=fds} 
+      {mcv_module_def = Some ({md with loc_val = rm_first_char md.loc_val}); mcv_fields=fds} 
     }
   | OPEN_SQRBRACKET ; CLOSE_SQRBRACKET
       {MSimple_val (MList_val [])}
@@ -662,26 +662,31 @@ funcallargs :
 
 funargs_top:
   |  { [] }
-  | varname = VARNAME; funargs = funargs_top;
+  | varname = located(VARNAME); funargs = funargs_top;
     { 
       let open GenUtils in 
-      (MBaseArg (rm_first_char varname)) ::funargs }
-  | OPEN_BRACKET ; subargs = funargs; CLOSE_BRACKET; funargs = funargs_top
+      (MBaseArg ( { varname with loc_val =  rm_first_char varname.loc_val})) 
+        ::funargs 
+    }
+  | OPEN_BRACKET ; subargs = located(funargs); CLOSE_BRACKET; funargs = funargs_top
     { (MTupleArg subargs) ::funargs }
 
 funargs:
-  | arg = VARNAME
+  | arg = located(VARNAME)
     { 
       let open GenUtils in 
-      [MBaseArg (rm_first_char arg)] }
-  |  OPEN_BRACKET; arg = funargs ; CLOSE_BRACKET;
+      [MBaseArg ( { arg with loc_val = rm_first_char arg.loc_val}
+        )] }
+
+  |  OPEN_BRACKET; arg = located(funargs) ; CLOSE_BRACKET;
     { 
       [MTupleArg arg] }
-  | arg = VARNAME ; DOUBLE_MINUS ; funargs = funargs
+  | arg = located(VARNAME) ; DOUBLE_MINUS ; funargs = funargs
     { 
       let open GenUtils in 
-      (MBaseArg (rm_first_char arg)):: funargs }
-  | OPEN_BRACKET arg = funargs; CLOSE_BRACKET; DOUBLE_MINUS ; funargs = funargs
+      (MBaseArg ( { arg with loc_val = rm_first_char arg.loc_val } )):: funargs 
+    }
+  | OPEN_BRACKET arg = located(funargs); CLOSE_BRACKET; DOUBLE_MINUS ; funargs = funargs
     { 
       (MTupleArg arg):: funargs }
 
@@ -850,10 +855,13 @@ redir :
 
 fields_assign:
   | { [] }
-  | fields = fields_assign ; fieldname = WORD ; AFFECTATION; value=  topvarassign; COMMA
-    { {mtfv_name = fieldname; mtfv_val = value} :: fields }
+  | fields = fields_assign ;  sf = located(single_field); COMMA
+    {  sf :: fields }
   ;
 
+single_field:
+  | fieldname = located(WORD) ; AFFECTATION; value=  located(topvarassign);
+    { {mtfv_name = fieldname; mtfv_val = value} }
 
 modulVar:
   | var = VARNAME; idx = lst_index; 
@@ -891,9 +899,9 @@ listSetEl:
     {el::lst}
 
 mapEl:
-  | key = top_expr; COLON ; el = top_expr;
+  | key = located(top_expr); COLON ; el = located(top_expr);
     {[key, el]}
-      | key = top_expr; COLON ; el = top_expr; COMMA; lst = mapEl;
+  | key = located(top_expr); COLON ; el = located(top_expr); COMMA; lst = mapEl;
     {(key,el)::lst}
 
 

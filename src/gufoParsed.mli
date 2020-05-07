@@ -131,8 +131,8 @@ and mtype_field = {
 }
 
 and mtype_field_val = {
-  mtfv_name : string;
-  mtfv_val: mtype_val;
+  mtfv_name : string located;
+  mtfv_val: mtype_val located;
 }
 
 and mcomposed_type = {
@@ -142,8 +142,8 @@ and mcomposed_type = {
 }
 
 and mcomposed_type_val = {
-  mcv_module_def : string option;
-  mcv_fields: mtype_field_val list;
+  mcv_module_def : string located option;
+  mcv_fields: mtype_field_val located list;
 }
 
 and mref_val = {
@@ -185,12 +185,12 @@ and msimple_type_val =
   | MNone_val 
   | MSome_val of mtype_val located
   | MSet_val of  mtype_val located list
-  | MMap_val of (mtype_val * mtype_val) list (*(key * value list ) Type info will come next. *)
+  | MMap_val of (mtype_val located * mtype_val located) list (*(key * value list ) Type info will come next. *)
   | MFun_val of mfunarg list * mtype_val located (* args name * body_expr *)
 
 and mfunarg = 
-  | MBaseArg of string
-  | MTupleArg of mfunarg list
+  | MBaseArg of string located
+  | MTupleArg of mfunarg list located
 
 and mtype =
   | MComposed_type of mcomposed_type
