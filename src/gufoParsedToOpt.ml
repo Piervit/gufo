@@ -2141,7 +2141,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
         MOList_val (List.map (fun v -> parsedToOpt_expr ~topvar optiprog locScope v.loc_val) lst)
     | MNone_val -> MONone_val
     | MSome_val s -> 
-        MOSome_val (parsedToOpt_expr ~topvar optiprog locScope s)
+        MOSome_val (parsedToOpt_expr ~topvar optiprog locScope s.loc_val)
     | MSet_val slst ->
         let set = 
           List.fold_left 
@@ -2169,7 +2169,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
           ) 
           (StringMap.empty,locScope,[]) args 
       in 
-      let obody = parsedToOpt_expr ~topvar optiprog locScope body in
+      let obody = parsedToOpt_expr ~topvar optiprog locScope body.loc_val in
       MOFun_val 
         {mofv_args_name = onames; mofv_args_id = ofunargs; mofv_body = obody}
   

@@ -199,12 +199,12 @@ shell:
     {   
       Some {mpg_types = GenUtils.StringMap.empty; mpg_topvar = []; mpg_topcal = main_expr} 
     }
-    | LET ; varnames = var_tuple_decl; argnames = funargs_top ; AFFECTATION; funbody = topvarassign; EOF
+    | LET ; varnames = var_tuple_decl; argnames = funargs_top ; AFFECTATION; funbody = located(topvarassign); EOF
 	{
           let open GenUtils in 
           (match argnames, varnames with
             | [], _ -> 
-              let mvar = {mva_name = varnames; mva_value = funbody} in
+              let mvar = {mva_name = varnames; mva_value = funbody.loc_val} in
               Some ({mpg_types = GenUtils.StringMap.empty; mpg_topvar = [mvar];  mpg_topcal = MSimple_val(MEmpty_val)} )
             | argnames, MBaseDecl varname ->
                 let mvar = {mva_name = MBaseDecl varname; mva_value = MSimple_val (MFun_val (List.rev argnames, funbody))} in
@@ -301,14 +301,14 @@ rev_mtypes_or_topvals:
 
   (*variables and function assignation*)
 
-  | topels= rev_mtypes_or_topvals; LET ; varnames = var_tuple_decl; argnames = funargs_top ; AFFECTATION; funbody = topvarassign;
+  | topels= rev_mtypes_or_topvals; LET ; varnames = var_tuple_decl; argnames = funargs_top ; AFFECTATION; funbody = located(topvarassign);
 	{
            
           let open GenUtils in 
       	  let (types, topvals) = topels in
           (match argnames, varnames with
             | [], _ -> 
-              let mvar = {mva_name = varnames; mva_value = funbody} in
+              let mvar = {mva_name = varnames; mva_value = funbody.loc_val} in
       	      (  types ,  mvar :: topvals )
             | argnames, MBaseDecl varname ->
                 let mvar = {mva_name = MBaseDecl varname; mva_value = MSimple_val (MFun_val (List.rev argnames, funbody))} in
@@ -475,19 +475,19 @@ leaf_expr:
 basic_expr:
   | res = leaf_expr 
     { res }
-  | LET ; binding_name = var_tuple_decl ; argnames = funargs_top ; AFFECTATION ; binding_value = topvarassign; IN ; OPEN_BRACKET; body = topvarassign ; CLOSE_BRACKET;
+  | LET ; binding_name = var_tuple_decl ; argnames = funargs_top ; AFFECTATION ; binding_value = located(topvarassign); IN ; OPEN_BRACKET; body = topvarassign ; CLOSE_BRACKET;
     { 
      let open GenUtils in
       MBind_val {mbd_name = binding_name; 
                   mbd_value = 
                     (match argnames with 
-                      | [] -> binding_value
+                      | [] -> binding_value.loc_val
                       | lstargs -> MSimple_val (MFun_val (List.rev lstargs, binding_value)))
                   ; 
                   mbd_body =  body;
                   }
     }
-  | SOME;  varassign = varassign_in_expr;
+  | SOME;  varassign = located(varassign_in_expr);
     {MSimple_val (MSome_val varassign)}
   | IF ; cond = top_expr ; THEN; thn = top_expr ELSE; els = top_expr; 
   {MIf_val (cond, thn, els)}
@@ -574,7 +574,7 @@ comp_expr :
     {MComp_val (LessOrEq, expr1, expr2) }
 
 anonymousfun: 
-  | OPEN_BRACKET; FUN; args = funargs_top; ARROW;   body =topvarassign; CLOSE_BRACKET; 
+  | OPEN_BRACKET; FUN; args = funargs_top; ARROW;   body = located(topvarassign); CLOSE_BRACKET; 
     { 
     MSimple_val (MFun_val (List.rev args, body))
     }

@@ -183,10 +183,10 @@ and msimple_type_val =
   | MList_val of mtype_val located list
   | MEmpty_val
   | MNone_val 
-  | MSome_val of mtype_val
+  | MSome_val of mtype_val located
   | MSet_val of  mtype_val located list
   | MMap_val of (mtype_val * mtype_val) list (*(key * value list ) Type info will come next. *)
-  | MFun_val of mfunarg list * mtype_val (* args name * body_expr *)
+  | MFun_val of mfunarg list * mtype_val located (* args name * body_expr *)
 
 and mfunarg = 
   | MBaseArg of string

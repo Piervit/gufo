@@ -176,10 +176,10 @@ and msimple_type_val =
   | MList_val of mtype_val located list
   | MEmpty_val
   | MNone_val 
-  | MSome_val of mtype_val
+  | MSome_val of mtype_val located
   | MSet_val of  mtype_val located list
   | MMap_val of (mtype_val * mtype_val) list (*(key * value list ) Type info will come next. *)
-  | MFun_val of mfunarg list * mtype_val (* args name * body_expr *)
+  | MFun_val of mfunarg list * mtype_val located (* args name * body_expr *)
 
 and mfunarg = 
   | MBaseArg of string
@@ -485,7 +485,7 @@ and dump_cmd_val cmdval =
          |  MNone_val ->
            print_string "none"; print_space () 
          |  MSome_val v->
-           print_string "some"; dump_mtype_val v; print_space () 
+           print_string "some"; dump_mtype_val v.loc_val; print_space () 
          | MBase_val MTypeStringVal v ->
          print_string v.loc_val; print_space () 
          | MBase_val MTypeBoolVal b ->
@@ -520,7 +520,7 @@ and dump_cmd_val cmdval =
            print_string "fun ";
            List.iter dump_arg fargs;
            print_string "= ";
-           dump_mtype_val fexpr
+           dump_mtype_val fexpr.loc_val
         )
      |  MComposed_val cvar ->
         (match cvar.mcv_module_def with

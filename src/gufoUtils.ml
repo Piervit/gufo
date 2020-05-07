@@ -51,7 +51,7 @@ open GufoParsed
         | MTuple_val mtyplst ->
             List.fold_left (fun acc v -> fold_over_cmd_val apply_fun acc v.loc_val) acc mtyplst
         | MFun_val (_, mtype) 
-        | MSome_val mtype -> fold_over_cmd_val apply_fun acc mtype
+        | MSome_val mtype -> fold_over_cmd_val apply_fun acc mtype.loc_val
         | MMap_val keyValLst ->
             List.fold_left (fun acc (key, v) -> fold_over_cmd_val apply_fun (fold_over_cmd_val apply_fun acc v) key) acc keyValLst
       )
@@ -122,7 +122,7 @@ open GufoParsed
         | MTuple_val mtypelst ->
             List.fold_left (fun acc v -> fold_over_composed_type_val apply_fun acc v.loc_val) acc mtypelst
         | MFun_val (_, mtype) 
-        | MSome_val mtype -> fold_over_composed_type_val apply_fun acc mtype
+        | MSome_val mtype -> fold_over_composed_type_val apply_fun acc mtype.loc_val
         | MMap_val keyValLst ->
             List.fold_left (fun acc (key, v) -> fold_over_composed_type_val apply_fun (fold_over_composed_type_val apply_fun acc v) key) acc keyValLst
       )
@@ -193,7 +193,7 @@ open GufoParsed
         | MTuple_val mtypelst ->
             List.fold_left (fun acc v -> fold_over_mref_val apply_fun acc v.loc_val) acc mtypelst
         | MFun_val (_, mtype) 
-        | MSome_val mtype -> fold_over_mref_val apply_fun acc mtype
+        | MSome_val mtype -> fold_over_mref_val apply_fun acc mtype.loc_val
         | MMap_val keyValLst ->
             List.fold_left (fun acc (key, v) -> fold_over_mref_val apply_fun (fold_over_mref_val apply_fun acc v) key) acc keyValLst
       )
@@ -291,7 +291,7 @@ open GufoParsed
         | MTuple_val mtypelst ->
             List.fold_left (fun acc v -> fold_over_binding_val apply_fun acc v.loc_val) acc mtypelst
         | MFun_val (_, mtype) 
-        | MSome_val mtype -> fold_over_binding_val apply_fun acc mtype
+        | MSome_val mtype -> fold_over_binding_val apply_fun acc mtype.loc_val
         | MMap_val keyValLst ->
             List.fold_left (fun acc (key, v) -> fold_over_binding_val apply_fun (fold_over_binding_val apply_fun acc v) key) acc keyValLst
       )
