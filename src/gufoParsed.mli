@@ -46,14 +46,12 @@ and 'a located = {
 
 
 type mvar = {
-  mva_name: var_decl ; 
-  mva_value: mtype_val;
+  mva_name: var_decl located; 
+  mva_value: mtype_val located;
 }
 
-
-
 and var_decl = 
-  | MBaseDecl of string 
+  | MBaseDecl of string located
   | MTupDecl of var_decl list
 
 
@@ -105,10 +103,6 @@ and mcmd_seq =
   | SequenceCmd of mcmd_seq located * mcmd_seq located (*; *)
   | PipedCmd of mcmd_seq located * mcmd_seq located (*; *)
 
-and mfile_val = {
-  mfv_path:string;
-}
-
 and mbase_type = 
   | MTypeString
   | MTypeBool
@@ -122,7 +116,6 @@ and mbase_type_val =
   | MTypeIntVal of int located
   | MTypeFloatVal of float located
   | MTypeCmdVal of mcmd_seq located
-(*      | MTypeFileVal of mfile_val *) 
 
 and mtype_field = {
   mtf_name : string;
@@ -148,7 +141,7 @@ and mcomposed_type_val = {
 
 and mref_val = {
   mrv_module : string option; (* None if curmodule *)
-  mrv_varname : string list; (*varname * fields ($toto.f1.f2 ) *)
+  mrv_varname : string list located; (*varname * fields ($toto.f1.f2 ) *)
   mrv_index: mtype_val list option; (*in case we access a list element of the
                                     reference, such as in $a[$b][$c].
                                     $a will have mrv_index as Some [mref($b); 
@@ -199,25 +192,17 @@ and mtype =
 and mtype_val = 
   | MComposed_val of mcomposed_type_val
   | MSimple_val of msimple_type_val
-  | MRef_val of mref_val * mtype_val list (*module, varname args*)
-  | MEnvRef_val of string (*environment variable*)
-  | MBasicFunBody_val of m_expr_operation * mtype_val list
+  | MRef_val of mref_val located * mtype_val located list (*module, varname args*)
+  | MEnvRef_val of string located (*environment variable*)
+  | MBasicFunBody_val of m_expr_operation * mtype_val located list
   | MBind_val of mbinding
-  | MIf_val of mtype_val * mtype_val * mtype_val
-  | MComp_val of mcomp_op * mtype_val * mtype_val (* comp_op * left_expr * right_expr *)
-  | MBody_val of mtype_val list (*this is used to express complex body using unit
+  | MIf_val of mtype_val located * mtype_val located * mtype_val located
+  | MComp_val of mcomp_op * mtype_val located * mtype_val located (* comp_op * left_expr * right_expr *)
+  | MBody_val of mtype_val located list (*this is used to express complex body using unit
                           * mtype for side effect.
                           * For exemple like "printf "aa";; true" 
                           * *)
-(*and mpos = 
-  {
-    mps_line : int;
-    mps_col : int;
-  }
 
-and mtype_val_with_pos =
-  mtype_val * pos
-*)
 and mcomp_op = 
   | Egal      (* == *)
   | NotEqual (* != *)
@@ -227,9 +212,9 @@ and mcomp_op =
   | GreaterOrEq (* >= *)
 
 and mbinding = {
-  mbd_name : var_decl;
-  mbd_value: mtype_val;
-  mbd_body: mtype_val ;
+  mbd_name : var_decl; 
+  mbd_value: mtype_val located;
+  mbd_body: mtype_val located;
 }
 
 and m_expr_operation =
@@ -253,25 +238,13 @@ and m_expr_operation =
   | MHasMap
 (*   | IntAbsolute  *)
 
-(** A scope contains types and variables*)
-and mscope = {
-  msc_father : mscope option; (* None when toplevel*)
-  msc_vars : mvar list;
-  msc_type : mtype list; (* always MComposed_type except for toplevel*) 
-}
-
-and mshell_state = {
-  mst_curdir : string; 
-}
 
 and mprogram = {
   mpg_types : mtype StringMap.t;
   mpg_topvar: mvar list;
-  mpg_topcal : mtype_val ;
+  mpg_topcal : mtype_val located;
 
 }
-
-
 
 and mmodultype = 
   | MUserMod of mprogram
@@ -288,12 +261,6 @@ and fullprog= {
 
 and mprocess = {
   mps : string list; (*TODO*)
-}
-
-and mshell = {
-  mpr_scopes : mscope list;
-  mpr_process : mprocess list; (* this is a shell, it can be running process*)
-  mpr_shell_state : mshell_state; 
 }
 
 

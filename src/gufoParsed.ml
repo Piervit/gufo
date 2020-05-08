@@ -48,12 +48,12 @@ and 'a located = {
 }
 
 type mvar = {
-  mva_name: var_decl ; 
-  mva_value: mtype_val;
+  mva_name: var_decl located; 
+  mva_value: mtype_val located;
 }
 
 and var_decl = 
-  | MBaseDecl of string 
+  | MBaseDecl of string located
   | MTupDecl of var_decl list
 
 and mcmd_redir =  (*only for parsing, then we use mcmd_* *)
@@ -104,10 +104,6 @@ and mcmd_seq =
   | SequenceCmd of mcmd_seq located * mcmd_seq located(*; *)
   | PipedCmd of mcmd_seq located * mcmd_seq located (*; *)
 
-and mfile_val = {
-  mfv_path:string;
-}
-
 and mbase_type = 
   | MTypeString
   | MTypeBool
@@ -121,7 +117,6 @@ and mbase_type_val =
   | MTypeIntVal of int located
   | MTypeFloatVal of float located
   | MTypeCmdVal of mcmd_seq located
-(*      | MTypeFileVal of mfile_val *) 
 
 and mtype_field = {
   mtf_name : string;
@@ -147,7 +142,7 @@ and mcomposed_type_val = {
 
 and mref_val = {
   mrv_module : string option; (* None if curmodule *)
-  mrv_varname : string list; (*varname * fields ($toto.f1.f2 ) *)
+  mrv_varname : string list located; (*varname * fields ($toto.f1.f2 ) *)
   mrv_index: mtype_val list option; (*in case we access a list element of the
                                     reference, such as in $a[$b][$c].
                                     $a will have mrv_index as Some [mref($b); 
@@ -191,13 +186,13 @@ and mtype =
 and mtype_val = 
   | MComposed_val of mcomposed_type_val
   | MSimple_val of msimple_type_val
-  | MRef_val of mref_val * mtype_val list (*module, varname args*)
-  | MEnvRef_val of string (*environment variable*)
-  | MBasicFunBody_val of m_expr_operation * mtype_val list
+  | MRef_val of mref_val located * mtype_val located list (*module, varname args*)
+  | MEnvRef_val of string located (*environment variable*)
+  | MBasicFunBody_val of m_expr_operation * mtype_val located list
   | MBind_val of mbinding
-  | MIf_val of mtype_val * mtype_val * mtype_val
-  | MComp_val of mcomp_op * mtype_val * mtype_val (* comp_op * left_expr * right_expr *)
-  | MBody_val of mtype_val list (*this is used to express complex body using unit
+  | MIf_val of mtype_val located * mtype_val located * mtype_val located
+  | MComp_val of mcomp_op * mtype_val located * mtype_val located (* comp_op * left_expr * right_expr *)
+  | MBody_val of mtype_val located list (*this is used to express complex body using unit
                           * mtype for side effect.
                           * For exemple like "printf "aa";; true" 
                           * *)
@@ -225,8 +220,8 @@ and mcomp_op =
 
 and mbinding = {
   mbd_name : var_decl;
-  mbd_value: mtype_val;
-  mbd_body: mtype_val ;
+  mbd_value: mtype_val located;
+  mbd_body: mtype_val located;
 }
 
 and m_expr_operation =
@@ -250,25 +245,12 @@ and m_expr_operation =
   | MHasMap
 
 
-(** A scope contains types and variables*)
-and mscope = {
-  msc_father : mscope option; (* None when toplevel*)
-  msc_vars : mvar list;
-  msc_type : mtype list; (* always MComposed_type except for toplevel*) 
-}
-
-and mshell_state = {
-  mst_curdir : string; 
-}
-
 and mprogram = {
   mpg_types : mtype StringMap.t;
   mpg_topvar: mvar list;
-  mpg_topcal : mtype_val ;
+  mpg_topcal : mtype_val located;
 
 }
-
-
 
 and mmodultype = 
   | MUserMod of mprogram
@@ -285,12 +267,6 @@ and fullprog= {
 
 and mprocess = {
   mps : string list; (*TODO*)
-}
-
-and mshell = {
-  mpr_scopes : mscope list;
-  mpr_process : mprocess list; (* this is a shell, it can be running process*)
-  mpr_shell_state : mshell_state; 
 }
 
 let basetype_to_str mybasetype = 
@@ -316,8 +292,8 @@ let dump_base_type mybasetype =
 
 let ref_to_string var =
   match var.mrv_module  with
-    | None -> String.concat "." var.mrv_varname
-    | Some modul -> String.concat "." (modul :: var.mrv_varname)
+    | None -> String.concat "." var.mrv_varname.loc_val
+    | Some modul -> String.concat "." (modul :: var.mrv_varname.loc_val)
 
 
 let rec dump_mtype_short mytype = 
@@ -471,7 +447,7 @@ and dump_cmd_val cmdval =
     let print_call op args = 
       print_string "( ";
               print_string op;
-              List.iter (fun arg -> print_string " "; dump_mtype_val arg) args;
+              List.iter (fun arg -> print_string " "; dump_mtype_val arg.loc_val) args;
               print_string " ) ";
     in
     (match varval with
@@ -538,18 +514,18 @@ and dump_cmd_val cmdval =
      |  MRef_val (var, args) ->
          (match args with
           | [] ->
-            print_string " ref "; print_string (ref_to_string var)
-          | args -> print_call (ref_to_string var) args
+            print_string " ref "; print_string (ref_to_string var.loc_val)
+          | args -> print_call (ref_to_string var.loc_val) args
           )
      |  MEnvRef_val (var) ->
-            print_string " ref "; print_string var
+            print_string " ref "; print_string var.loc_val
      | MBind_val bd ->
          print_string "let ";
          dump_var_decl bd.mbd_name;
          print_string " = ";
-         dump_mtype_val bd.mbd_value;
+         dump_mtype_val bd.mbd_value.loc_val;
          print_string " in ";
-         dump_mtype_val bd.mbd_body
+         dump_mtype_val bd.mbd_body.loc_val
      | MBasicFunBody_val (fop, args) ->
          (match fop with
             | MConcatenation -> 
@@ -591,17 +567,17 @@ and dump_cmd_val cmdval =
          )
       | MIf_val (cond, thn, els ) ->
           print_string "if {";
-          dump_mtype_val cond;
+          dump_mtype_val cond.loc_val;
           print_string "} then{ ";
-          dump_mtype_val thn;
+          dump_mtype_val thn.loc_val;
           print_string "}else{ ";
-          dump_mtype_val els;
+          dump_mtype_val els.loc_val;
           print_string "} "
       | MComp_val (comp_op, left, right) ->
           let print_comp op = 
-            dump_mtype_val left;
+            dump_mtype_val left.loc_val;
             print_string op;
-            dump_mtype_val right
+            dump_mtype_val right.loc_val
           in
           (match comp_op with 
             | Egal ->
@@ -618,11 +594,11 @@ and dump_cmd_val cmdval =
                 print_comp " >= " 
           )
       | MBody_val bodylst -> 
-          List.iter (fun bd -> dump_mtype_val bd; print_string " ;; ") bodylst
+          List.iter (fun bd -> dump_mtype_val bd.loc_val; print_string " ;; ") bodylst
     )
 and dump_var_decl decl = 
   match decl with 
-    | MBaseDecl str -> print_string str
+    | MBaseDecl str -> print_string str.loc_val
     | MTupDecl tup -> print_string "("; 
                       List.iter 
                         (fun decl -> dump_var_decl decl;
@@ -632,10 +608,10 @@ and dump_var_decl decl =
 
 and dump_var var =
   open_hovbox 2;
-  dump_var_decl var.mva_name;
+  dump_var_decl var.mva_name.loc_val;
   print_string " = ";
   print_space ();
-  dump_mtype_val var.mva_value;
+  dump_mtype_val var.mva_value.loc_val;
   close_box ();
   print_newline ()
 
@@ -645,7 +621,7 @@ let dump_fullprog prog =
       debug_info ("-- mainprog --");
       
       debug_info ("---- topcall ----");
-      dump_mtype_val prog.mfp_mainprog.mpg_topcal;
+      dump_mtype_val prog.mfp_mainprog.mpg_topcal.loc_val;
       
 
       debug_info ("-- mfp_progmodules --");

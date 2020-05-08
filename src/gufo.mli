@@ -346,8 +346,6 @@ sig
     momo_topvar : movar list
   }
   
-  and moshell_state = GufoParsed.mshell_state
-  
   and mosysmodulemvar = {
     mosmv_name: string;
     mosmv_description: string; (*A comment associated to the function or variable.*)

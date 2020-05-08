@@ -189,8 +189,6 @@ struct
         mimo_topvar : mivar list
       }
       
-      and mishell_state = GufoParsed.mshell_state
-      
       and misysmodulemvar = {
         mismv_name: string;
         mismv_intname: int;
@@ -811,8 +809,6 @@ struct
     momo_name : int;
     momo_topvar : movar list
   }
-  
-  and moshell_state = GufoParsed.mshell_state
   
   and mosysmodulemvar = {
     mosmv_name: string;

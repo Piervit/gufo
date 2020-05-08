@@ -61,27 +61,30 @@ open GufoParsed
       )
     | MBody_val (mtyplst) 
     | MBasicFunBody_val (_, mtyplst) -> 
-        List.fold_left (fold_over_cmd_val apply_fun) acc mtyplst
+        List.fold_left (fun acc el -> fold_over_cmd_val apply_fun acc el.loc_val) acc mtyplst
     | MRef_val (ref, mtyplst) -> 
-              let acc = match ref.mrv_index with 
+              let acc = match ref.loc_val.mrv_index with 
                 | None -> acc
                 | Some lst -> List.fold_left (fold_over_cmd_val apply_fun) acc lst
               in 
-              List.fold_left (fold_over_cmd_val apply_fun) acc mtyplst
+              List.fold_left (fun acc arg -> fold_over_cmd_val apply_fun acc arg.loc_val) 
+                acc mtyplst
     | MEnvRef_val _ -> 
       acc
     | MBind_val mbind -> 
-        fold_over_cmd_val apply_fun (fold_over_cmd_val apply_fun acc mbind.mbd_value) mbind.mbd_body
+        fold_over_cmd_val 
+          apply_fun (fold_over_cmd_val apply_fun acc mbind.mbd_value.loc_val) 
+          mbind.mbd_body.loc_val
     | MIf_val (cond, thn , els) ->
     fold_over_cmd_val apply_fun 
       (fold_over_cmd_val apply_fun 
-        (fold_over_cmd_val apply_fun acc cond) 
-      thn) 
-    els
+        (fold_over_cmd_val apply_fun acc cond.loc_val) 
+      thn.loc_val) 
+    els.loc_val
     | MComp_val (_, mtyp1, mtyp2) ->
     fold_over_cmd_val apply_fun 
-      (fold_over_cmd_val apply_fun acc mtyp2)
-    mtyp1
+      (fold_over_cmd_val apply_fun acc mtyp2.loc_val)
+    mtyp1.loc_val
 
   let rec fold_over_composed_type_val apply_fun acc mtype = 
     match mtype with
@@ -136,27 +139,31 @@ open GufoParsed
       )
     | MBody_val (mtyplst) 
     | MBasicFunBody_val (_, mtyplst) ->
-        List.fold_left (fold_over_composed_type_val apply_fun) acc mtyplst
+        List.fold_left (fun acc bd -> fold_over_composed_type_val apply_fun acc bd.loc_val) 
+          acc mtyplst
     | MRef_val (ref, mtyplst) -> 
-              let acc = match ref.mrv_index with 
+              let acc = match ref.loc_val.mrv_index with 
                 | None -> acc
                 | Some lst -> List.fold_left (fold_over_composed_type_val apply_fun) acc lst
               in 
-              List.fold_left (fold_over_composed_type_val apply_fun) acc mtyplst
+              List.fold_left (fun acc arg -> fold_over_composed_type_val apply_fun acc arg.loc_val) 
+                acc mtyplst
     | MEnvRef_val _ -> 
         acc
     | MBind_val mbind -> 
-        fold_over_composed_type_val apply_fun (fold_over_composed_type_val apply_fun acc mbind.mbd_value) mbind.mbd_body
+        fold_over_composed_type_val 
+          apply_fun (fold_over_composed_type_val apply_fun acc mbind.mbd_value.loc_val) 
+          mbind.mbd_body.loc_val
     | MIf_val (cond, thn , els) ->
     fold_over_composed_type_val apply_fun 
       (fold_over_composed_type_val apply_fun 
-        (fold_over_composed_type_val apply_fun acc cond) 
-      thn) 
-    els
+        (fold_over_composed_type_val apply_fun acc cond.loc_val) 
+      thn.loc_val) 
+    els.loc_val
     | MComp_val (_, mtyp1, mtyp2) ->
     fold_over_composed_type_val apply_fun 
-      (fold_over_composed_type_val apply_fun acc mtyp2)
-    mtyp1
+      (fold_over_composed_type_val apply_fun acc mtyp2.loc_val)
+    mtyp1.loc_val
 
   let rec fold_over_mref_val apply_fun acc mtype = 
     match mtype with
@@ -211,27 +218,29 @@ open GufoParsed
       )
     | MBody_val (mtypelst) 
     | MBasicFunBody_val (_, mtypelst) ->
-            List.fold_left (fold_over_mref_val apply_fun) acc mtypelst
+            List.fold_left (fun acc bd -> fold_over_mref_val apply_fun acc bd.loc_val) acc mtypelst
     | MRef_val (mref, mtyplst) -> 
-              let acc = match mref.mrv_index with 
+              let acc = match mref.loc_val.mrv_index with 
                 | None -> acc
                 | Some lst -> List.fold_left (fold_over_mref_val apply_fun) acc lst
               in 
-              List.fold_left (fold_over_mref_val apply_fun) (apply_fun acc mref) mtyplst
+              List.fold_left (fun acc arg -> fold_over_mref_val apply_fun acc arg.loc_val) 
+                (apply_fun acc mref.loc_val) mtyplst
     | MEnvRef_val _ -> 
       acc
     | MBind_val mbind -> 
-        fold_over_mref_val apply_fun (fold_over_mref_val apply_fun acc mbind.mbd_value) mbind.mbd_body
+        fold_over_mref_val apply_fun (fold_over_mref_val apply_fun acc mbind.mbd_value.loc_val) 
+        mbind.mbd_body.loc_val
     | MIf_val (cond, thn , els) ->
     fold_over_mref_val apply_fun 
       (fold_over_mref_val apply_fun 
-        (fold_over_mref_val apply_fun acc cond) 
-      thn) 
-    els
+        (fold_over_mref_val apply_fun acc cond.loc_val) 
+      thn.loc_val) 
+    els.loc_val
     | MComp_val (_, mtyp1, mtyp2) ->
     fold_over_mref_val apply_fun 
-      (fold_over_mref_val apply_fun acc mtyp2)
-    mtyp1
+      (fold_over_mref_val apply_fun acc mtyp2.loc_val)
+    mtyp1.loc_val
 
   let fold_over_mref_type apply_fun acc mtype = 
     let rec fold_over_mref_simple_type apply_fun acc ms = 
@@ -312,29 +321,30 @@ open GufoParsed
       )
     | MBody_val (mtyplst) 
     | MBasicFunBody_val (_, mtyplst) ->
-        List.fold_left (fold_over_binding_val apply_fun) acc mtyplst
+        List.fold_left (fun acc bd -> fold_over_binding_val apply_fun acc bd.loc_val) acc mtyplst
     | MRef_val (ref , mtyplst) -> 
-              let acc = match ref.mrv_index with 
+              let acc = match ref.loc_val.mrv_index with 
                 | None -> acc
                 | Some lst -> List.fold_left (fold_over_binding_val apply_fun) acc lst
               in 
-              List.fold_left (fold_over_binding_val apply_fun) acc mtyplst
+              List.fold_left (fun acc arg -> fold_over_binding_val apply_fun acc arg.loc_val)
+                acc mtyplst
     | MEnvRef_val _ -> 
       acc
     | MBind_val mbind -> 
         fold_over_binding_val apply_fun 
-          (fold_over_binding_val apply_fun (apply_fun acc mbind) mbind.mbd_value) 
-        mbind.mbd_body
+          (fold_over_binding_val apply_fun (apply_fun acc mbind) mbind.mbd_value.loc_val) 
+        mbind.mbd_body.loc_val
     | MIf_val (cond, thn , els) ->
     fold_over_binding_val apply_fun 
       (fold_over_binding_val apply_fun 
-        (fold_over_binding_val apply_fun acc cond) 
-      thn) 
-    els
+        (fold_over_binding_val apply_fun acc cond.loc_val) 
+      thn.loc_val) 
+    els.loc_val
     | MComp_val (_, mtyp1, mtyp2) ->
     fold_over_binding_val apply_fun 
-      (fold_over_binding_val apply_fun acc mtyp2)
-    mtyp1
+      (fold_over_binding_val apply_fun acc mtyp2.loc_val)
+    mtyp1.loc_val
 
 
 let gufoKeywords = 

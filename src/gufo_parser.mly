@@ -193,22 +193,42 @@ issue for commands such as 'ls *'.
 shell:
     |  EOF
     {   
-      Some {mpg_types = GenUtils.StringMap.empty; mpg_topvar = []; mpg_topcal = MSimple_val(MEmpty_val)} 
+      Some {mpg_types = GenUtils.StringMap.empty; mpg_topvar = []; 
+            mpg_topcal = {
+                           loc_pos = GufoParsedHelper.dummy_position ; 
+                           loc_val = MSimple_val(MEmpty_val);
+                         }
+           }
     }
-    |  main_expr = topvarassign; EOF
+    |  main_expr = located(topvarassign); EOF
     {   
       Some {mpg_types = GenUtils.StringMap.empty; mpg_topvar = []; mpg_topcal = main_expr} 
     }
-    | LET ; varnames = var_tuple_decl; argnames = funargs_top ; AFFECTATION; funbody = located(topvarassign); EOF
+    | LET ; varnames = located(var_tuple_decl); argnames = funargs_top ; AFFECTATION; funbody = located(topvarassign); EOF
 	{
           let open GenUtils in 
-          (match argnames, varnames with
+          (match argnames, varnames.loc_val with
             | [], _ -> 
-              let mvar = {mva_name = varnames; mva_value = funbody.loc_val} in
-              Some ({mpg_types = GenUtils.StringMap.empty; mpg_topvar = [mvar];  mpg_topcal = MSimple_val(MEmpty_val)} )
+              let mvar = {mva_name = varnames; mva_value = funbody} in
+              Some ({mpg_types = GenUtils.StringMap.empty; mpg_topvar = [mvar];  
+                     mpg_topcal = {
+                           loc_pos = GufoParsedHelper.dummy_position ; 
+                           loc_val = MSimple_val(MEmpty_val);
+                         }
+                   })
             | argnames, MBaseDecl varname ->
-                let mvar = {mva_name = MBaseDecl varname; mva_value = MSimple_val (MFun_val (List.rev argnames, funbody))} in
-                Some ({mpg_types = GenUtils.StringMap.empty; mpg_topvar = [mvar];  mpg_topcal = MSimple_val(MEmpty_val)} )
+                let mvar = 
+                  {
+                    mva_name = varnames; 
+                    mva_value = {funbody with loc_val = MSimple_val (MFun_val (List.rev argnames, funbody))}
+                  } 
+                in
+                Some ({mpg_types = GenUtils.StringMap.empty; mpg_topvar = [mvar];  
+                       mpg_topcal = {
+                           loc_pos = GufoParsedHelper.dummy_position ; 
+                           loc_val = MSimple_val(MEmpty_val);
+                         }
+                      })
             | argnames, MTupDecl _ -> 
                 (*TODO: improve error message *)
                 raise (VarError "Error, impossible to gives arguments to tuple element of a let declaration. ")
@@ -225,7 +245,12 @@ shell:
                                mct_fields = typ; 
                                mct_internal_val = internal_val})
           in
-          Some {mpg_types = StringMap.singleton name ctyp; mpg_topvar = []; mpg_topcal = MSimple_val(MEmpty_val) } 
+          Some {mpg_types = StringMap.singleton name ctyp; mpg_topvar = []; 
+                mpg_topcal = {
+                           loc_pos = GufoParsedHelper.dummy_position ; 
+                           loc_val = MSimple_val(MEmpty_val);
+                         }
+                }
 	}
 
 
@@ -240,9 +265,14 @@ mfile:
   |  topels = mtopels; EOF
     {
       let (types, variables) = topels in
-      {mpg_types = types; mpg_topvar = variables;  mpg_topcal = MSimple_val(MEmpty_val)} 
+      {mpg_types = types; mpg_topvar = variables;  
+       mpg_topcal = {
+         loc_pos = GufoParsedHelper.dummy_position ; 
+         loc_val = MSimple_val(MEmpty_val);
+         }
+      }
     }
-  |  topels = mtopels; START; main_expr = topvarassign;EOF
+  |  topels = mtopels; START; main_expr = located(topvarassign);EOF
     {   
       let (types, variables) = topels in
       {mpg_types = types; mpg_topvar = variables; mpg_topcal = main_expr} 
@@ -272,11 +302,9 @@ var_tuple_decl:
     }
 
 base_var_tuple_decl:
-  | name = VARNAME; 
+  | name = located(VARNAME); 
     {let open GenUtils in 
-     
-      let name = rm_first_char name in
-      MBaseDecl (name)
+      MBaseDecl ({name with loc_val =  rm_first_char  name.loc_val })
     }
 
 rev_mtypes_or_topvals:
@@ -301,17 +329,21 @@ rev_mtypes_or_topvals:
 
   (*variables and function assignation*)
 
-  | topels= rev_mtypes_or_topvals; LET ; varnames = var_tuple_decl; argnames = funargs_top ; AFFECTATION; funbody = located(topvarassign);
+  | topels= rev_mtypes_or_topvals; LET ; varnames = located(var_tuple_decl); argnames = funargs_top ; AFFECTATION; funbody = located(topvarassign);
 	{
            
           let open GenUtils in 
       	  let (types, topvals) = topels in
-          (match argnames, varnames with
+          (match argnames, varnames.loc_val with
             | [], _ -> 
-              let mvar = {mva_name = varnames; mva_value = funbody.loc_val} in
+              let mvar = {mva_name = varnames; mva_value = funbody} in
       	      (  types ,  mvar :: topvals )
             | argnames, MBaseDecl varname ->
-                let mvar = {mva_name = MBaseDecl varname; mva_value = MSimple_val (MFun_val (List.rev argnames, funbody))} in
+                let mvar = 
+                  {
+                    mva_name = varnames; 
+                    mva_value = {funbody with loc_val = MSimple_val (MFun_val (List.rev argnames, funbody))}
+                  } in
       	      (  types ,  mvar :: topvals )
             | argnames, MTupDecl _ -> 
                 (*TODO: improve error message *)
@@ -475,21 +507,22 @@ leaf_expr:
 basic_expr:
   | res = leaf_expr 
     { res }
-  | LET ; binding_name = var_tuple_decl ; argnames = funargs_top ; AFFECTATION ; binding_value = located(topvarassign); IN ; OPEN_BRACKET; body = topvarassign ; CLOSE_BRACKET;
+  | LET ; binding_name = var_tuple_decl ; argnames = funargs_top ; AFFECTATION ; binding_value = located(topvarassign); IN ; OPEN_BRACKET; body = located(topvarassign); CLOSE_BRACKET;
     { 
      let open GenUtils in
       MBind_val {mbd_name = binding_name; 
-                  mbd_value = 
+                 mbd_value = 
                     (match argnames with 
-                      | [] -> binding_value.loc_val
-                      | lstargs -> MSimple_val (MFun_val (List.rev lstargs, binding_value)))
-                  ; 
+                      | [] -> binding_value
+                      | lstargs -> 
+                          { binding_value with 
+                            loc_val = MSimple_val (MFun_val (List.rev lstargs, binding_value))}); 
                   mbd_body =  body;
                   }
     }
   | SOME;  varassign = located(varassign_in_expr);
     {MSimple_val (MSome_val varassign)}
-  | IF ; cond = top_expr ; THEN; thn = top_expr ELSE; els = top_expr; 
+  | IF ; cond = located(top_expr); THEN; thn = located(top_expr) ELSE; els = located(top_expr); 
   {MIf_val (cond, thn, els)}
 
   | OPEN_BRACE ;fds = fields_assign; CLOSE_BRACE
@@ -501,9 +534,9 @@ basic_expr:
     }
   | comp = comp_expr; 
     {comp}
-  |  envvar = ENVVAR; 
-     {MEnvRef_val (GenUtils.rm_first_char envvar)}
-  |  funcall = modulVar; funargs = funcallargs ; 
+  |  envvar = located(ENVVAR); 
+     {MEnvRef_val ({envvar with loc_val = GenUtils.rm_first_char envvar.loc_val })}
+  |  funcall = located(modulVar); funargs = funcallargs ; 
      {MRef_val (funcall, funargs)}
   | op = operation ; 
     {op}
@@ -555,22 +588,22 @@ varassign_in_expr :
     {
       MSimple_val (MList_val lst)
     }
-  | var = modulVar; 
+  | var = located(modulVar); 
      {MRef_val (var, [])}
 
 
 comp_expr :
-  | expr1 = varassign_in_expr ; EQUALITY; expr2 = varassign_in_expr
+  | expr1 = located(varassign_in_expr) ; EQUALITY; expr2 = located(varassign_in_expr)
     {MComp_val (Egal, expr1, expr2) }
-  | expr1 = varassign_in_expr ; INEQUALITY; expr2 = varassign_in_expr
+  | expr1 = located(varassign_in_expr) ; INEQUALITY; expr2 = located(varassign_in_expr)
     {MComp_val (NotEqual, expr1, expr2) }
-  | expr1 = varassign_in_expr ; CLOSING_CHEVRON ; expr2 = varassign_in_expr
+  | expr1 = located(varassign_in_expr) ; CLOSING_CHEVRON ; expr2 = located(varassign_in_expr)
     {MComp_val (GreaterThan, expr1, expr2) }
-  | expr1 = varassign_in_expr ; EQ_CLOSING_CHEVRON; expr2 = varassign_in_expr
+  | expr1 = located(varassign_in_expr) ; EQ_CLOSING_CHEVRON; expr2 = located(varassign_in_expr)
     {MComp_val (GreaterOrEq, expr1, expr2) }
-  | expr1 = varassign_in_expr ; OPENING_CHEVRON ; expr2 = varassign_in_expr
+  | expr1 = located(varassign_in_expr) ; OPENING_CHEVRON ; expr2 = located(varassign_in_expr)
     {MComp_val (LessThan, expr1, expr2) }
-  | expr1 = varassign_in_expr ; EQ_OPENING_CHEVRON; expr2 = varassign_in_expr
+  | expr1 = located(varassign_in_expr) ; EQ_OPENING_CHEVRON; expr2 = located(varassign_in_expr)
     {MComp_val (LessOrEq, expr1, expr2) }
 
 anonymousfun: 
@@ -589,43 +622,43 @@ topvarassign :
 operation : 
   | OPEN_BRACKET; CLOSE_BRACKET;
     { MSimple_val (MEmpty_val) }
-  | i1 = top_expr; PLUS_STR; i2 = top_expr
+  | i1 = located(top_expr); PLUS_STR; i2 = located(top_expr)
     {MBasicFunBody_val (MConcatenation, [i1; i2])}
-  | i1 = top_expr; PLUS; i2 = top_expr
+  | i1 = located(top_expr); PLUS; i2 = located(top_expr)
     {MBasicFunBody_val (MAddition, [i1; i2])}
-  | i1 = top_expr; PLUS_DOT; i2 = top_expr 
+  | i1 = located(top_expr); PLUS_DOT; i2 = located(top_expr) 
     {MBasicFunBody_val (MAdditionFloat, [i1; i2])}
-  | i1 = top_expr ; MINUS ; i2 = top_expr
+  | i1 = located(top_expr) ; MINUS ; i2 = located(top_expr)
     {MBasicFunBody_val (MSoustraction, [i1; i2])}
-  | i1 = top_expr ; MINUS_DOT ; i2 = top_expr
+  | i1 = located(top_expr) ; MINUS_DOT ; i2 = located(top_expr)
     {MBasicFunBody_val (MSoustractionFloat, [i1; i2])}
-  | i1 = top_expr ; STAR ; i2 = top_expr
+  | i1 = located(top_expr) ; STAR ; i2 = located(top_expr)
     {MBasicFunBody_val (MMultiplication, [i1; i2])}
-  | i1 = top_expr ; STAR_DOT ; i2 = top_expr
+  | i1 = located(top_expr) ; STAR_DOT ; i2 = located(top_expr)
     {MBasicFunBody_val (MMultiplicationFLoat, [i1; i2])}
-  | i1 = top_expr ; DIVISION ; i2 = top_expr
+  | i1 = located(top_expr) ; DIVISION ; i2 = located(top_expr)
     {MBasicFunBody_val (MDivision , [i1; i2])}
-  | i1 = top_expr ; DIVISION_DOT ; i2 = top_expr
+  | i1 = located(top_expr) ; DIVISION_DOT ; i2 = located(top_expr)
     {MBasicFunBody_val (MDivisionFloat , [i1; i2])}
-  | i1 = top_expr; MODULO ; i2 = top_expr
+  | i1 = located(top_expr); MODULO ; i2 = located(top_expr)
     {MBasicFunBody_val (MModulo, [i1; i2])}
-  | i1 = top_expr; MODULO_DOT ; i2 = top_expr
+  | i1 = located(top_expr); MODULO_DOT ; i2 = located(top_expr)
     {MBasicFunBody_val (MModuloFloat, [i1; i2])}
-  | i1 = top_expr; WITH ; i2 = top_expr
+  | i1 = located(top_expr); WITH ; i2 = located(top_expr)
     {MBasicFunBody_val (MWithList, [i1; i2])}
-  | i1 = top_expr; WITH_SET ; i2 = top_expr
+  | i1 = located(top_expr); WITH_SET ; i2 = located(top_expr)
     {MBasicFunBody_val (MWithSet, [i1; i2])}
-  | i1 = top_expr; WITH_MAP ; i2 = top_expr
+  | i1 = located(top_expr); WITH_MAP ; i2 = located(top_expr)
     {MBasicFunBody_val (MWithMap, [i1; i2])}
-  | i1 = top_expr; WITHOUT_SET ; i2 = top_expr
+  | i1 = located(top_expr); WITHOUT_SET ; i2 = located(top_expr)
     {MBasicFunBody_val (MWithoutSet, [i1; i2])}
-  | i1 = top_expr; WITHOUT_MAP ; i2 = top_expr
+  | i1 = located(top_expr); WITHOUT_MAP ; i2 = located(top_expr)
     {MBasicFunBody_val (MWithoutMap, [i1; i2])}
-  | i1 = top_expr; SHAS ; i2 = top_expr
+  | i1 = located(top_expr); SHAS ; i2 = located(top_expr)
     {MBasicFunBody_val (MHasSet, [i1; i2])}
-  | i1 = top_expr; MHAS ; i2 = top_expr
+  | i1 = located(top_expr); MHAS ; i2 = located(top_expr)
     {MBasicFunBody_val (MHasMap, [i1; i2])}
-  | assign1 = top_expr; DOUBLE_SEMICOLON ;assign2 = exprseqeassign; 
+  | assign1 = located(top_expr); DOUBLE_SEMICOLON ;assign2 = exprseqeassign; 
     { MBody_val (assign1 ::assign2)}
 
 cmd_expr:
@@ -656,7 +689,7 @@ cmd_expr:
 
 funcallargs :
   | {[]}
-  | funarg = varassign_in_expr; funargs = funcallargs
+  | funarg = located(varassign_in_expr); funargs = funcallargs
     { funarg :: funargs }
 
 
@@ -691,13 +724,13 @@ funargs:
       (MTupleArg arg):: funargs }
 
 exprseqeassign:
-  | var1 =varassign_in_expr
+  | var1 =located(varassign_in_expr)
     {[var1]}
   | var1 = tupleassign; DOUBLE_SEMICOLON ; seq=exprseqeassign
     {var1 :: seq}
 
 tupleassign:
-  | var1 =varassign_in_expr
+  | var1 =located(varassign_in_expr)
     {var1}
 
 in_tuple_assign:
@@ -864,22 +897,34 @@ single_field:
     { {mtfv_name = fieldname; mtfv_val = value} }
 
 modulVar:
-  | var = VARNAME; idx = lst_index; 
+  | var = located(VARNAME); idx = lst_index; 
     {
       let open GenUtils in 
-      {mrv_module = None; mrv_varname= [(rm_first_char var)]; mrv_index = idx}}
-  |  varfield = VARFIELD; idx = lst_index; 
+      {
+        mrv_module = None; 
+        mrv_varname= { loc_val = [( rm_first_char var.loc_val )] ; loc_pos = var.loc_pos}; 
+        mrv_index = idx;
+      }
+    }
+  |  varfield = located(VARFIELD); idx = lst_index; 
     {
      let open GenUtils in 
-     let lst = Str.split (Str.regexp "\\.") (rm_first_char varfield)  in
-    {mrv_module = None; mrv_varname= lst ; mrv_index = idx}
+     let lst = Str.split (Str.regexp "\\.") (rm_first_char varfield.loc_val)  in
+    {
+      mrv_module = None; 
+      mrv_varname= {loc_val = lst; loc_pos = varfield.loc_pos ;} ; 
+      mrv_index = idx}
     }
-  | var = MODULVAR; idx = lst_index; 
+  | var = located(MODULVAR); idx = lst_index; 
     {
     let open GenUtils in 
-    let lst = Str.split (Str.regexp "\\.") (rm_first_char var) in
+    let lst = Str.split (Str.regexp "\\.") (rm_first_char var.loc_val) in
     let (modul, lst) = (List.hd lst, List.tl lst) in
-      {mrv_module = Some modul; mrv_varname= lst ; mrv_index = idx}
+      {
+        mrv_module = Some modul; 
+        mrv_varname= {loc_val = lst; loc_pos = var.loc_pos} ; 
+        mrv_index = idx
+      }
     }
 
 lst_index:
@@ -907,9 +952,9 @@ mapEl:
 
 
 modulVarOrExpr:
-  | a = ENVVAR
-    {MEnvRef_val (GenUtils.rm_first_char a)}
-  | a = modulVar
+  | a = located(ENVVAR)
+    {MEnvRef_val ({ a with loc_val = GenUtils.rm_first_char a.loc_val })}
+  | a = located(modulVar)
     {MRef_val (a,[])}
   | OPEN_BRACKET ; varassign = top_expr; CLOSE_BRACKET;
     { varassign }

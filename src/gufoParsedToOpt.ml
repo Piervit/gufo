@@ -118,7 +118,7 @@ let search_modules mprogram =
           | false -> map
       )
       map
-      mref.mrv_varname
+      mref.mrv_varname.loc_val
   in
   (*first look in types declaration*)
   let module2int = StringMap.fold 
@@ -130,11 +130,11 @@ let search_modules mprogram =
   let module2int = List.fold_left (fun module2int mvar ->
                     fold_over_mref_val 
                       add_module_from_mref
-                      module2int mvar.mva_value)
+                      module2int mvar.mva_value.loc_val)
                     module2int mprogram.mpg_topvar
   in
   (*then in toplevel*)
-  let module2int = fold_over_mref_val add_module_from_mref module2int mprogram.mpg_topcal
+  let module2int = fold_over_mref_val add_module_from_mref module2int mprogram.mpg_topcal.loc_val
   in module2int
 
   (* PART 3: FULL TYPE CHECKING *)
@@ -2192,7 +2192,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
     let search_in_topvar optiprog s = StringMap.find_opt s optiprog.mopg_topvar2int 
     in
     let resolve_main_var modul ref = 
-      let vname = List.hd ref.mrv_varname in
+      let vname = List.hd ref.mrv_varname.loc_val in
       (*get the variable*)
       let ires = 
         match modul  with
@@ -2245,7 +2245,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
               | Some modul, false -> (resolve_fd_modul modul fdname) :: newlst, None
               | Some modul, true -> raise (VarError ("Invalid syntax, not possible to have a module reference after another module reference: "^modul^"."^fdname^" ."))
           )
-          ([], None) (List.tl ref.mrv_varname)
+          ([], None) (List.tl ref.mrv_varname.loc_val)
       in
         let newlst,_ = fields in 
        newlst 
@@ -2265,7 +2265,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
             morv_debugname = 
               List.fold_left 
                 (fun str curstr -> sprintf "%s.%s" str curstr) 
-                "" ref.mrv_varname;
+                "" ref.mrv_varname.loc_val;
           }
       | Some s -> 
           let modi = 
@@ -2284,7 +2284,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
             morv_index = resolve_index ref ;
             morv_debugname = 
               List.fold_left 
-                (fun str curstr -> sprintf "%s.%s" str curstr) "" ref.mrv_varname;
+                (fun str curstr -> sprintf "%s.%s" str curstr) "" ref.mrv_varname.loc_val;
           }
   and parsedToOpt_binding ?topvar:(topvar = None) optiprog locScope bd = 
     let add_in_bindlist bindScope bindList debugnames elname position = 
@@ -2306,7 +2306,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
               | lst -> 
                    (List.hd lst + 1)::(List.tl lst) 
             )
-              in add_in_bindlist bindScope bindList debugnames str nposition
+              in add_in_bindlist bindScope bindList debugnames str.loc_val nposition
         | MTupDecl decllst -> 
           let nposition = -1::position in
           List.fold_left 
@@ -2336,11 +2336,11 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
          * previous definition of the variable to be usable (if there was
          * one).
          * *)
-        (match bd.mbd_value with 
-                | MSimple_val (MFun_val (_, _)) -> parsedToOpt_expr ~topvar optiprog newlocScope bd.mbd_value;
-                | _  -> parsedToOpt_expr ~topvar optiprog locScope bd.mbd_value
+        (match bd.mbd_value.loc_val with 
+                | MSimple_val (MFun_val (_, _)) -> parsedToOpt_expr ~topvar optiprog newlocScope bd.mbd_value.loc_val;
+                | _  -> parsedToOpt_expr ~topvar optiprog locScope bd.mbd_value.loc_val
         );
-      mobd_body = parsedToOpt_expr ~topvar optiprog newlocScope bd.mbd_body;
+      mobd_body = parsedToOpt_expr ~topvar optiprog newlocScope bd.mbd_body.loc_val;
     }
 
 
@@ -2368,28 +2368,32 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
           parsedToOpt_composed_val ~topvar optiprog locScope mct
       | MSimple_val sv -> MOSimple_val (parsedToOpt_simple_val ~topvar optiprog locScope sv)
       | MRef_val (ref, args) -> 
-          let oref = parsedToOpt_ref ~topvar optiprog locScope ref  in
-          MORef_val (oref, List.map (parsedToOpt_expr ~topvar optiprog locScope) args)
+          let oref = parsedToOpt_ref ~topvar optiprog locScope ref.loc_val  in
+          MORef_val (oref, 
+                     List.map 
+                       (fun arg -> parsedToOpt_expr ~topvar optiprog locScope arg.loc_val)
+                       args)
       | MEnvRef_val (var) -> 
-          MOEnvRef_val var
+          MOEnvRef_val var.loc_val
       | MBasicFunBody_val (op, args) ->
           (match args with 
           |  [a;b] -> 
-              MOBasicFunBody_val (op, parsedToOpt_expr ~topvar optiprog locScope a, 
-                                      parsedToOpt_expr ~topvar optiprog locScope b)
+              MOBasicFunBody_val (op, parsedToOpt_expr ~topvar optiprog locScope a.loc_val, 
+                                      parsedToOpt_expr ~topvar optiprog locScope b.loc_val)
           |  _ -> raise (SyntaxError "basic operators (+,-,/,mod...) are binary.")
           )
       | MBind_val bd -> 
           MOBind_val (parsedToOpt_binding ~topvar optiprog locScope bd)
       | MIf_val (cond, thn, els) ->
-          MOIf_val(parsedToOpt_expr ~topvar optiprog locScope cond,
-                   parsedToOpt_expr ~topvar optiprog locScope thn, 
-                   parsedToOpt_expr ~topvar optiprog locScope els)
+          MOIf_val(parsedToOpt_expr ~topvar optiprog locScope cond.loc_val,
+                   parsedToOpt_expr ~topvar optiprog locScope thn.loc_val, 
+                   parsedToOpt_expr ~topvar optiprog locScope els.loc_val)
       | MComp_val (op, left, right) -> 
-          MOComp_val (op, parsedToOpt_expr ~topvar optiprog locScope left, 
-                      parsedToOpt_expr ~topvar optiprog locScope right)
+          MOComp_val (op, parsedToOpt_expr ~topvar optiprog locScope left.loc_val, 
+                      parsedToOpt_expr ~topvar optiprog locScope right.loc_val)
       | MBody_val dblst -> 
-          MOBody_val (List.map (parsedToOpt_expr ~topvar optiprog locScope) dblst)
+          MOBody_val 
+            (List.map (fun bd -> parsedToOpt_expr ~topvar optiprog locScope bd.loc_val) dblst)
   
   
   in
@@ -2397,11 +2401,11 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
   let mapping_mpg_topvar optiprog mvarlst = 
     List.fold_left
       (fun map mvar -> 
-        match mvar.mva_name with
+        match mvar.mva_name.loc_val with
           | MBaseDecl aname ->
-              let iname = (StringMap.find aname optiprog.mopg_topvar2int) in
+              let iname = (StringMap.find aname.loc_val optiprog.mopg_topvar2int) in
               let res_expr = 
-              match mvar.mva_value with
+              match mvar.mva_value.loc_val with
               (*the idea is that when the topvar is a function, we want it to
                  be potientially recursive and so it can use reference to
                 itself to be recursive.
@@ -2411,15 +2415,15 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
                 one).
                 *)
                 | MSimple_val (MFun_val (_, _)) ->
-                  (parsedToOpt_expr  ~topvar:(None) optiprog (StringMap.add aname iname StringMap.empty) mvar.mva_value)
+                  (parsedToOpt_expr  ~topvar:(None) optiprog (StringMap.add aname.loc_val iname StringMap.empty) mvar.mva_value.loc_val)
                 | _  ->
                     (match past_var_map with 
-                      | None -> parsedToOpt_expr ~topvar:(None) optiprog StringMap.empty mvar.mva_value 
+                      | None -> parsedToOpt_expr ~topvar:(None) optiprog StringMap.empty mvar.mva_value.loc_val
                       | Some past_var_map -> 
                           parsedToOpt_expr ~topvar:(Some ((IntSet.singleton iname), 
                                                           past_var_map)) 
                                            optiprog StringMap.empty 
-                                           mvar.mva_value 
+                                           mvar.mva_value.loc_val
                     )
               in
               IntMap.add iname
@@ -2434,7 +2438,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
                         | [] -> [0]
                         | position -> ((List.hd position) + 1)::(List.tl position) 
                       in 
-                      IntMap.add (StringMap.find aname optiprog.mopg_topvar2int)
+                      IntMap.add (StringMap.find aname.loc_val optiprog.mopg_topvar2int)
                         (MOTupEl_val (tup_id, List.rev (new_position))) map, new_position
                   | MTupDecl lst -> 
                       let new_position = 
@@ -2453,7 +2457,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
               (*we compute the value affected to the whole tuple.*)
               let tup_val = 
                 (match past_var_map with 
-                  | None -> (MOTop_val (parsedToOpt_expr optiprog StringMap.empty mvar.mva_value))
+                  | None -> (MOTop_val (parsedToOpt_expr optiprog StringMap.empty mvar.mva_value.loc_val))
                   | Some past_var_map -> 
                     (*We have to compute the topvar elements *)
                     let inames =
@@ -2464,7 +2468,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
                            (match decl with
                             | MBaseDecl aname -> 
                               find_inames 
-                                (IntSet.add (StringMap.find aname
+                                (IntSet.add (StringMap.find aname.loc_val
                                               optiprog.mopg_topvar2int) acc) 
                                 decl_lst
                             | MTupDecl lst_vardecl ->
@@ -2474,7 +2478,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
                         )
                       in find_inames IntSet.empty decl_lst
                     in 
-                    (MOTop_val (parsedToOpt_expr ~topvar:(Some (inames, past_var_map)) optiprog StringMap.empty mvar.mva_value))
+                    (MOTop_val (parsedToOpt_expr ~topvar:(Some (inames, past_var_map)) optiprog StringMap.empty mvar.mva_value.loc_val))
                 )
               in 
               let tup_id = get_fresh_int () in
@@ -2509,7 +2513,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
   in
   match is_main_prog with
     | true -> 
-        let topcal = parsedToOpt_expr optiprog StringMap.empty oldprog.mpg_topcal in
+        let topcal = parsedToOpt_expr optiprog StringMap.empty oldprog.mpg_topcal.loc_val in
         let topcap_bind_vars = get_bind_vars_from_topvar topcal in
         {
           optiprog with 
@@ -2534,11 +2538,11 @@ let parsedToOpt_topval_intmap prog optiprog =
     in
     let rec add_topel el map = 
       match el with 
-        | MBaseDecl aname -> add_topvar aname map
+        | MBaseDecl aname -> add_topvar aname.loc_val map
         | MTupDecl nlst -> List.fold_left (fun map el -> add_topel el map) map nlst
     in
     List.fold_left
-      (fun map mvar -> add_topel mvar.mva_name map) 
+      (fun map mvar -> add_topel mvar.mva_name.loc_val map) 
       StringMap.empty mvarlst
   in
   let topvar2int = mapping_for_mvars prog.mpg_topvar in 
@@ -2639,9 +2643,9 @@ let provide_type_id oldprog optiprog =
 let parsedToOpt_type fulloptiprog oldprog optiprog = 
 
   let handle_ref_val_from_prog optiprog ref = 
-    let typname = List.hd ref.mrv_varname in
+    let typname = List.hd ref.mrv_varname.loc_val in
     let inttyp = StringMap.find_opt typname optiprog.mopg_ctype2int in
-    (match inttyp, ref.mrv_varname with 
+    (match inttyp, ref.mrv_varname.loc_val with 
       | Some inttyp, [typname] -> 
           let modul = 
             (match ref.mrv_module with 
@@ -3301,12 +3305,12 @@ let add_prog_to_optprog fulloptiprog fullprog =
           in
           let rec add_topel el map = 
             match el with 
-              | MBaseDecl aname -> add_topvar aname map
+              | MBaseDecl aname -> add_topvar aname.loc_val map
               | MTupDecl nlst -> List.fold_left (fun map el -> add_topel el map) map nlst
           in
           let topvar2int = 
             List.fold_left
-                (fun map mvar -> add_topel mvar.mva_name map)
+                (fun map mvar -> add_topel mvar.mva_name.loc_val map)
               oprog.mopg_topvar2int mprog.mpg_topvar
           in
           (*TODO: this could be optimized: we iterate on every program var*)
