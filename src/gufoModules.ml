@@ -71,7 +71,7 @@ let get_oref_from_sysmodule ref fulloprog =
     | None -> raise GufoModuleInvalidArgument 
     | Some modul -> 
         let sysmod = parse_system_module modul in
-          match ref.mrv_varname with 
+          match ref.mrv_varname.loc_val with 
             | [varname] ->
               let intname = StringMap.find varname sysmod.mosm_typstr2int in
               (get_intname_from_modulestr modul fulloprog), intname

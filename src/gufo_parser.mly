@@ -929,7 +929,7 @@ modulVar:
 
 lst_index:
   | {None}
-  | prev_idx = lst_index; OPEN_SQRIDXBRACKET;elkey = top_expr; CLOSE_SQRBRACKET;
+  | prev_idx = lst_index; OPEN_SQRIDXBRACKET;elkey = located(top_expr); CLOSE_SQRBRACKET;
     {match prev_idx with
       | None -> Some [elkey]
       | Some lst -> Some (elkey::lst)

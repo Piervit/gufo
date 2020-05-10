@@ -270,7 +270,7 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
                   | MOSORString a, MOSORExpr b -> 1 
                   | MOSORExpr a, MOSORString b -> -1
                   | MOSORString a, MOSORString b -> 
-                    String.compare a b
+                    String.compare a.loc_val b.loc_val
                   | MOSORExpr a, MOSORExpr b -> val_compare a b
               ) cmda.mocm_args cmdb.mocm_args 
             with
@@ -910,7 +910,7 @@ and apply_fun toplevel arg2valMap funval arglst =
 and _play_cmd_simple toplevel to_fork (pip_write, pip_read) arg2valMap cmd = 
   let apply_mostringOrRef mosr = 
     match mosr with
-      | MOSORString str -> str
+      | MOSORString str -> str.loc_val
       | MOSORExpr expr -> 
           match apply_motype_val toplevel arg2valMap expr with
             | MOSimple_val (MOBase_val (MOTypeStringVal s)) -> s (*result has to be a string*)
@@ -970,7 +970,7 @@ and _play_cmd_simple toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
 and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd = 
   let apply_mostringOrRef mosr = 
     match mosr with
-      | MOSORString str -> str
+      | MOSORString str -> str.loc_val
       | MOSORExpr expr -> 
           match apply_motype_val toplevel arg2valMap expr with
             | MOSimple_val (MOBase_val (MOTypeStringVal s)) -> 

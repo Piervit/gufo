@@ -142,7 +142,7 @@ and mcomposed_type_val = {
 and mref_val = {
   mrv_module : string option; (* None if curmodule *)
   mrv_varname : string list located; (*varname * fields ($toto.f1.f2 ) *)
-  mrv_index: mtype_val list option; (*in case we access a list element of the
+  mrv_index: mtype_val located list option; (*in case we access a list element of the
                                     reference, such as in $a[$b][$c].
                                     $a will have mrv_index as Some [mref($b); 
                                                                     mref(c)]

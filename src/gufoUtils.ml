@@ -65,7 +65,7 @@ open GufoParsed
     | MRef_val (ref, mtyplst) -> 
               let acc = match ref.loc_val.mrv_index with 
                 | None -> acc
-                | Some lst -> List.fold_left (fold_over_cmd_val apply_fun) acc lst
+                | Some lst -> List.fold_left (fun acc v -> fold_over_cmd_val apply_fun acc v.loc_val) acc lst
               in 
               List.fold_left (fun acc arg -> fold_over_cmd_val apply_fun acc arg.loc_val) 
                 acc mtyplst
@@ -144,7 +144,7 @@ open GufoParsed
     | MRef_val (ref, mtyplst) -> 
               let acc = match ref.loc_val.mrv_index with 
                 | None -> acc
-                | Some lst -> List.fold_left (fold_over_composed_type_val apply_fun) acc lst
+                | Some lst -> List.fold_left (fun acc v -> fold_over_composed_type_val apply_fun acc v.loc_val) acc lst
               in 
               List.fold_left (fun acc arg -> fold_over_composed_type_val apply_fun acc arg.loc_val) 
                 acc mtyplst
@@ -222,7 +222,7 @@ open GufoParsed
     | MRef_val (mref, mtyplst) -> 
               let acc = match mref.loc_val.mrv_index with 
                 | None -> acc
-                | Some lst -> List.fold_left (fold_over_mref_val apply_fun) acc lst
+                | Some lst -> List.fold_left (fun acc v -> fold_over_mref_val apply_fun acc v.loc_val) acc lst
               in 
               List.fold_left (fun acc arg -> fold_over_mref_val apply_fun acc arg.loc_val) 
                 (apply_fun acc mref.loc_val) mtyplst
@@ -325,7 +325,7 @@ open GufoParsed
     | MRef_val (ref , mtyplst) -> 
               let acc = match ref.loc_val.mrv_index with 
                 | None -> acc
-                | Some lst -> List.fold_left (fold_over_binding_val apply_fun) acc lst
+                | Some lst -> List.fold_left (fun acc v -> fold_over_binding_val apply_fun acc v.loc_val) acc lst
               in 
               List.fold_left (fun acc arg -> fold_over_binding_val apply_fun acc arg.loc_val)
                 acc mtyplst

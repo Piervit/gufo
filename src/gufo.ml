@@ -96,7 +96,7 @@ struct
         | MICMDIFile of mistringOrRef_val (*path*)
 
       and mistringOrRef_val =
-        | MISORString of string
+        | MISORString of string located
         | MISORExpr of mitype_val
 
 
@@ -310,7 +310,7 @@ struct
                       | MISORString a, MISORExpr b -> 1 
                       | MISORExpr a, MISORString b -> -1
                       | MISORString a, MISORString b -> 
-                        String.compare a b
+                        String.compare a.loc_val b.loc_val
                       | MISORExpr a, MISORExpr b -> type_compare a b
                   ) cmda.micm_args cmdb.micm_args 
                 with
@@ -716,7 +716,7 @@ struct
     | MOCMDIFile of mostringOrRef_val (*path*)
 
   and mostringOrRef_val =
-    | MOSORString of string
+    | MOSORString of string located
     | MOSORExpr of motype_val
 
 

@@ -241,7 +241,7 @@ sig
     | MOCMDIFile of mostringOrRef_val (*path*)
 
   and mostringOrRef_val =
-    | MOSORString of string
+    | MOSORString of string located
     | MOSORExpr of motype_val
 
 
