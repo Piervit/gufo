@@ -115,7 +115,7 @@ sig
 
   module MMap : 
     sig
-      type key = SimpleCore.mitype_val
+      type key = SimpleCore.mitype_val located
       type (+'a) t
       val empty: 'a t
       val is_empty: 'a t -> bool
@@ -154,7 +154,7 @@ sig
 
   module MSet :
     sig
-      type elt = SimpleCore.mitype_val
+      type elt = SimpleCore.mitype_val located
       type t
       val empty: t
       val is_empty: t -> bool
@@ -202,7 +202,7 @@ sig
   and moref_val = {
     morv_module : int option; (* None if defined in current module.*)
     morv_varname : int * (int option * int) list; (*varname * (fieldmoduleid * fieldsid *)
-    morv_index : motype_val list option; (*in case we access a list element of the
+    morv_index : motype_val located list option; (*in case we access a list element of the
                                     reference, such as in $a[$b][$c].
                                     $a will have mrv_index as Some [mref($b); 
                                                                     mref(c)]
@@ -210,7 +210,6 @@ sig
     morv_debugname : string;
   }
  
-  and mcSetEl = motype_val
 
   and mocmd_redir =  
     | MORedirOStdOut
@@ -242,11 +241,11 @@ sig
 
   and mostringOrRef_val =
     | MOSORString of string located
-    | MOSORExpr of motype_val
+    | MOSORExpr of motype_val located
 
 
   and mocmd_val = {
-    mocm_cmd : string;
+    mocm_cmd : string located;
     mocm_args : mostringOrRef_val list;
     mocm_res : int option; (*if res is None, the command has not already been executed*)
     mocm_output : mocmd_output; 
@@ -259,43 +258,43 @@ sig
   }
 
   and mocmd_seq = 
-    | MOSimpleCmd of mocmd_val
-    | MOForkedCmd of mocmd_seq (*symbol & *)
-    | MOAndCmd of mocmd_seq * mocmd_seq (*&& : The right side of && will only be evaluated if the exit status of the left side is zero.*)
-    | MOOrCmd of mocmd_seq * mocmd_seq (*|| : The right side of || will only be evaluated if the exit status of the left side is non-zero.*)
-    | MOSequenceCmd of mocmd_seq * mocmd_seq (*; *)
-    | MOPipedCmd of mocmd_seq * mocmd_seq (*; *)
+    | MOSimpleCmd of mocmd_val located
+    | MOForkedCmd of mocmd_seq located (*symbol & *)
+    | MOAndCmd of mocmd_seq located * mocmd_seq located (*&& : The right side of && will only be evaluated if the exit status of the left side is zero.*)
+    | MOOrCmd of mocmd_seq located * mocmd_seq located (*|| : The right side of || will only be evaluated if the exit status of the left side is non-zero.*)
+    | MOSequenceCmd of mocmd_seq located * mocmd_seq located (*; *)
+    | MOPipedCmd of mocmd_seq located * mocmd_seq located(*; *)
  
   and mobase_type_val = 
-    | MOTypeStringVal of string
-    | MOTypeBoolVal of bool
-    | MOTypeIntVal of int
-    | MOTypeFloatVal of float
-    | MOTypeCmdVal of mocmd_seq
+    | MOTypeStringVal of string located 
+    | MOTypeBoolVal of bool located
+    | MOTypeIntVal of int located 
+    | MOTypeFloatVal of float located
+    | MOTypeCmdVal of mocmd_seq located
 (*     | MTypeFileVal of mfile_val *)
   
  
   and mocomposed_type_val = {
     mocv_module_def : int option ; (*the module in which the type is defined.*)
-    mocv_fields: motype_val IntMap.t; (*The key are are name of the field, the values are the value of the field.*)
+    mocv_fields: motype_val located IntMap.t; (*The key are are name of the field, the values are the value of the field.*)
     mocv_resolved_type : int option *int ; (*module, id of the type*)
   }
  
   and mofun_val = {
     mofv_args_name : int StringMap.t; (*args name map (for debug + color)*) 
     mofv_args_id : mofunarg list; 
-    mofv_body : motype_val;
+    mofv_body : motype_val located;
     (*TODO: Should this have a type information?*)
   } 
  
   and mosimple_type_val = 
     | MOBase_val of mobase_type_val 
-    | MOTuple_val of motype_val list
-    | MOList_val of motype_val list
+    | MOTuple_val of motype_val located list
+    | MOList_val of motype_val located list
     | MONone_val 
-    | MOSome_val of motype_val
+    | MOSome_val of motype_val located
     | MOSet_val of MSet.t
-    | MOMap_val of motype_val MMap.t
+    | MOMap_val of motype_val located MMap.t
     | MOFun_val of mofun_val
     | MOEmpty_val
   
@@ -309,13 +308,13 @@ sig
   and motype_val = 
     | MOSimple_val of mosimple_type_val
     | MOComposed_val of mocomposed_type_val
-    | MORef_val of moref_val * motype_val list (*ref , varname args*)
+    | MORef_val of moref_val * motype_val located list (*ref , varname args*)
     | MOEnvRef_val of string (*Environnement variable.*)
-    | MOBasicFunBody_val of mo_expr_operation * motype_val * motype_val
+    | MOBasicFunBody_val of mo_expr_operation * motype_val located * motype_val located
     | MOBind_val of mobinding
-    | MOIf_val of motype_val * motype_val * motype_val
-    | MOComp_val of mocomp_op * motype_val * motype_val (* comp_op * left_expr * right_expr *)
-    | MOBody_val of motype_val list
+    | MOIf_val of motype_val located * motype_val located * motype_val located
+    | MOComp_val of mocomp_op * motype_val located * motype_val located (* comp_op * left_expr * right_expr *)
+    | MOBody_val of motype_val located list
 
   and mocomp_op = GufoParsed.mcomp_op
 
@@ -328,8 +327,8 @@ sig
       [xa, [1]; xb, [2;1]; xc, [2;2]; xd, [3]]
     *)
     mobd_debugnames : string IntMap.t; (*this has been added for debug and possible colorization*)
-    mobd_value: motype_val;
-    mobd_body: motype_val ;
+    mobd_value: motype_val located;
+    mobd_body: motype_val located;
   }
 
   and mo_expr_operation = GufoParsed.m_expr_operation
@@ -351,7 +350,7 @@ sig
     mosmv_description: string; (*A comment associated to the function or variable.*)
     mosmv_intname: int;
     mosmv_type: motype; 
-    mosmv_action: (motype_val list -> topvar_val IntMap.t -> motype_val); (* function argument -> scope -> function res *)
+    mosmv_action: (motype_val located list -> topvar_val IntMap.t -> motype_val located); (* function argument -> scope -> function res *)
   }
 
   and mosysmodulefield = {
@@ -404,7 +403,7 @@ sig
     mopg_topvar_bind_vars: IntSet.t StringMap.t IntMap.t; (*used to give indication of the type of a var in a binding (or in a fun):
       For a topvar, for a var name, I want a set of integer var id.
       *)
-    mopg_topcal : motype_val;
+    mopg_topcal : motype_val located;
     mopg_topcal_bind_vars: IntSet.t StringMap.t; (*used to give indication of the type of a var in a binding (or in a fun)*)
     mopg_topvar2int: int StringMap.t ;
     mopg_topvar_debugname: string IntMap.t ;
@@ -413,7 +412,7 @@ sig
   }
 
   and topvar_val = 
-    | MOTop_val of motype_val 
+    | MOTop_val of motype_val located
     | MOTupEl_val of int * int list (*reference of the tupel, position in the tuple. This is a list for multi dimensional tuple*)
 
   and moprocess = GufoParsed.mprocess
@@ -436,9 +435,16 @@ sig
 
   (**Transformation from SimpleCore to Core **)
 
-  val simple_to_core_val: mitype_val -> motype_val
+  val simple_to_core_val: mitype_val located -> motype_val located
+  
+  (*The general idea, is that at runtype, we don't want to care about location,
+  so this function are for runtime (especially system module stuff).*)
+  val simple_to_core_val_no_loc: mitype_val -> motype_val 
 
-  val core_to_simple_val: motype_val -> mitype_val
+  val core_to_simple_val: motype_val located -> mitype_val located
+  (*The general idea, is that at runtype, we don't want to care about location,
+  so this function are for runtime (especially system module stuff) .*)
+  val core_to_simple_val_no_loc: motype_val -> mitype_val 
 
   (**END Transformation from SimpleCore to Core **)
 
@@ -481,6 +487,8 @@ environment 'env'. Raise NotFould if not found.*)
 
   (* return the val as a string *)
   val moval_to_string: motype_val -> string
+
+  val moval_loc_to_string: motype_val located -> string
  
   val topvar_to_string: topvar_val -> string
  

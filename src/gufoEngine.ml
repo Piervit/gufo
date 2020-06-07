@@ -25,6 +25,7 @@ open Unix
 open Sys
 open Array
 open Printf
+open GufoLocHelper
 
 
 let print_debug_arg2valMap arg2valMap = 
@@ -183,6 +184,7 @@ let play_assert_false cmd red_args shenv input_fd output_fd outerr_fd =
 
 
 let play_cd cmd red_args shenv input_fd output_fd outerr_fd = 
+  let cmdv = cmd.loc_val in
   (*cd will write an error and do nothing else if it has more than 1 arg.*)
   let path, error = 
     match red_args with
@@ -198,8 +200,8 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
         in
         ecode,
         shenv, 
-        {cmd with mocm_res = Some ecode; 
-                mocm_print_error = Some msg}
+        {cmd with loc_val = {cmdv with mocm_res = Some ecode; 
+                mocm_print_error = Some msg}}
     | None, path -> 
         try 
           Sys.chdir path;
@@ -207,15 +209,15 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
           {
             mose_curdir = Sys.getcwd ();
           },
-          {cmd with mocm_res = Some 0;}
+          {cmd with loc_val = { cmdv with mocm_res = Some 0;}}
         with Sys_error msg -> 
         let _nb_written = 
           write_substring outerr_fd (msg ^ "\n") 0 ((String.length msg)+1)
         in
           1,
           shenv ,
-          {cmd with mocm_res = Some 1;
-           mocm_print_error = Some msg}
+          {cmd with loc_val = { cmdv with mocm_res = Some 1;
+           mocm_print_error = Some msg} }
           
 
 
@@ -248,6 +250,7 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
 
 
   and cmd_compare cmda cmdb = 
+    let cmda, cmdb = cmda.loc_val, cmdb.loc_val in
     let cmp_res resa resb = 
       match resa, resb with
         | Some _, None -> 1
@@ -262,7 +265,7 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
         | Some printa , Some printb when ((String.compare printa printb != 0)) -> String.compare printa printb
         | _ -> 0 
     in
-      match String.compare cmda.mocm_cmd cmdb.mocm_cmd with
+      match String.compare cmda.mocm_cmd.loc_val cmdb.mocm_cmd.loc_val with
         | 0  -> 
             (match list_compare 
               (fun arga argb -> 
@@ -289,7 +292,7 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
         | i -> i
   
   and cmd_seq_compare cmdseqa cmdseqb =
-    match cmdseqa, cmdseqb with
+    match cmdseqa.loc_val, cmdseqb.loc_val with
       | MOSimpleCmd cmda, MOSimpleCmd cmdb ->
           cmd_compare cmda cmdb
       | MOForkedCmd cmda, MOForkedCmd cmdb ->
@@ -373,13 +376,15 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
       (*TODO definir pour chaque type de base une fonction de comparaison*)
           (match aaa, bbb with
             | MOTypeStringVal aaaa, MOTypeStringVal bbbb ->
-                  String.compare aaaa bbbb
-            | MOTypeBoolVal true, MOTypeBoolVal false ->
+                  String.compare aaaa.loc_val bbbb.loc_val
+            | MOTypeBoolVal a, MOTypeBoolVal b ->
+              (match a.loc_val, b.loc_val with
+                | true, false -> 
                   1
-            | MOTypeBoolVal false, MOTypeBoolVal true ->
+                | false, true -> 
                   -1
-            | MOTypeBoolVal _, MOTypeBoolVal _ ->
-                  0
+                | _,_ -> 0
+              )
             | MOTypeIntVal aaaa, MOTypeIntVal bbbb ->
                   compare aaaa bbbb
             | MOTypeFloatVal aaaa, MOTypeFloatVal bbbb ->
@@ -412,8 +417,8 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
       | _ , _ -> raise (TypeError "Bad type comparison")
   
   and val_compare a b =
-      match a, b with 
-      | MOSimple_val  aa , MOSimple_val bb ->
+      match a.loc_val, b.loc_val with 
+      | MOSimple_val aa , MOSimple_val bb ->
           simple_val_compare aa bb
       | MOComposed_val aa , MOComposed_val bb ->
           composedType_compare aa bb
@@ -459,44 +464,44 @@ let val_from_cmd_field field cmdseq =
       | _, _ -> None
   in
   let rec get_cmd_res_from_cmdseq cmdseq = 
-    match cmdseq with
+    match cmdseq.loc_val with
     | MOSimpleCmd cmdv -> cmdv
     | MOForkedCmd cmdv -> get_cmd_res_from_cmdseq cmdv
     | MOAndCmd (cmda, cmdb) -> 
         let cmda = get_cmd_res_from_cmdseq cmda in
-        (match cmda.mocm_res with
+        (match cmda.loc_val.mocm_res with
           | Some 0 ->
               let cmdb = get_cmd_res_from_cmdseq cmdb in
-              {
-                mocm_cmd = "";
+                box_loc { 
+                mocm_cmd = box_loc "";
                 mocm_args = [];
-                mocm_res = cmdb.mocm_res;
-                mocm_output = cmdb.mocm_output; 
-                mocm_outputerr = cmdb.mocm_outputerr; 
-                mocm_input_src = cmda.mocm_input_src; 
-                mocm_input = cmda.mocm_input; 
-                mocm_print =  merge_opt_string cmda.mocm_print cmdb.mocm_print;
-                mocm_print_error= merge_opt_string cmda.mocm_print_error cmdb.mocm_print_error;
-                mocm_print_std=  merge_opt_string cmda.mocm_print_std cmdb.mocm_print_std;
+                mocm_res = cmdb.loc_val.mocm_res;
+                mocm_output = cmdb.loc_val.mocm_output; 
+                mocm_outputerr = cmdb.loc_val.mocm_outputerr; 
+                mocm_input_src = cmda.loc_val.mocm_input_src; 
+                mocm_input = cmda.loc_val.mocm_input; 
+                mocm_print =  merge_opt_string cmda.loc_val.mocm_print cmdb.loc_val.mocm_print;
+                mocm_print_error= merge_opt_string cmda.loc_val.mocm_print_error cmdb.loc_val.mocm_print_error;
+                mocm_print_std=  merge_opt_string cmda.loc_val.mocm_print_std cmdb.loc_val.mocm_print_std;
               }
           | None -> raise (ExecutionError "command not executed (gufo internal error.)")
           | Some i -> cmda)
     | MOOrCmd (cmda, cmdb) -> 
         let cmda = get_cmd_res_from_cmdseq cmda in
-        (match cmda.mocm_res with
+        (match cmda.loc_val.mocm_res with
           | Some i ->
               let cmdb = get_cmd_res_from_cmdseq cmdb in
-              {
-                mocm_cmd = "";
+              box_loc {
+                mocm_cmd = box_loc "";
                 mocm_args = [];
-                mocm_res = cmdb.mocm_res;
-                mocm_output = cmdb.mocm_output; 
-                mocm_outputerr = cmdb.mocm_outputerr; 
-                mocm_input_src = cmda.mocm_input_src; 
-                mocm_input = cmda.mocm_input; 
-                mocm_print =  merge_opt_string cmda.mocm_print cmdb.mocm_print;
-                mocm_print_error= merge_opt_string cmda.mocm_print_error cmdb.mocm_print_error;
-                mocm_print_std=  merge_opt_string cmda.mocm_print_std cmdb.mocm_print_std;
+                mocm_res = cmdb.loc_val.mocm_res;
+                mocm_output = cmdb.loc_val.mocm_output; 
+                mocm_outputerr = cmdb.loc_val.mocm_outputerr; 
+                mocm_input_src = cmda.loc_val.mocm_input_src; 
+                mocm_input = cmda.loc_val.mocm_input; 
+                mocm_print =  merge_opt_string cmda.loc_val.mocm_print cmdb.loc_val.mocm_print;
+                mocm_print_error= merge_opt_string cmda.loc_val.mocm_print_error cmdb.loc_val.mocm_print_error;
+                mocm_print_std=  merge_opt_string cmda.loc_val.mocm_print_std cmdb.loc_val.mocm_print_std;
               }
           | None -> raise (ExecutionError "command not executed (gufo internal error.)")
           )
@@ -504,59 +509,60 @@ let val_from_cmd_field field cmdseq =
         let cmda, cmdb = get_cmd_res_from_cmdseq cmda,
                          get_cmd_res_from_cmdseq cmdb
         in
-        {
-           mocm_cmd = "";
+        box_loc {
+           mocm_cmd = box_loc "";
            mocm_args = [];
-           mocm_res = cmdb.mocm_res;
-           mocm_output = cmdb.mocm_output; 
-           mocm_outputerr = cmdb.mocm_outputerr; 
-           mocm_input_src = cmda.mocm_input_src; 
-           mocm_input = cmda.mocm_input; 
-           mocm_print =  merge_opt_string cmda.mocm_print cmdb.mocm_print;
-           mocm_print_error= merge_opt_string cmda.mocm_print_error cmdb.mocm_print_error;
-           mocm_print_std=  merge_opt_string cmda.mocm_print_std cmdb.mocm_print_std;
+           mocm_res = cmdb.loc_val.mocm_res;
+           mocm_output = cmdb.loc_val.mocm_output; 
+           mocm_outputerr = cmdb.loc_val.mocm_outputerr; 
+           mocm_input_src = cmda.loc_val.mocm_input_src; 
+           mocm_input = cmda.loc_val.mocm_input; 
+           mocm_print =  merge_opt_string cmda.loc_val.mocm_print cmdb.loc_val.mocm_print;
+           mocm_print_error= merge_opt_string cmda.loc_val.mocm_print_error cmdb.loc_val.mocm_print_error;
+           mocm_print_std=  merge_opt_string cmda.loc_val.mocm_print_std cmdb.loc_val.mocm_print_std;
         }
     | MOPipedCmd (cmda, cmdb) -> 
         let cmda, cmdb = get_cmd_res_from_cmdseq cmda,
                          get_cmd_res_from_cmdseq cmdb
         in
-        {
-           mocm_cmd = "";
+        box_loc {
+           mocm_cmd = box_loc "";
            mocm_args = [];
-           mocm_res = cmdb.mocm_res;
-           mocm_output = cmdb.mocm_output; 
-           mocm_outputerr = cmdb.mocm_outputerr; 
-           mocm_input_src = cmda.mocm_input_src; 
-           mocm_input = cmda.mocm_input; 
-           mocm_print =  cmdb.mocm_print;
-           mocm_print_error= merge_opt_string cmda.mocm_print_error cmdb.mocm_print_error;
-           mocm_print_std=  cmdb.mocm_print_std;
+           mocm_res = cmdb.loc_val.mocm_res;
+           mocm_output = cmdb.loc_val.mocm_output; 
+           mocm_outputerr = cmdb.loc_val.mocm_outputerr; 
+           mocm_input_src = cmda.loc_val.mocm_input_src; 
+           mocm_input = cmda.loc_val.mocm_input; 
+           mocm_print =  cmdb.loc_val.mocm_print;
+           mocm_print_error= merge_opt_string cmda.loc_val.mocm_print_error cmdb.loc_val.mocm_print_error;
+           mocm_print_std=  cmdb.loc_val.mocm_print_std;
         }
  
   in
 
   let cmd = get_cmd_res_from_cmdseq cmdseq in
+  let cmdv = cmd.loc_val in
   match field with 
     | 2 (*res*) -> 
-        (match cmd.mocm_res with
+        (match cmdv.mocm_res with
           | None -> MOSimple_val (MOEmpty_val)
-          | Some i -> MOSimple_val (MOSome_val (MOSimple_val (MOBase_val (MOTypeIntVal i))))
+          | Some i -> MOSimple_val (MOSome_val (box_loc (MOSimple_val (MOBase_val (MOTypeIntVal (box_loc i))))))
         )
     | 3 (*print*) -> 
-        (match cmd.mocm_res, cmd.mocm_print_std with
-          | None, _ -> MOSimple_val (MOBase_val (MOTypeStringVal ""))
-          | Some _res, None -> MOSimple_val (MOBase_val (MOTypeStringVal ""))
-          | Some res, Some str -> MOSimple_val (MOBase_val (MOTypeStringVal str))
+        (match cmdv.mocm_res, cmdv.mocm_print_std with
+          | None, _ -> MOSimple_val (MOBase_val (MOTypeStringVal (box_loc "")))
+          | Some _res, None -> MOSimple_val (MOBase_val (MOTypeStringVal (box_loc "")))
+          | Some res, Some str -> MOSimple_val (MOBase_val (MOTypeStringVal (box_loc str)))
         )
     | _ -> assert false
 
 let rec find_val_from_field fields moval =
-  match fields, moval with
+  match fields, moval.loc_val with
     | ([_, field],MOComposed_val cv) -> IntMap.find field cv.mocv_fields
     | (( _, field)::fields,MOComposed_val cv) -> 
       find_val_from_field fields (IntMap.find field cv.mocv_fields)
     | ([_, field],MOSimple_val (MOBase_val (MOTypeCmdVal cmdseq))) ->  
-         val_from_cmd_field field cmdseq 
+         box_loc (val_from_cmd_field field cmdseq )
     | _ -> assert false
 
 let find_var_in_prog varname scope = 
@@ -564,11 +570,11 @@ let find_var_in_prog varname scope =
     match pos with 
       | [] ->  raise (ExecutionError "internal error")
       | [i] -> 
-        (match tup_val with
+        (match tup_val.loc_val with
           | MOSimple_val (MOTuple_val lst) -> List.nth lst i 
-            | _ -> raise (ExecutionError (sprintf "internal error(expecting tuple value but found %s \n" (moval_to_string tup_val))))
+            | _ -> raise (ExecutionError (sprintf "internal error(expecting tuple value but found %s \n" (moval_loc_to_string tup_val))))
       | i::lst -> 
-          (match tup_val with
+          (match tup_val.loc_val with
             | MOSimple_val (MOTuple_val tuplst) -> find_with_pos lst (List.nth tuplst i)
             | _ -> raise (ExecutionError "internal error")
           )
@@ -605,59 +611,59 @@ let find_var_in_sysmod varname sysmod =
 
 
 let check_is_true expr = 
-  match expr with 
-    | MOSimple_val (MOBase_val (MOTypeBoolVal true)) -> true
-    | MOSimple_val (MOBase_val (MOTypeBoolVal false)) -> false 
+  match expr.loc_val with 
+    | MOSimple_val (MOBase_val (MOTypeBoolVal t)) -> t.loc_val
     | _ -> assert false
 
   
 let rec apply_opcomp toplevel arg2valMap op leftv rightv =
-  let (red_leftv, red_rightv) = 
+  let (red_left, red_right) = 
     (apply_motype_val toplevel arg2valMap leftv, apply_motype_val toplevel arg2valMap rightv)
   in
+  let (red_leftv, red_rightv) = (red_left.loc_val, red_right.loc_val) in
   match op with 
   | Egal -> 
-      MOSimple_val (MOBase_val (MOTypeBoolVal ((val_compare red_leftv red_rightv) == 0)))
+      box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(( val_compare red_left red_right) == 0)))))
   | NotEqual ->
-      MOSimple_val (MOBase_val (MOTypeBoolVal (not ((val_compare red_leftv red_rightv) == 0))))
+      box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc (not ((val_compare red_left red_right) == 0))))))
   | LessThan ->
       (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
-            MOSimple_val (MOBase_val (MOTypeBoolVal (left < right)))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left < right)))))
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
-            MOSimple_val (MOBase_val (MOTypeBoolVal(left < right)))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc(left < right)))))
         | _ -> assert false
       )
   | LessOrEq ->
       (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
-            MOSimple_val (MOBase_val (MOTypeBoolVal (left <= right)))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc (left <= right)))))
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
-            MOSimple_val (MOBase_val (MOTypeBoolVal(left <= right)))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left <= right)))))
         | _ -> assert false
       )
   | GreaterThan ->
       (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
-            MOSimple_val (MOBase_val (MOTypeBoolVal (left > right)))
+            box_loc(MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left > right)))))
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
-            MOSimple_val (MOBase_val (MOTypeBoolVal(left > right)))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left > right)))))
         | _ -> assert false
       )
   | GreaterOrEq ->
       (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
-            MOSimple_val (MOBase_val (MOTypeBoolVal (left >= right)))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left >= right)))))
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
-            MOSimple_val (MOBase_val (MOTypeBoolVal(left >= right)))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left >= right)))))
         | _ -> assert false
       )
 
@@ -689,21 +695,21 @@ and systemvar_partial_interpretation ref sysmodulevar argslst =
       List.init (List.length argslst) 
         (fun i -> GufoParsedToOpt.get_fresh_int ( ), [i])
     in
-    let bd_value = MOSimple_val (MOTuple_val (argslst)) in
+    let bd_value = box_loc(MOSimple_val (MOTuple_val (argslst))) in
     let bd_body = 
       let args_from_binding = List.map (fun (i,_) -> i ) bd_name in
       let ref_args = 
         List.map 
-          (fun i -> MORef_val ({
+          (fun i -> box_loc (MORef_val ({
                                 morv_module = None;
                                 morv_varname = i, [];
                                 morv_index = None;
                                 morv_debugname = "generated";
                                },
-                               []))  
+                               [])))
           (List.append args_from_binding anofun_args_id) 
       in
-      MORef_val (ref,ref_args)
+      box_loc (MORef_val (ref,ref_args))
     in
       {
         mobd_name = bd_name;
@@ -713,13 +719,13 @@ and systemvar_partial_interpretation ref sysmodulevar argslst =
       }
 
   in
-  let anofun_body = MOBind_val body_binding in 
+  let anofun_body = box_loc (MOBind_val body_binding) in 
   let anofun = {
     mofv_args_name = StringMap.empty;
     mofv_args_id = anofun_args;
     mofv_body = anofun_body;
   } 
-  in MOSimple_val (MOFun_val anofun)
+  in box_loc (MOSimple_val (MOFun_val anofun))
 
 
 (*apply a core module function *)
@@ -749,28 +755,28 @@ and apply_core_fun ref msymodule fname arg2valMap msysmodvar argslst =
 and apply_load_fun args =
   try
   (
-  match args with
+  match (lst_val_only args) with
     |  [MOSimple_val (MOBase_val (MOTypeStringVal filePath)) ] ->
-        (match GufoStartComp.parse_file filePath with
+        (match GufoStartComp.parse_file filePath.loc_val with
           | Some prog -> 
-            let progname = GufoModuleUtils.getModuleNameFromPath filePath in
+            let progname = GufoModuleUtils.getModuleNameFromPath filePath.loc_val in
             debug_print (sprintf "progname : %s\n" progname);
             let fullprog , _ = GufoParsedToOpt.add_module_to_optprog 
                                 progname (get_fullprog ()) prog in
              set_fullprog fullprog; 
-            MOSimple_val (MOBase_val (MOTypeStringVal "success"))
-          | None -> MOSimple_val (MOBase_val (MOTypeStringVal "fail"))
+            box_loc (MOSimple_val (MOBase_val (MOTypeStringVal (box_loc "success"))))
+          | None -> box_loc (MOSimple_val (MOBase_val (MOTypeStringVal (box_loc "fail"))))
         )
-    | _ -> MOSimple_val (MOBase_val (MOTypeStringVal "fail"))
+    | _ -> box_loc (MOSimple_val (MOBase_val (MOTypeStringVal (box_loc "fail"))))
   )
   with e -> 
-    MOSimple_val (MOBase_val (MOTypeStringVal (Printexc.to_string e )))
+    box_loc (MOSimple_val (MOBase_val (MOTypeStringVal (box_loc(Printexc.to_string e )))))
 
 (****************** Runtime function of the list module  ******************)
 
 (*Apply the special function $List.iter *)
 and list_iter args scope =  
-  match args with 
+  match (lst_val_only args) with 
     |  [MOSimple_val (MOFun_val fv); MOSimple_val (MOList_val mtvlist)] ->
         let _ = List.iter 
         (fun arg -> 
@@ -779,49 +785,49 @@ and list_iter args scope =
           ()
         )
         mtvlist
-        in MOSimple_val (MOEmpty_val)
+        in box_loc (MOSimple_val (MOEmpty_val))
     | _ -> assert false 
 
 
 (*Apply the special function $List.filter*)
 and list_filter args scope =
-    match args with
+    match (lst_val_only args) with
       | [MOSimple_val (MOFun_val fval);
          MOSimple_val (MOList_val mtvlist);
         ] ->
-        MOSimple_val (MOList_val 
+        box_loc (MOSimple_val (MOList_val 
         (List.filter 
           (fun el -> 
             let fun_res = 
               apply_fun true scope (MOSimple_val (MOFun_val fval)) [el] 
             in
-            (match fun_res with
-              | MOSimple_val (MOBase_val (MOTypeBoolVal true)) -> true
+            (match fun_res.loc_val with
+              | MOSimple_val (MOBase_val (MOTypeBoolVal b)) -> b.loc_val
               | _ -> false
             )
           )
           mtvlist
-        ))
+        )))
       | _ -> 
         assert false
 
 and list_map args scope = 
-    match args with
+    match (lst_val_only args) with
       | [MOSimple_val (MOFun_val fval);
          MOSimple_val (MOList_val mtvlist);
         ] ->
-        MOSimple_val (MOList_val 
+        box_loc (MOSimple_val (MOList_val 
         (List.map
           (fun el -> 
-              apply_fun true scope (MOSimple_val (MOFun_val fval)) [el] 
+              apply_fun true scope (MOSimple_val (MOFun_val fval)) [el]
           )
           mtvlist
-        ))
+        )))
       | _ -> 
         assert false
 
 and list_fold_left args scope = 
-    match args with
+    match (lst_val_only args) with
       | [MOSimple_val (MOFun_val fval);
          acc;
          MOSimple_val (MOList_val mtvlist);
@@ -831,7 +837,7 @@ and list_fold_left args scope =
           (fun acc el -> 
               apply_fun true scope (MOSimple_val (MOFun_val fval)) [acc; el] 
           )
-          acc mtvlist
+          (box_loc acc) mtvlist
         )
       | _ -> 
         assert false
@@ -853,7 +859,7 @@ and apply_fun toplevel arg2valMap funval arglst =
     List.fold_left
       (fun (acc,pos) argval -> 
         let mofunarg = List.nth mofunarglst pos in
-        match mofunarg, argval with
+        match mofunarg, argval.loc_val with
           | MOBaseArg i, _ -> (IntMap.add i (MOTop_val argval) acc, pos + 1)
           | MOTupleArg mofunarglst, MOSimple_val (MOTuple_val tuplst) -> 
               create_pointer acc mofunarglst tuplst
@@ -880,7 +886,7 @@ and apply_fun toplevel arg2valMap funval arglst =
             in
             let new_fv = {mofv_args_name = fv.mofv_args_name; 
                           mofv_args_id = mofunarglst; 
-                          mofv_body = MOBind_val body_binding} 
+                          mofv_body = box_loc (MOBind_val body_binding)} 
             in 
               apply_partial_fun (MOSimple_val (MOFun_val new_fv)) partial_args
           | _ -> assert false
@@ -892,7 +898,7 @@ and apply_fun toplevel arg2valMap funval arglst =
       (*we check if it is a partial application *)
       (match (Pervasives.compare (List.length arglst) (List.length fv.mofv_args_id)) with
         | i when i < 0 -> 
-            apply_partial_fun funval arglst
+            box_loc (apply_partial_fun funval arglst)
         | 0 -> 
             let arg2valMap,_ = create_pointer arg2valMap fv.mofv_args_id arglst in
             apply_motype_val toplevel arg2valMap fv.mofv_body
@@ -901,19 +907,20 @@ and apply_fun toplevel arg2valMap funval arglst =
                let arglst, nargs = list_split_at_idx arglst pos in
                let narg2valMap,_ = create_pointer arg2valMap fv.mofv_args_id arglst in
                let funval = (apply_motype_val toplevel narg2valMap fv.mofv_body) in 
-               apply_fun toplevel arg2valMap funval nargs
+               apply_fun toplevel arg2valMap funval.loc_val nargs
       )
-    | _ -> apply_motype_val toplevel arg2valMap funval
+    | _ -> apply_motype_val toplevel arg2valMap (box_loc funval)
 
   (*This was the first version of play_cmd: this is no more used. For now we
    * keep it in case it is still usefull for comphrehension of this part.*)
+(*
 and _play_cmd_simple toplevel to_fork (pip_write, pip_read) arg2valMap cmd = 
   let apply_mostringOrRef mosr = 
     match mosr with
       | MOSORString str -> str.loc_val
       | MOSORExpr expr -> 
-          match apply_motype_val toplevel arg2valMap expr with
-            | MOSimple_val (MOBase_val (MOTypeStringVal s)) -> s (*result has to be a string*)
+          match (apply_motype_val toplevel arg2valMap expr).loc_val with
+            | MOSimple_val (MOBase_val (MOTypeStringVal s)) -> s.loc_val (*result has to be a string*)
             | _ -> assert false
   in
 
@@ -965,17 +972,18 @@ and _play_cmd_simple toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
                  }
                in
                (res, MOSimpleCmd cmd)
-
+*)
 
 and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd = 
+  let cmdv = cmd.loc_val in
   let apply_mostringOrRef mosr = 
     match mosr with
       | MOSORString str -> str.loc_val
       | MOSORExpr expr -> 
-          match apply_motype_val toplevel arg2valMap expr with
+          match (apply_motype_val toplevel arg2valMap expr).loc_val with
             | MOSimple_val (MOBase_val (MOTypeStringVal s)) -> 
               (*result has to be a string*)
-               s 
+               s.loc_val 
             | _ -> assert false
   in
 
@@ -995,7 +1003,7 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
             | _ ->  true
             
   in
-  let red_args = List.map apply_mostringOrRef cmd.mocm_args in
+  let red_args = List.map apply_mostringOrRef cmdv.mocm_args in
   let shenv = get_shenv () in
   let red_args = 
     List.fold_left
@@ -1005,13 +1013,13 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
       [] red_args 
   in
   let input_fd = 
-    match cmd.mocm_input_src, pip_read with
+    match cmdv.mocm_input_src, pip_read with
       | (MOCMDIStdIn, None) -> Unix.stdin
       | (MOCMDIStdIn, Some fd) -> fd
       | MOCMDIFile f,_ -> Unix.openfile (apply_mostringOrRef f) [Unix.O_RDONLY] 0o640 
   in
   let output_fd = 
-    match cmd.mocm_output, pip_write with
+    match cmdv.mocm_output, pip_write with
       | MOCMDOStdOut, None -> Unix.stdout
       | MOCMDOStdOut, Some fd -> fd
       | MOCMDOStdErr,_ -> Unix.stderr
@@ -1019,7 +1027,7 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
       | MOCMDOFileAppend f,_ -> Unix.openfile (apply_mostringOrRef f) [Unix.O_APPEND] 0o640 
   in
   let outerr_fd = 
-    match cmd.mocm_outputerr with
+    match cmdv.mocm_outputerr with
       | MOCMDEStdErr -> Unix.stderr
       | MOCMDEStdOut -> Unix.stdout
       | MOCMDEFile f-> Unix.openfile (apply_mostringOrRef f) [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC] 0o640
@@ -1027,7 +1035,8 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
   in
 
   let check_and_call_system_cmd cmd = 
-      match cmd.mocm_cmd with
+    let cmdv = cmd.loc_val in
+      match cmdv.mocm_cmd.loc_val with
         | "cd" -> Some (play_cd cmd red_args shenv input_fd output_fd outerr_fd)
         | "exit" -> Some (play_exit cmd red_args shenv input_fd output_fd outerr_fd)
         | "assert_false" -> Some (play_assert_false cmd red_args shenv input_fd output_fd outerr_fd)
@@ -1036,7 +1045,8 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
 
 
   let play_cmd_toplevel () = 
-    let pid = Unix.create_process cmd.mocm_cmd (Array.of_list (cmd.mocm_cmd::red_args)) input_fd output_fd outerr_fd in
+    let cmdv = cmd.loc_val in
+    let pid = Unix.create_process cmdv.mocm_cmd.loc_val (Array.of_list (cmdv.mocm_cmd.loc_val::red_args)) input_fd output_fd outerr_fd in
     match to_fork with
       | true -> (0, MOSimpleCmd cmd)
       | false -> 
@@ -1059,29 +1069,30 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
                     | _ -> ()
                  in
                  let cmd = 
-                   { cmd with 
+                   {cmd with loc_val = { cmdv with 
                     mocm_res = Some res ;
                     mocm_input = None; (*Field to remove*)
                     mocm_print = None; (*Field to remove*)
                     mocm_print_error = None; 
                     mocm_print_std = None;
-                   }
+                   }}
                  in
                  (res, MOSimpleCmd cmd)
   in
   let play_cmd_nottoplevel () =
+    let cmdv = cmd.loc_val in
     let (child_stdout_descr, proc_stdout_descr) =
       Unix.pipe ~cloexec:true ()
     in
     set_nonblock proc_stdout_descr;
-    let pid = Unix.create_process cmd.mocm_cmd (Array.of_list (cmd.mocm_cmd::red_args)) input_fd proc_stdout_descr outerr_fd
+    let pid = Unix.create_process cmdv.mocm_cmd.loc_val (Array.of_list (cmdv.mocm_cmd.loc_val::red_args)) input_fd proc_stdout_descr outerr_fd
     in 
     match to_fork with
       | true -> (0, MOSimpleCmd cmd)
       | false -> 
                 let stdout_channel_in = Unix.in_channel_of_descr child_stdout_descr in
                 let output_fd = 
-                  (match cmd.mocm_output, pip_write with
+                  (match cmdv.mocm_output, pip_write with
                     | MOCMDOStdOut, None -> Unix.openfile "/dev/null" [Unix.O_APPEND] 0o640
                     | _,_ -> output_fd )
                 in
@@ -1125,13 +1136,13 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
                  in
 
                  let cmd = 
-                   { cmd with 
+                   {cmd with loc_val = { cmdv with 
                     mocm_res = Some res ;
                     mocm_input = None; (*Field to remove*)
                     mocm_print = None; (*Field to remove*)
                     mocm_print_error = None; 
                     mocm_print_std = Some stdout_str;
-                   }
+                   }}
                  in
                  (res, MOSimpleCmd cmd)
   in
@@ -1154,42 +1165,42 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
 and apply_cmdseq_val toplevel to_fork (pip_write,pip_read) arg2valMap cmdseq = 
   let apply_cmd to_fork (pip_write, pip_read) cmd = 
     (*we never play several times the same command*)
-    match cmd.mocm_res with 
+    match cmd.loc_val.mocm_res with 
       | None -> play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd 
       | Some i -> i, MOSimpleCmd cmd
   in
-  match cmdseq with 
+  match cmdseq.loc_val with 
     | MOSimpleCmd cmd -> apply_cmd to_fork (pip_write, pip_read) cmd
     | MOForkedCmd mocmd_seq -> 
         let (res, seq) = apply_cmdseq_val toplevel true (pip_write, pip_read) arg2valMap mocmd_seq  in
-        (res, MOForkedCmd seq)
+        (res, MOForkedCmd (box_loc seq))
     | MOAndCmd (cmda, cmdb) ->
        (match apply_cmdseq_val toplevel to_fork (pip_write, pip_read) arg2valMap cmda with
           | (0, cmdseqa) -> 
               let (res, cmdseqb) = apply_cmdseq_val toplevel to_fork (pip_write, pip_read) arg2valMap cmdb in 
-                (res, MOAndCmd (cmdseqa, cmdseqb))
+                (res, MOAndCmd ((box_loc cmdseqa), (box_loc cmdseqb)))
           | (i, cmdseqa) -> 
-              (i, MOAndCmd (cmdseqa, cmdb))
+              (i, MOAndCmd ((box_loc cmdseqa), cmdb))
        )
     | MOOrCmd (cmda, cmdb) -> 
        (match apply_cmdseq_val toplevel to_fork (pip_write, pip_read) arg2valMap cmda with
           | (0, cmdseqa) -> 
-                (0, MOOrCmd (cmdseqa, cmdb))
+                (0, MOOrCmd ((box_loc cmdseqa), cmdb))
           | (i, cmdseqa) -> 
               let (res, cmdseqb) =  apply_cmdseq_val toplevel to_fork (pip_write, pip_read) arg2valMap cmdb in 
-              (res, MOOrCmd (cmdseqa, cmdseqb))
+              (res, MOOrCmd ((box_loc cmdseqa), (box_loc cmdseqb)))
        )
     | MOSequenceCmd (cmda, cmdb) ->
         let (_, cmdseqa) = apply_cmdseq_val toplevel to_fork (pip_write, pip_read) arg2valMap cmda in
         let (res, cmdseqb) = apply_cmdseq_val toplevel to_fork (pip_write, pip_read) arg2valMap cmdb in
-        (res, MOSequenceCmd(cmdseqa, cmdseqb))
+        (res, MOSequenceCmd((box_loc cmdseqa), (box_loc cmdseqb)))
     | MOPipedCmd (cmda, cmdb) ->
         let (newpip_read, newpip_write) = Unix.pipe ~cloexec:true () in 
         let (_,cmda_run) = 
           apply_cmdseq_val toplevel to_fork (Some newpip_write, pip_read) arg2valMap cmda
         in
         let (res, cmdb_run) = apply_cmdseq_val toplevel to_fork (pip_write, Some newpip_read) arg2valMap cmdb
-        in (res, MOPipedCmd (cmda_run, cmdb_run))
+        in (res, MOPipedCmd ((box_loc cmda_run), (box_loc cmdb_run)))
 
 and apply_basic_fun toplevel arg2valMap op arga argb =
   let reduced_arga = apply_motype_val toplevel arg2valMap arga in
@@ -1197,58 +1208,58 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   
   (*TODO: improve perf *)
   (*TODO: replace assert false by runtime exception*)
-  match op, reduced_arga, reduced_argb with 
+  match op, reduced_arga.loc_val, reduced_argb.loc_val with 
             (** Concatenation **)
   | MConcatenation , MOSimple_val (MOBase_val (MOTypeStringVal a)),
     MOSimple_val (MOBase_val (MOTypeStringVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeStringVal 
-      (Printf.sprintf "%s%s" a b)))
+      (box_loc (Printf.sprintf "%s%s" a.loc_val b.loc_val))))
   | MConcatenation, _, _ -> raise (InternalError "Execution engine error")
             (** Addition **)
   | MAddition, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) -> 
-      MOSimple_val (MOBase_val (MOTypeIntVal  (a + b)))
+      MOSimple_val (MOBase_val (MOTypeIntVal  (box_loc (a.loc_val + b.loc_val))))
   | MAdditionFloat, MOSimple_val (MOBase_val (MOTypeFloatVal a)),
     MOSimple_val (MOBase_val (MOTypeFloatVal b)) -> 
-      MOSimple_val (MOBase_val (MOTypeFloatVal (a +. b)))
+      MOSimple_val (MOBase_val (MOTypeFloatVal (box_loc (a.loc_val +. b.loc_val))))
   | MAddition, _, _ -> raise (InternalError "Execution engine error")  
   | MAdditionFloat, _, _ -> raise (InternalError "Execution engine error")
             (** Soustraction **)
   | MSoustraction, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) -> 
       MOSimple_val (MOBase_val (MOTypeIntVal (
-      a - b)))
+      box_loc (a.loc_val - b.loc_val))))
   | MSoustractionFloat , MOSimple_val (MOBase_val (MOTypeFloatVal a)),
     MOSimple_val (MOBase_val (MOTypeFloatVal b))  -> 
-      MOSimple_val (MOBase_val (MOTypeFloatVal (a -. b)))
+      MOSimple_val (MOBase_val (MOTypeFloatVal (box_loc (a.loc_val -. b.loc_val))))
   | MSoustraction, _,_ -> raise (InternalError "Execution engine error")
   | MSoustractionFloat, _,_ -> raise (InternalError "Execution engine error")
             (** Multiplication **)
   | MMultiplication, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) -> 
       MOSimple_val(MOBase_val (MOTypeIntVal 
-      (a * b) ))
+      (box_loc (a.loc_val * b.loc_val))))
   | MMultiplicationFLoat, MOSimple_val (MOBase_val (MOTypeFloatVal a)), 
     MOSimple_val (MOBase_val (MOTypeFloatVal b)) -> 
-      MOSimple_val (MOBase_val (MOTypeFloatVal (a *. b)))
+      MOSimple_val (MOBase_val (MOTypeFloatVal (box_loc (a.loc_val *. b.loc_val))))
   | MMultiplication, _, _ -> raise (InternalError "Execution engine error")
   | MMultiplicationFLoat, _, _ -> raise (InternalError "Execution engine error")
             (** Division **)
   | MDivision, MOSimple_val (MOBase_val (MOTypeIntVal a)),
     MOSimple_val (MOBase_val (MOTypeIntVal b)) ->
-      MOSimple_val (MOBase_val (MOTypeIntVal (a / b)))
+      MOSimple_val (MOBase_val (MOTypeIntVal (box_loc (a.loc_val / b.loc_val))))
   | MDivisionFloat, MOSimple_val (MOBase_val (MOTypeFloatVal a)), 
     MOSimple_val (MOBase_val (MOTypeFloatVal b)) -> 
-      MOSimple_val (MOBase_val (MOTypeFloatVal(a /. b)))
+      MOSimple_val (MOBase_val (MOTypeFloatVal(box_loc (a.loc_val /. b.loc_val))))
   | MDivision, _, _ -> raise (InternalError "Execution engine error")
   | MDivisionFloat, _, _ -> raise (InternalError "Execution engine error")
             (** Modulo **)
   | MModulo, MOSimple_val (MOBase_val (MOTypeIntVal el1)),
                         MOSimple_val (MOBase_val (MOTypeIntVal el2)) -> 
-      MOSimple_val(MOBase_val (MOTypeIntVal (el1 mod el2)))
+      MOSimple_val(MOBase_val (MOTypeIntVal (box_loc (el1.loc_val mod el2.loc_val))))
   | MModuloFloat, MOSimple_val (MOBase_val (MOTypeFloatVal el1)),
                           MOSimple_val (MOBase_val (MOTypeFloatVal el2)) -> 
-      MOSimple_val (MOBase_val (MOTypeFloatVal (mod_float el1 el2)))
+      MOSimple_val (MOBase_val (MOTypeFloatVal (box_loc (mod_float el1.loc_val el2.loc_val))))
   | MModulo, _, _ -> raise (InternalError "Execution engine error")
   | MModuloFloat, _, _ -> raise (InternalError "Execution engine error")
             (** With **)
@@ -1269,9 +1280,9 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   | MWithSet, _, _ -> raise (InternalError "Execution engine error")
             (** Has **)
   | MHasSet, MOSimple_val(MOSet_val set1), possibleEl ->
-    MOSimple_val( MOBase_val (MOTypeBoolVal (MSet.mem (core_to_simple_val possibleEl) set1)))
+    MOSimple_val( MOBase_val (MOTypeBoolVal (box_loc (MSet.mem (core_to_simple_val reduced_argb) set1))))
   | MHasMap, MOSimple_val(MOMap_val map1), possibleEl ->
-    MOSimple_val( MOBase_val (MOTypeBoolVal (MMap.mem (core_to_simple_val possibleEl) map1)))
+    MOSimple_val( MOBase_val (MOTypeBoolVal (box_loc (MMap.mem (core_to_simple_val reduced_argb) map1))))
   | MHasSet, _, _ -> raise (InternalError "Execution engine error")
   | MHasMap, _, _ -> raise (InternalError "Execution engine error")
             (** without **)
@@ -1296,12 +1307,12 @@ and apply_binding toplevel arg2valMap mbind =
     match position with
       | [] -> MOTop_val (res_value) (*not a tuple, we immediatly return the value.*)
       | [i] -> (*one dimension tuple *)
-          (match res_value with
+          (match res_value.loc_val with
             | MOSimple_val (MOTuple_val tupv) -> MOTop_val (List.nth tupv i)
             | _ -> raise (ExecutionError "This is an internal error from gufo. Please complain.")
           )
       | i::lst ->
-          (match res_value with 
+          (match res_value.loc_val with 
             | MOSimple_val (MOTuple_val tupv) -> get_value_from_position lst (List.nth tupv i)
             | _ -> raise (ExecutionError "This is an internal error from gufo. Please complain.")
           )
@@ -1330,7 +1341,7 @@ and apply_mosimpletype_val toplevel arg2valMap aval =
         let (_, cmd) = 
           (apply_cmdseq_val toplevel false (None,None) arg2valMap cmdseq)
         in 
-        MOSimple_val (MOBase_val (MOTypeCmdVal cmd))
+        MOSimple_val (MOBase_val (MOTypeCmdVal (box_loc cmd)))
     | MOBase_val bv -> MOSimple_val (MOBase_val bv)
     | MOTuple_val tuplst ->
         MOSimple_val (MOTuple_val (List.map (apply_motype_val toplevel arg2valMap) tuplst))
@@ -1366,24 +1377,25 @@ and apply_in_list toplevel arg2valMap ref indices =
             (match indices with 
               | [] -> assert false
               | [idx] -> 
-                  (match idx with 
-                    | MOSimple_val (MOBase_val (MOTypeIntVal i))-> List.nth lst_val i
+                  (match idx.loc_val with 
+                    | MOSimple_val (MOBase_val (MOTypeIntVal i))-> List.nth lst_val i.loc_val
                     | _ -> assert false
                   )
               | idx::others_idx -> 
-                  (match idx with 
+                  (match idx.loc_val with 
                     | MOSimple_val (MOBase_val (MOTypeIntVal i)) -> 
-                      apply_in_list_ (List.nth lst_val i) others_idx
+                      apply_in_list_ (List.nth lst_val i.loc_val).loc_val others_idx
                     | _ -> assert false
                   )
             )
         | _ -> assert false
     with Failure _ -> raise (RuntimeError "Invalid index.\n")
     in 
-  apply_in_list_ (find_var_in_prog ref.morv_varname arg2valMap) indices
+  apply_in_list_ (find_var_in_prog ref.morv_varname arg2valMap).loc_val indices
 
 and apply_motype_val toplevel arg2valMap aval = 
-    match aval with 
+    let res = 
+    match aval.loc_val with 
     | MOSimple_val sv ->
         apply_mosimpletype_val toplevel arg2valMap sv
     | MOComposed_val mct -> apply_composed_type toplevel arg2valMap mct 
@@ -1399,7 +1411,7 @@ and apply_motype_val toplevel arg2valMap aval =
                     apply_in_list toplevel arg2valMap ref idx_lst 
               )
             in
-            (apply_fun toplevel arg2valMap funvar (List.map (apply_motype_val toplevel arg2valMap) argslst) )
+            (apply_fun toplevel arg2valMap funvar.loc_val (List.map (apply_motype_val toplevel arg2valMap) argslst) ).loc_val
         | Some m -> 
             (match IntMap.find m (get_fullprog ()).mofp_progmodules with
               | MOUserMod modul -> 
@@ -1417,7 +1429,7 @@ and apply_motype_val toplevel arg2valMap aval =
                 contrary, the toplevel from the current module are no more
               present.*)
               let farg2valMap = modul.mopg_topvar in
-              (apply_fun toplevel farg2valMap funvar (List.map (apply_motype_val toplevel arg2valMap) argslst)) 
+              (apply_fun toplevel farg2valMap funvar.loc_val (List.map (apply_motype_val toplevel arg2valMap) argslst)).loc_val
               | MOSystemMod msymodule when msymodule.mosm_name = "Base"-> 
                   (*$Base.load filename function: this is specific code which
                     do not work like others modules: 
@@ -1426,7 +1438,7 @@ and apply_motype_val toplevel arg2valMap aval =
                         within a module.
                    *)
                   (match (find_var_in_sysmod ref.morv_varname msymodule).mosmv_name with
-                    | "load" -> apply_load_fun argslst
+                    | "load" -> (apply_load_fun argslst).loc_val
                     | _ -> assert false 
                   )
               | MOSystemMod msymodule -> 
@@ -1436,24 +1448,24 @@ and apply_motype_val toplevel arg2valMap aval =
 
               (apply_core_fun ref msymodule fname arg2valMap 
                 (find_var_in_sysmod ref.morv_varname msymodule) 
-                (List.map (apply_motype_val toplevel arg2valMap) argslst) )
+                (List.map (apply_motype_val toplevel arg2valMap) argslst) ).loc_val
               )
       )
     | MOEnvRef_val (var) ->
-      MOSimple_val (MOBase_val (MOTypeStringVal (get_var (get_shenv ()) var)))
+      MOSimple_val (MOBase_val (MOTypeStringVal (box_loc(get_var (get_shenv ()) var))))
     | MOBasicFunBody_val (op, arga, argb) -> apply_basic_fun toplevel arg2valMap op arga argb
     | MOBind_val mbind ->
-        apply_binding toplevel arg2valMap mbind
+        (apply_binding toplevel arg2valMap mbind).loc_val
     | MOIf_val (cond, thn, els) -> 
         (match check_is_true (apply_motype_val toplevel arg2valMap cond) with
-        | true -> apply_motype_val toplevel arg2valMap thn
-        | _ -> apply_motype_val toplevel arg2valMap els
+        | true -> (apply_motype_val toplevel arg2valMap thn).loc_val
+        | _ -> (apply_motype_val toplevel arg2valMap els).loc_val
         )
     | MOComp_val (opcomp, leftval, rightval) ->
-      apply_opcomp toplevel arg2valMap opcomp leftval rightval 
+      (apply_opcomp toplevel arg2valMap opcomp leftval rightval ).loc_val
     | MOBody_val bodylst -> 
-        apply_in_body toplevel arg2valMap bodylst
-
+        (apply_in_body toplevel arg2valMap bodylst).loc_val
+    in box_loc res
 
 let exec prog shenv=
   set_shenv shenv ;

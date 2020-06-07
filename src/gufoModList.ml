@@ -22,6 +22,8 @@
 
 open Gufo.MCore
 open GenUtils
+open GufoParsedHelper
+open GufoLocHelper
 
 let listtypes = IntMap.empty
 
@@ -33,14 +35,11 @@ let map args scope = assert false
 let fold_left args scope = assert false
 
 let length args scope =
-  match args with
+  match (lst_val_only args) with
     | [MOSimple_val (MOList_val mtvlist);] ->
-      MOSimple_val (MOBase_val (MOTypeIntVal (List.length mtvlist)))
+      box_loc(MOSimple_val (MOBase_val 
+        (MOTypeIntVal (box_loc(List.length mtvlist)))))
     | _ -> assert false
-
-
-
-
 
 
 let topvars = 

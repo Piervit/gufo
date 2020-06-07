@@ -732,7 +732,7 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
              Lwt.return () )) >>=
           (fun () -> 
           fulloprog := redprog;
-          print_res term (Gufo.MCore.moval_to_string redprog.mofp_mainprog.mopg_topcal))
+          print_res term (Gufo.MCore.moval_to_string redprog.mofp_mainprog.mopg_topcal.loc_val))
           >>=
         (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id)))))
     | None ->

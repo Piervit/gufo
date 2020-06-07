@@ -23,17 +23,24 @@
 open Gufo.MCore
 open GenUtils
 open GufoParsed
+open GufoLocHelper
 
 let modtypes = IntMap.empty
 
+
+
 let get args scope = 
-  match args with
-    |  [MOSimple_val (MOSome_val i ); defval ] -> i
-    |  [MOSimple_val (MONone_val); defval ] -> defval
+  match (args) with
+    |  [optv; defval] ->
+      (match optv.loc_val with
+        |  MOSimple_val (MOSome_val i )  -> i
+        |  MOSimple_val (MONone_val) -> defval
+        | _ -> assert false 
+      )
     | _ -> assert false 
 
 let force args scope = 
-  match args with
+  match (lst_val_only args) with
     |  [MOSimple_val (MOSome_val i ); ] -> i
     |  [MOSimple_val (MONone_val); ] -> raise (ExecutionError "$Opt.force was used with a None value.")
     | _ -> assert false 

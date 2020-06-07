@@ -23,40 +23,55 @@
 open Gufo.MCore
 open GenUtils
 open GufoParsed
+open GufoLocHelper
 
 let settypes = IntMap.empty
 
 let cardinal args scope =  
-  match args with 
+  match (lst_val_only args) with 
     |  [MOSimple_val (MOSet_val(mset)); ] ->
-        MOSimple_val (MOBase_val (MOTypeIntVal (MSet.cardinal mset)))
+        box_loc (MOSimple_val (MOBase_val (MOTypeIntVal (box_loc (MSet.cardinal mset)))))
 
     | _ -> assert false 
 
-let is_in args scope =  
-  match args with 
-    |  [MOSimple_val (MOSet_val(mset)); el_val ] ->
-        MOSimple_val (MOBase_val (MOTypeBoolVal (MSet.mem (core_to_simple_val el_val) mset)))
-
+let is_in args scope = 
+  match (args) with
+    |  [mset; kval] ->
+      (match mset.loc_val with
+        | MOSimple_val (MOSet_val(mset)) -> 
+        box_loc(MOSimple_val (MOBase_val (MOTypeBoolVal 
+          (box_loc(
+            MSet.mem ((core_to_simple_val kval)) mset)))
+        ))
+        | _ -> assert false
+      )
     | _ -> assert false 
 
 let union args scope = 
-  match args with 
+  match (lst_val_only args) with 
     |  [MOSimple_val (MOSet_val(mset)); MOSimple_val (MOSet_val(mset2))] ->
-        MOSimple_val (MOSet_val (MSet.union  mset mset2))
+        box_loc (MOSimple_val (MOSet_val (MSet.union  mset mset2)))
     | _ -> assert false 
 
 let add args scope = 
-  match args with
-    |  [MOSimple_val (MOSet_val(mset));el_val ] ->
-        MOSimple_val (MOSet_val (MSet.add (core_to_simple_val el_val) mset))
+  match (args) with
+    |  [mset; el_val] ->
+      (match mset.loc_val with
+        | MOSimple_val (MOSet_val(mset)) -> 
+          box_loc (MOSimple_val (MOSet_val (MSet.add (core_to_simple_val el_val) mset)))
+        | _ -> assert false
+      )
     | _ -> assert false 
 
 let rm args scope = 
-  match args with
-    |  [MOSimple_val (MOSet_val(mset));el_val ] ->
-        MOSimple_val (MOSet_val (MSet.remove (core_to_simple_val el_val) mset))
-    | _ -> assert false 
+  match (args) with
+    |  [mset; el_val] ->
+      (match mset.loc_val with
+        | MOSimple_val (MOSet_val(mset)) -> 
+        box_loc (MOSimple_val (MOSet_val (MSet.remove (core_to_simple_val el_val) mset)))
+        | _ -> assert false 
+      )
+    | _ -> assert false
 
 
 let topvars = 

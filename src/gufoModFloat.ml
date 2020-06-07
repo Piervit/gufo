@@ -22,25 +22,32 @@
 
 open Gufo.MCore
 open GenUtils
+open GufoParsedHelper
+open GufoLocHelper
 
 let floattypes = IntMap.empty
 
 let toString args scope = 
-  match args with
-    |  [MOSimple_val (MOBase_val (MOTypeFloatVal i)) ] ->
-       MOSimple_val (MOBase_val (MOTypeStringVal (string_of_float i)))
-    | _ -> assert false 
+  match (lst_val_only args) with
+    | [MOSimple_val (MOBase_val (MOTypeFloatVal i))] ->
+       box_loc (MOSimple_val (MOBase_val 
+               (MOTypeStringVal ((string_of_float_loc i)))))
+    | _ -> assert false
 
 (*return a type option, some i, if the string is parsable to the floateger i, else return none.*)
 let fromString args scope = 
-  match args with
+  match (lst_val_only args) with
     |  [MOSimple_val (MOBase_val (MOTypeStringVal i)) ] ->
         (try
-          MOSimple_val (MOSome_val 
-            (MOSimple_val (MOBase_val (MOTypeFloatVal 
-              (float_of_string (List.hd (String.split_on_char '\n' i)))))))
+          box_loc (MOSimple_val (MOSome_val 
+            (box_loc
+            (MOSimple_val (MOBase_val (MOTypeFloatVal (
+              box_loc
+                (float_of_string (List.hd (String.split_on_char '\n' i.loc_val)))
+          )))))
+            ))
         with _ ->
-          MOSimple_val (MONone_val)
+          box_loc (MOSimple_val (MONone_val))
         )
     | _ -> assert false 
 

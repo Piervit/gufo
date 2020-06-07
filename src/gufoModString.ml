@@ -22,74 +22,81 @@
 open Gufo.MCore
 open GenUtils
 open GufoParsed
+open GufoLocHelper
 
 let types = IntMap.empty
 
 let split args scope =  
-  match args with 
+  match (lst_val_only args) with 
     |  [MOSimple_val (MOBase_val MOTypeStringVal (str))] ->
-        let res = String.split_on_char '\n' str in
+        let res = String.split_on_char '\n' str.loc_val in
         let res =
-        List.map (fun str -> MOSimple_val (MOBase_val (MOTypeStringVal((String.trim str))))) res
-        in MOSimple_val (MOList_val res)
+        List.map (fun str -> box_loc (MOSimple_val 
+                    (MOBase_val (MOTypeStringVal(box_loc(String.trim str)))))) res
+        in box_loc (MOSimple_val (MOList_val res))
     | _ -> assert false 
 
 
 let contains args scope =  
-  match args with 
-    |  [
-        MOSimple_val (MOBase_val MOTypeStringVal (str));
-        MOSimple_val (MOBase_val MOTypeStringVal (""))
-       ] -> 
-        (*We always contains the empty string*)
-        MOSimple_val (MOBase_val (MOTypeBoolVal true ))
-    |  [
-        MOSimple_val (MOBase_val MOTypeStringVal (str));
-        MOSimple_val (MOBase_val MOTypeStringVal (substr))
-       ] ->
-      (
-        let substr_first_char = String.get substr 0 in
-        (*the list of every position where the first char of substr appears.*)
-        let possible_starts = 
-          let rec get_possible_starts from_pos possible_starts =
-            match from_pos with 
-              | i when i < 0 || i >= (String.length str) -> 
+  match (args) with 
+    |  [str; substr] ->
+      (match str.loc_val, substr.loc_val with
+        | MOSimple_val (MOBase_val MOTypeStringVal (str)),
+          MOSimple_val (MOBase_val MOTypeStringVal sstr) 
+          when (String.equal sstr.loc_val "")
+          -> 
+            (*We always contains the empty string*)
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc true) )))
+
+        | MOSimple_val (MOBase_val MOTypeStringVal (str)),
+          MOSimple_val (MOBase_val MOTypeStringVal (substr))
+          ->
+            (
+            let substr_first_char = String.get substr.loc_val 0 in
+            (*the list of every position where the first char of substr appears.*)
+            let possible_starts = 
+              let rec get_possible_starts from_pos possible_starts =
+                match from_pos with 
+                  | i when i < 0 || i >= (String.length str.loc_val) -> 
+                      possible_starts
+                  | _ -> 
+                    (
+                      match (String.index_from_opt str.loc_val from_pos substr_first_char) with
+                        | None -> possible_starts
+                        | Some new_pos -> get_possible_starts (new_pos + 1) (new_pos::possible_starts)
+                    )
+              in
+                List.rev (get_possible_starts 0 [])
+            in
+            (*for each possible start, we check the following chars.*)
+            let substr_last_index = String.length substr.loc_val  in
+            let str_last_index = String.length str.loc_val in
+              
+            let rec rec_contains pos_in_str pos_in_substr = 
+              (match pos_in_substr - substr_last_index, pos_in_str - str_last_index with 
+                | 0,_ -> true 
+                | _,0 -> false
+                | _,_ -> 
+                  let sub_current_char = String.get substr.loc_val pos_in_substr in
+                  let str_current_char = String.get str.loc_val pos_in_str in
+                  (match (int_of_char sub_current_char) - (int_of_char str_current_char) with
+                    | 0 -> rec_contains (pos_in_str + 1) (pos_in_substr + 1)
+                    | _ -> false
+                  )    
+              )
+            in
+              box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(
+                List.exists 
+                  (fun start_pos -> 
+                    rec_contains (start_pos + 1) 1 
+                  )
                   possible_starts
-              | _ -> 
-                (
-                  match (String.index_from_opt str from_pos substr_first_char) with
-                    | None -> possible_starts
-                    | Some new_pos -> get_possible_starts (new_pos + 1) (new_pos::possible_starts)
+                ))))
                 )
-          in
-            List.rev (get_possible_starts 0 [])
-        in
-        (*for each possible start, we check the following chars.*)
-        let substr_last_index = String.length substr  in
-        let str_last_index = String.length str in
-          
-        let rec rec_contains pos_in_str pos_in_substr = 
-          (match pos_in_substr - substr_last_index, pos_in_str - str_last_index with 
-            | 0,_ -> true 
-            | _,0 -> false
-            | _,_ -> 
-              let sub_current_char = String.get substr pos_in_substr in
-              let str_current_char = String.get str pos_in_str in
-              (match (int_of_char sub_current_char) - (int_of_char str_current_char) with
-                | 0 -> rec_contains (pos_in_str + 1) (pos_in_substr + 1)
-                | _ -> false
-              )    
-          )
-        in
-        MOSimple_val (MOBase_val (MOTypeBoolVal (
-          List.exists 
-            (fun start_pos -> 
-              rec_contains (start_pos + 1) 1 
             )
-            possible_starts
-        )))
-      )
     | _ -> assert false 
+    )
+  | _ -> assert false
 
 
 

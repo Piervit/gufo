@@ -48,4 +48,4 @@ val string_of_position : pars_position -> string
 
 val compare_positions : pars_position -> pars_position -> int
 
-
+val box_with_dummy_pos : 't -> 't located 

@@ -24,6 +24,7 @@ open Gufo.MCore
 open GenUtils
 open GufoModuleUtils
 open GufoParsed
+open GufoLocHelper
 
 let listtypes = IntMap.empty
 

@@ -95,3 +95,8 @@ let merge_positions p1 p2 =
   { ppos_start = p1.ppos_start; ppos_end = p2.ppos_end }
 
 
+let box_with_dummy_pos a =
+  {
+    loc_val = a; 
+    loc_pos = dummy_position; 
+  }

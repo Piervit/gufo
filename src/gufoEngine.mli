@@ -17,6 +17,7 @@
     Author: Pierre Vittet
 *)
 
+open GufoParsed
 
 (* This is the interpretation engine of Gufo. *)
 (* An execution is the reduction of a large expressions to a simple expression:
@@ -26,8 +27,10 @@
  *
  * *)
 
-(* This function allow to compare two gufo values. *)
-val val_compare: Gufo.MCore.motype_val -> Gufo.MCore.motype_val -> int
+(* This function allow to compare two gufo values. 
+   The location is not part of the comparison (eg, 2 same value with different locations will be considered equal).
+ *)
+val val_compare: Gufo.MCore.motype_val located -> Gufo.MCore.motype_val located -> int
 
 (*
 (* This function sadly needs to be exposed because it is used by system

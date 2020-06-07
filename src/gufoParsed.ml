@@ -430,7 +430,7 @@ and dump_cmd_val cmdval =
     print_string "(" ; dump_cmd_val operand1; print_string symbol; dump_cmd_val operand2; print_string ")"
   in
   match cmdval with
-    | SimpleCmd cmdval -> dump_cmd cmdval.loc_val ; print_space () ; print_loc cmdval.loc_pos; print_space ()
+    | SimpleCmd cmdval -> dump_cmd cmdval.loc_val ; print_space ()  
     | ForkedCmd cmdval -> dump_cmd_val cmdval.loc_val; print_string " & "
     | AndCmd (cmdval1, cmdval2)-> dump_2op " && " cmdval1.loc_val cmdval2.loc_val
     | OrCmd (cmdval1, cmdval2)-> dump_2op " || " cmdval1.loc_val cmdval2.loc_val

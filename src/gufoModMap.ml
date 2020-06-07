@@ -23,47 +23,73 @@
 open Gufo.MCore
 open GenUtils
 open GufoParsed
+open GufoParsedHelper
+open GufoLocHelper
 
 let maptypes = IntMap.empty
 
 let cardinal args scope =  
-  match args with 
+  match (lst_val_only args) with 
     |  [MOSimple_val (MOMap_val(mmap)) ] ->
-        MOSimple_val (MOBase_val (MOTypeIntVal (MMap.cardinal  mmap)))
+        box_loc (MOSimple_val (MOBase_val (MOTypeIntVal (box_loc (MMap.cardinal mmap)))))
     | _ -> assert false 
 
-let is_in args scope =  
-  match args with 
-    |  [MOSimple_val (MOMap_val(mmap)); key_val ] ->
-        MOSimple_val (MOBase_val (MOTypeBoolVal (MMap.mem (core_to_simple_val key_val) mmap)))
+
+let is_in args scope = 
+  match (args) with
+    |  [mmap; kval] ->
+      (match mmap.loc_val with
+        | MOSimple_val (MOMap_val(mmap)) -> 
+        box_loc(MOSimple_val (MOBase_val (MOTypeBoolVal 
+          (box_loc(
+            MMap.mem ((core_to_simple_val kval)) mmap)))
+        ))
+        | _ -> assert false
+      )
     | _ -> assert false 
 
 let mwith args scope = 
-  match args with
+  match (lst_val_only args) with
     |  [MOSimple_val (MOMap_val(mmap)); MOSimple_val (MOMap_val(mmap2)) ] ->
-      MOSimple_val (MOMap_val (MMap.union (fun _k _a b -> (Some b)) mmap mmap2))
+      box_loc (MOSimple_val (MOMap_val (MMap.union (fun _k _a b -> (Some b)) mmap mmap2)))
     | _ -> assert false 
 
 let get args scope = 
-  match args with
-    |  [MOSimple_val (MOMap_val(mmap)); kval ] ->
-        (match (MMap.find_opt (core_to_simple_val kval) mmap) with
-          | None -> MOSimple_val (MONone_val)
-          | Some v -> MOSimple_val (MOSome_val v)
-        )
+  match (args) with
+    |  [mmap; kval ] ->
+      (match mmap.loc_val with
+        | MOSimple_val (MOMap_val(mmap)) -> 
+          (match (MMap.find_opt ((core_to_simple_val kval)) mmap) with
+            | None -> box_loc (MOSimple_val (MONone_val))
+            | Some v -> box_loc (MOSimple_val (MOSome_val v))
+          )
+        | _ -> assert false
+      )
     | _ -> assert false 
+
 
 let add args scope = 
-  match args with
-    |  [MOSimple_val (MOMap_val(mmap)); kval; vval ] ->
-        MOSimple_val (MOMap_val (MMap.add (core_to_simple_val kval) vval mmap))
-    | _ -> assert false 
+  match (args) with
+    |  [mmap;kval; vval ] ->
+      (match mmap.loc_val with
+        | MOSimple_val (MOMap_val(mmap)) -> 
+          box_loc (MOSimple_val (MOMap_val (MMap.add (core_to_simple_val kval) vval mmap)))
+          
+        | _ -> assert false
+      )
+    | _ -> assert false
 
 let rm args scope = 
-  match args with
-    |  [MOSimple_val (MOMap_val(mmap)); kval ] ->
-        MOSimple_val (MOMap_val (MMap.remove (core_to_simple_val kval) mmap))
-    | _ -> assert false 
+  match (args) with
+    |  [mmap;kval ] ->
+      (match mmap.loc_val with
+        | MOSimple_val (MOMap_val(mmap)) -> 
+          box_loc (MOSimple_val (MOMap_val (MMap.remove (core_to_simple_val kval) mmap)))
+          
+        | _ -> assert false
+      )
+    | _ -> assert false
+
 
 let topvars = 
   [

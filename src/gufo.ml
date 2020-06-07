@@ -20,6 +20,7 @@
 open GenUtils
 open GufoParsed
 open GufoUtils
+open GufoLocHelper
 
 
 module MCore =
@@ -59,15 +60,7 @@ struct
   module SimpleCore = 
    struct 
 
-      type mivar = {
-        miva_name: int list; (*we have a list when the input is a tuple, for
-        exemple in the case "let a,b= 5" then mva_name is ("a","b"). *)
-        miva_value: mitype_val;
-      }
-
-      and mcSetEl = mitype_val
-
-      and micmd_redir =  
+      type micmd_redir =  
         | MIRedirOStdOut
         | MIRedirOStdErr
         | MIRedirOFile of mistringOrRef_val (*path*)
@@ -97,12 +90,12 @@ struct
 
       and mistringOrRef_val =
         | MISORString of string located
-        | MISORExpr of mitype_val
+        | MISORExpr of mitype_val located
 
 
 
       and micmd_val = {
-        micm_cmd : string;
+        micm_cmd : string located;
         micm_args : mistringOrRef_val list;
         micm_res : int option; 
         micm_output : micmd_output; 
@@ -115,46 +108,46 @@ struct
       }
 
       and micmd_seq = 
-        | MISimpleCmd of micmd_val
-        | MIForkedCmd of micmd_seq 
-        | MIAndCmd of micmd_seq * micmd_seq 
-        | MIOrCmd of micmd_seq * micmd_seq 
-        | MISequenceCmd of micmd_seq * micmd_seq 
-        | MIPipedCmd of micmd_seq * micmd_seq 
+        | MISimpleCmd of micmd_val located
+        | MIForkedCmd of micmd_seq located
+        | MIAndCmd of micmd_seq located * micmd_seq located
+        | MIOrCmd of micmd_seq located * micmd_seq located
+        | MISequenceCmd of micmd_seq located * micmd_seq located
+        | MIPipedCmd of micmd_seq located * micmd_seq located
  
       and mibase_type_val = 
-        | MITypeStringVal of string
-        | MITypeBoolVal of bool
-        | MITypeIntVal of int
-        | MITypeFloatVal of float
-        | MITypeCmdVal of micmd_seq
+        | MITypeStringVal of string located
+        | MITypeBoolVal of bool located
+        | MITypeIntVal of int located
+        | MITypeFloatVal of float located
+        | MITypeCmdVal of micmd_seq located
       
      
       and micomposed_type_val = {
         micv_module_def : int option; 
-        micv_fields: mitype_val IntMap.t; 
+        micv_fields: mitype_val located IntMap.t; 
         micv_resolved_type : int option *int ; 
       }
       
       and miref_val = {
         mirv_module : int option; 
         mirv_varname : int * (int option * int) list; 
-        mirv_index: mitype_val list option;
+        mirv_index: mitype_val located list option;
         mirv_debugname: string;
       }
 
       and mifun_val = {
         mifv_args_name : int StringMap.t;  
         mifv_args_id : mifunarg list; 
-        mifv_body : mitype_val;
+        mifv_body : mitype_val located;
         }
       
       and misimple_type_val = 
         | MIBase_val of mibase_type_val 
-        | MITuple_val of mitype_val list
-        | MIList_val of mitype_val list
+        | MITuple_val of mitype_val located list
+        | MIList_val of mitype_val located list
         | MINone_val 
-        | MISome_val of mitype_val
+        | MISome_val of mitype_val located
         | MIFun_val of mifun_val
         | MIEmpty_val
       
@@ -165,30 +158,26 @@ struct
       and mitype_val = 
         | MISimple_val of misimple_type_val
         | MIComposed_val of micomposed_type_val
-        | MIRef_val of miref_val * mitype_val list 
+        | MIRef_val of miref_val * mitype_val located list 
         | MIEnvRef_val of string
-        | MIBasicFunBody_val of mi_expr_operation * mitype_val * mitype_val
+        | MIBasicFunBody_val of mi_expr_operation * mitype_val located 
+                                                  * mitype_val located
         | MIBind_val of mibinding
-        | MIIf_val of mitype_val * mitype_val * mitype_val
-        | MIComp_val of micomp_op * mitype_val * mitype_val 
-        | MIBody_val of mitype_val list
+        | MIIf_val of mitype_val located * mitype_val located * mitype_val located
+        | MIComp_val of micomp_op * mitype_val located * mitype_val located
+        | MIBody_val of mitype_val located list
 
       and micomp_op = GufoParsed.mcomp_op
 
       and mibinding = {
         mibd_name : (int * int list) list;
         mibd_debugnames: string IntMap.t;
-        mibd_value: mitype_val;
-        mibd_body: mitype_val ;
+        mibd_value: mitype_val located;
+        mibd_body: mitype_val located;
       }
 
       and mi_expr_operation = GufoParsed.m_expr_operation
  
-      and mimodule = {
-        mimo_name : int;
-        mimo_topvar : mivar list
-      }
-      
       and misysmodulemvar = {
         mismv_name: string;
         mismv_intname: int;
@@ -217,7 +206,6 @@ struct
         mipg_types : motype IntMap.t; 
         mipg_field_to_type: int IntMap.t; 
         mipg_topvar: mitype_val IntMap.t;
-        mipg_modules: mimodule IntMap.t;
         mipg_topcal : mitype_val ;
         mipg_var2int: int StringMap.t ;
         mipg_ctype2int: int StringMap.t; 
@@ -228,13 +216,13 @@ struct
 
       and miprocess = GufoParsed.mprocess
  
-      type t = mitype_val
+      type t = mitype_val located
 
       let rec mlist_compare ta tb = 
         let rec el_compare lsta lstb = 
           match lsta, lstb with
             | a::nlsta, b::nlstb ->
-                (match type_compare a b with
+                (match type_compare a.loc_val b.loc_val with
                   | 0 -> el_compare nlsta nlstb
                   | i -> i
                 )
@@ -302,7 +290,7 @@ struct
             | Some printa , Some printb when ((String.compare printa printb != 0)) -> String.compare printa printb
             | _ -> 0 
         in
-          match String.compare cmda.micm_cmd cmdb.micm_cmd with
+          match String.compare cmda.micm_cmd.loc_val cmdb.micm_cmd.loc_val with
             | 0  -> 
                 (match list_compare 
                   (fun arga argb -> 
@@ -311,7 +299,7 @@ struct
                       | MISORExpr a, MISORString b -> -1
                       | MISORString a, MISORString b -> 
                         String.compare a.loc_val b.loc_val
-                      | MISORExpr a, MISORExpr b -> type_compare a b
+                      | MISORExpr a, MISORExpr b -> type_compare a.loc_val b.loc_val
                   ) cmda.micm_args cmdb.micm_args 
                 with
                   | 0 ->
@@ -329,9 +317,9 @@ struct
             | i -> i
       
       and cmd_seq_compare cmdseqa cmdseqb =
-        match cmdseqa, cmdseqb with
+        match cmdseqa.loc_val, cmdseqb.loc_val with
           | MISimpleCmd cmda, MISimpleCmd cmdb ->
-              cmd_compare cmda cmdb
+              cmd_compare cmda.loc_val cmdb.loc_val
           | MIForkedCmd cmda, MIForkedCmd cmdb ->
               cmd_seq_compare cmda cmdb
           | _, MISimpleCmd _ -> 1
@@ -387,15 +375,15 @@ struct
 
       and fun_compare (aargs, abody) (bargs, bbody)  = 
         match funargs_compare aargs bargs with
-          | 0 -> type_compare abody bbody (*THIS SHOULD BE THOUGH AND IMPROVED*)
+          | 0 -> type_compare abody.loc_val bbody.loc_val (*THIS SHOULD BE THOUGH AND IMPROVED*)
           | i -> i 
 
       and composedType_compare sa sb = assert false
 
       and compare_basicfun (opa, arga1, arga2) (opb, argb1, argb2) = 
         let comp_args  = 
-                (match type_compare arga1 argb1 with 
-                | 0 -> type_compare arga2 argb2
+                (match type_compare arga1.loc_val argb1.loc_val with 
+                | 0 -> type_compare arga2.loc_val argb2.loc_val
                 | i -> i
                 )
         in
@@ -487,10 +475,10 @@ struct
           | i -> i 
 
       and compare_if (cond1,thn1, els1) (cond2, thn2, els2) =
-        match type_compare cond1 cond2 with
+        match type_compare cond1.loc_val cond2.loc_val with
           | 0 -> 
-              (match type_compare thn1 thn2 with
-                | 0 -> type_compare els1 els2 
+              (match type_compare thn1.loc_val thn2.loc_val with
+                | 0 -> type_compare els1.loc_val els2.loc_val
                 | i -> i 
               )
           | i -> i 
@@ -503,8 +491,8 @@ struct
           | LessOrEq, LessOrEq
           | GreaterThan, GreaterThan
           | GreaterOrEq, GreaterOrEq ->
-              (match type_compare left1 left2 with
-                | 0 -> type_compare right1 right2  
+              (match type_compare left1.loc_val left2.loc_val with
+                | 0 -> type_compare right1.loc_val right2.loc_val
                 | i -> i
               )
           | Egal, _ -> 1
@@ -522,7 +510,7 @@ struct
           match bdlst1, bdlst2 with
             | [],[] -> 0
             | ela::lsta, elb::lstb -> 
-                (match type_compare ela elb with
+                (match type_compare ela.loc_val elb.loc_val with
                 | 0 -> compare_body lsta lstb 
                 | i -> i )
             | _, _ -> assert false
@@ -533,19 +521,19 @@ struct
           (*TODO definir pour chaque type de base une fonction de comparaison*)
               (match aaa, bbb with
                 | MITypeStringVal aaaa, MITypeStringVal bbbb ->
-                      String.compare aaaa bbbb
-                | MITypeBoolVal true, MITypeBoolVal false ->
-                      1
-                | MITypeBoolVal false, MITypeBoolVal true ->
-                      -1
-                | MITypeBoolVal _, MITypeBoolVal _ ->
-                      0
+                      String.compare aaaa.loc_val bbbb.loc_val
+                | MITypeBoolVal b1, MITypeBoolVal b2 ->
+                    (match (b1.loc_val, b2.loc_val) with
+                      | true, false -> 1
+                      | false , true -> -1
+                      | _, _ -> 0
+                    )
                 | MITypeIntVal aaaa, MITypeIntVal bbbb ->
-                      compare aaaa bbbb
+                      compare aaaa.loc_val bbbb.loc_val
                 | MITypeFloatVal aaaa, MITypeFloatVal bbbb ->
-                    if aaaa = bbbb then 0 
+                    if aaaa.loc_val = bbbb.loc_val then 0 
                     else 
-                      if aaaa > bbbb then 1
+                      if aaaa.loc_val > bbbb.loc_val then 1
                       else -1
                 | MITypeCmdVal aaaa, MITypeCmdVal bbbb ->
                       cmd_seq_compare aaaa bbbb
@@ -664,7 +652,7 @@ struct
 
           | _ , _ -> raise (TypeError "Bad type comparison")
       
-      let compare a b = type_compare a b
+      let compare a b = type_compare a.loc_val b.loc_val
    end
 
   module MMap = Map.Make(SimpleCore)
@@ -679,13 +667,12 @@ struct
   and moref_val = {
     morv_module : int option; (* None if curmodule *)
     morv_varname : int * (int option * int) list; (*varname * (fieldmoduleid * fieldsid *)
-    morv_index : motype_val list option;
+    morv_index : motype_val located list option;
     morv_debugname : string;
   }
  
 
 
-  and mcSetEl = motype_val
 
   and mocmd_redir =  
     | MORedirOStdOut
@@ -717,12 +704,12 @@ struct
 
   and mostringOrRef_val =
     | MOSORString of string located
-    | MOSORExpr of motype_val
+    | MOSORExpr of motype_val located
 
 
 
   and mocmd_val = {
-    mocm_cmd : string;
+    mocm_cmd : string located;
     mocm_args : mostringOrRef_val list;
     mocm_res : int option; 
     mocm_output : mocmd_output; 
@@ -735,40 +722,40 @@ struct
   }
 
   and mocmd_seq = 
-    | MOSimpleCmd of mocmd_val
-    | MOForkedCmd of mocmd_seq 
-    | MOAndCmd of mocmd_seq * mocmd_seq 
-    | MOOrCmd of mocmd_seq * mocmd_seq 
-    | MOSequenceCmd of mocmd_seq * mocmd_seq 
-    | MOPipedCmd of mocmd_seq * mocmd_seq 
+    | MOSimpleCmd of mocmd_val located
+    | MOForkedCmd of mocmd_seq located
+    | MOAndCmd of mocmd_seq located * mocmd_seq located
+    | MOOrCmd of mocmd_seq located * mocmd_seq located
+    | MOSequenceCmd of mocmd_seq located * mocmd_seq located
+    | MOPipedCmd of mocmd_seq located * mocmd_seq located
  
   and mobase_type_val = 
-    | MOTypeStringVal of string
-    | MOTypeBoolVal of bool
-    | MOTypeIntVal of int
-    | MOTypeFloatVal of float
-    | MOTypeCmdVal of mocmd_seq
+    | MOTypeStringVal of string located
+    | MOTypeBoolVal of bool located
+    | MOTypeIntVal of int located
+    | MOTypeFloatVal of float located
+    | MOTypeCmdVal of mocmd_seq located
  
   and mocomposed_type_val = {
     mocv_module_def : int option ; 
-    mocv_fields: motype_val IntMap.t; 
+    mocv_fields: motype_val located IntMap.t; 
     mocv_resolved_type : int option *int ; 
   }
   
   and mofun_val = {
     mofv_args_name : int StringMap.t; (*args name map (for debug + color)*) 
     mofv_args_id : mofunarg list; 
-    mofv_body : motype_val;
+    mofv_body : motype_val located;
   } 
  
   and mosimple_type_val = 
     | MOBase_val of mobase_type_val 
-    | MOTuple_val of motype_val list
-    | MOList_val of motype_val list
+    | MOTuple_val of motype_val located list
+    | MOList_val of motype_val located list
     | MONone_val 
-    | MOSome_val of motype_val
+    | MOSome_val of motype_val located
     | MOSet_val of MSet.t
-    | MOMap_val of motype_val MMap.t
+    | MOMap_val of motype_val located MMap.t
     | MOFun_val of mofun_val
     | MOEmpty_val
   
@@ -779,21 +766,21 @@ struct
   and motype_val = 
     | MOSimple_val of mosimple_type_val
     | MOComposed_val of mocomposed_type_val
-    | MORef_val of moref_val * motype_val list 
+    | MORef_val of moref_val * motype_val located list 
     | MOEnvRef_val of string
-    | MOBasicFunBody_val of mo_expr_operation * motype_val * motype_val
+    | MOBasicFunBody_val of mo_expr_operation * motype_val located * motype_val located
     | MOBind_val of mobinding
-    | MOIf_val of motype_val * motype_val * motype_val
-    | MOComp_val of mocomp_op * motype_val * motype_val 
-    | MOBody_val of motype_val list
+    | MOIf_val of motype_val located * motype_val located * motype_val located
+    | MOComp_val of mocomp_op * motype_val located * motype_val located
+    | MOBody_val of motype_val located list
 
   and mocomp_op = GufoParsed.mcomp_op
 
   and mobinding = {
     mobd_name : (int * int list) list; 
     mobd_debugnames : string IntMap.t;
-    mobd_value: motype_val;
-    mobd_body: motype_val ;
+    mobd_value: motype_val located;
+    mobd_body: motype_val located;
   }
 
   and mo_expr_operation = GufoParsed.m_expr_operation
@@ -815,7 +802,7 @@ struct
     mosmv_description: string; (*A comment associated to the function or variable.*)
     mosmv_intname: int;
     mosmv_type: motype; 
-    mosmv_action: (motype_val list -> topvar_val IntMap.t -> motype_val); 
+    mosmv_action: (motype_val located list -> topvar_val IntMap.t -> motype_val located); 
   }
 
   and mosysmodulefield = {
@@ -863,7 +850,7 @@ struct
     mopg_field_to_type: int IntMap.t; 
     mopg_topvar: topvar_val IntMap.t;
     mopg_topvar_bind_vars: IntSet.t StringMap.t IntMap.t; 
-    mopg_topcal : motype_val ;
+    mopg_topcal : motype_val located;
     mopg_topcal_bind_vars: IntSet.t StringMap.t; 
     mopg_topvar2int: int StringMap.t ;
     mopg_topvar_debugname: string IntMap.t ;
@@ -872,7 +859,7 @@ struct
   }
 
   and topvar_val = 
-    | MOTop_val of motype_val 
+    | MOTop_val of motype_val located
     | MOTupEl_val of int * int list 
 
   and moprocess = GufoParsed.mprocess
@@ -990,19 +977,32 @@ struct
     }
 
   and simple_to_core_cmdseq_val cmdseq = 
-    match cmdseq with 
+    match cmdseq.loc_val with 
       | MISimpleCmd cmd ->
-          MOSimpleCmd (simple_to_core_cmd_val cmd)
+          {cmdseq with loc_val = 
+            MOSimpleCmd ({cmd with loc_val = 
+              simple_to_core_cmd_val cmd.loc_val})}
       | MIForkedCmd cmdseq -> 
-          MOForkedCmd (simple_to_core_cmdseq_val cmdseq)
+          {cmdseq with loc_val = MOForkedCmd (simple_to_core_cmdseq_val cmdseq)}
       | MIAndCmd (cmdseqa, cmdseqb) ->
-          MOAndCmd(simple_to_core_cmdseq_val cmdseqa, simple_to_core_cmdseq_val cmdseqb)
+          {cmdseq with loc_val = 
+            MOAndCmd(simple_to_core_cmdseq_val cmdseqa, 
+                     simple_to_core_cmdseq_val cmdseqb)}
       | MIOrCmd (cmdseqa, cmdseqb) -> 
-          MOOrCmd(simple_to_core_cmdseq_val cmdseqa, simple_to_core_cmdseq_val cmdseqb)
+          {cmdseq with loc_val = 
+            MOOrCmd(simple_to_core_cmdseq_val cmdseqa, 
+                    simple_to_core_cmdseq_val cmdseqb)
+          }
       | MISequenceCmd (cmdseqa, cmdseqb) -> 
-          MOSequenceCmd (simple_to_core_cmdseq_val cmdseqa, simple_to_core_cmdseq_val cmdseqb)
+          {cmdseq with loc_val = 
+            MOSequenceCmd (simple_to_core_cmdseq_val cmdseqa, 
+                           simple_to_core_cmdseq_val cmdseqb)
+          }
       | MIPipedCmd (cmdseqa, cmdseqb) ->
-          MOPipedCmd(simple_to_core_cmdseq_val cmdseqa, simple_to_core_cmdseq_val cmdseqb)
+          {cmdseq with loc_val = 
+            MOPipedCmd(simple_to_core_cmdseq_val cmdseqa, 
+                       simple_to_core_cmdseq_val cmdseqb)
+          }
  
   and simple_to_core_funarg funarg = 
     match funarg with 
@@ -1067,24 +1067,31 @@ struct
     }
 
   and simple_to_core_val mt =
-    match mt with
-      | MISimple_val ms -> MOSimple_val (simple_to_core_simple_val ms)
-      | MIComposed_val mc ->
-        MOComposed_val (simple_to_core_composed_val mc)
-      | MIRef_val (rf, argslst) ->
-          MORef_val(simple_to_core_ref_val rf, List.map simple_to_core_val argslst)
-      | MIEnvRef_val (var) ->
-          MOEnvRef_val(var)
-      | MIBasicFunBody_val (expr, v1, v2) -> 
-        MOBasicFunBody_val (expr, simple_to_core_val v1, simple_to_core_val v2)
-      | MIBind_val bd ->
-          MOBind_val (simple_to_core_binding_val bd)
-      | MIIf_val (cond, thn, els) -> 
-          MOIf_val (simple_to_core_val cond, simple_to_core_val thn, simple_to_core_val els)
-      | MIComp_val (op, val1, val2) -> 
-          MOComp_val(op,simple_to_core_val val1, simple_to_core_val val2)
-      | MIBody_val bdlst -> 
-          MOBody_val (List.map simple_to_core_val bdlst)
+    let res_val =  simple_to_core_val_no_loc mt.loc_val
+    in {mt with loc_val = res_val}
+
+  and simple_to_core_val_no_loc mt =
+      (match mt with
+        | MISimple_val ms -> MOSimple_val (simple_to_core_simple_val ms)
+        | MIComposed_val mc ->
+          MOComposed_val (simple_to_core_composed_val mc)
+        | MIRef_val (rf, argslst) ->
+            MORef_val(simple_to_core_ref_val rf, List.map simple_to_core_val argslst)
+        | MIEnvRef_val (var) ->
+            MOEnvRef_val(var)
+        | MIBasicFunBody_val (expr, v1, v2) -> 
+          MOBasicFunBody_val (expr, simple_to_core_val v1, simple_to_core_val v2)
+        | MIBind_val bd ->
+            MOBind_val (simple_to_core_binding_val bd)
+        | MIIf_val (cond, thn, els) -> 
+            MOIf_val (simple_to_core_val cond, 
+                      simple_to_core_val thn, 
+                      simple_to_core_val els)
+        | MIComp_val (op, val1, val2) -> 
+            MOComp_val(op,simple_to_core_val val1, simple_to_core_val val2)
+        | MIBody_val bdlst -> 
+            MOBody_val (List.map simple_to_core_val bdlst)
+      )
 
     let rec core_to_simple_composed ct = 
       {
@@ -1138,19 +1145,24 @@ struct
       }
 
     and core_to_simple_cmdseq c =
-     match c with 
-       | MOSimpleCmd c -> 
-           MISimpleCmd (core_to_simple_cmd c )
+     match c.loc_val with 
+       | MOSimpleCmd cmd -> 
+           {c with loc_val = 
+              MISimpleCmd ({cmd with loc_val = core_to_simple_cmd cmd.loc_val })}
        | MOForkedCmd cseq ->
-           MIForkedCmd (core_to_simple_cmdseq cseq)
+           {c with loc_val = MIForkedCmd (core_to_simple_cmdseq cseq)}
        | MOAndCmd (cseqa, cseqb) ->
-           MIAndCmd (core_to_simple_cmdseq cseqa, core_to_simple_cmdseq cseqb)
+           {c with loc_val = MIAndCmd (core_to_simple_cmdseq cseqa, 
+                                       core_to_simple_cmdseq cseqb)}
        | MOOrCmd (cseqa, cseqb)-> 
-           MIOrCmd (core_to_simple_cmdseq cseqa, core_to_simple_cmdseq cseqb)
+           {c with loc_val = MIOrCmd (core_to_simple_cmdseq cseqa, 
+                                     core_to_simple_cmdseq cseqb)}
        | MOSequenceCmd (cseqa,cseqb) ->
-           MISequenceCmd (core_to_simple_cmdseq cseqa, core_to_simple_cmdseq cseqb)
+           {c with loc_val = MISequenceCmd (core_to_simple_cmdseq cseqa,
+                                            core_to_simple_cmdseq cseqb)}
        | MOPipedCmd (cseqa, cseqb) ->
-           MIPipedCmd(core_to_simple_cmdseq cseqa, core_to_simple_cmdseq cseqb)
+           {c with loc_val = MIPipedCmd(core_to_simple_cmdseq cseqa, 
+                                        core_to_simple_cmdseq cseqb)}
 
    and core_to_simple_fun_val fv = 
     {
@@ -1206,6 +1218,10 @@ struct
 
 
     and core_to_simple_val v = 
+      let new_val = core_to_simple_val_no_loc v.loc_val 
+      in {v with loc_val = new_val}
+
+    and core_to_simple_val_no_loc v = 
       match v with 
         | MOSimple_val sv -> 
             MISimple_val (core_to_simple_simple_val sv )
@@ -1230,6 +1246,8 @@ struct
         | MOBody_val bdlst -> 
             MIBody_val (List.map core_to_simple_val bdlst)
 
+
+
   (**END Transformation from SimpleCore to Core **)
 
   (*Utility *)
@@ -1242,7 +1260,7 @@ struct
           mopg_field_to_type= IntMap.empty ;
           mopg_topvar= IntMap.empty;
           mopg_topvar_bind_vars= IntMap.empty; 
-          mopg_topcal = MOSimple_val MOEmpty_val;
+          mopg_topcal = box_loc(MOSimple_val MOEmpty_val);
           mopg_topcal_bind_vars= StringMap.empty; 
           mopg_topvar2int= StringMap.empty;
           mopg_topvar_debugname = IntMap.empty;
@@ -1267,54 +1285,6 @@ struct
   (* END EXPR *)
 
   (** PRINTER **)
-
-(*TODO: not finished, not sur we want this*)
-(*
-let moval_to_type aval = 
-  match aval with
-    |  [MOSimple_val(MOBase_val MOTypeStringVal _) ] -> 
-        (MOUnique_type (MOBase_type MTypeString ))
-    |  [MOSimple_val(MOBase_val MOTypeIntVal _) ] -> 
-        (MOUnique_type (MOBase_type MTypeInt ))
-    |  [MOSimple_val(MOBase_val MOTypeBoolVal _) ] -> 
-        (MOUnique_type (MOBase_type MTypeBool ))
-    |  [MOSimple_val(MOBase_val MOTypeFloatVal _) ] -> 
-        (MOUnique_type (MOBase_type MTypeFloat ))
-    |  [MOSimple_val(MOBase_val MOTypeCmdVal _) ] -> 
-        (MOUnique_type (MOBase_type MTypeCmd ))
-    |  [MOSimple_val(MOTuple_val lst ) ] -> 
-        (MOUnique_type(MOTuple_type (List.map moval_to_type lst)))
-    |  [MOSimple_val(MOList_val v) ] -> 
-        (MOUnique_type(MOList_type (moval_to_type (List.hd lst))))
-    |  [MOSimple_val(MONone_val ) ]  
-        (MOUnique_type(MOList_type (moval_to_type (List.hd lst))))
-    |  [MOSimple_val(MONone_val ) ] -> 
-        (MOUnique_type(MOOption_type (MOUnique_type MOUnit_type)))
-    | [MOSimple_val (MOSome_val v)] ->
-        (MOUnique_type(MOOption_type (moval_to_type v)))
-    | [MOSimple_val (MOSet_val set)] ->
-      match MSet.is_empty set with
-        | true -> 
-          (MOUnique_type(MOSet_type (MOUnit_type) ))
-        | _ -> 
-          (MOUnique_type(MOSet_type (moval_to_type MSet.choose set)))
-    | [MOSimple_val (MOMap_val map)] ->
-      match MMap.is_empty map with
-        | true -> 
-          (MOUnique_type(MOMap_type (MOUnit_type, MOUnit_type)))
-        | _ -> 
-          let k,v = MMap.choose map in
-          (MOUnique_type(MOMap_type (moval_to_type k, moval_to_type v)))
-    | [MOSimple_val (MOFun_val _,args,_)] ->
-        
-*)
-
-
-
-
-
-
-
 
   let rec type_to_string typ = 
     (match typ with
@@ -1369,15 +1339,18 @@ let moval_to_type aval =
     match v with 
         | MOSimple_val sv ->
             (match sv with
-              | MOBase_val MOTypeStringVal str -> str
-              | MOBase_val MOTypeBoolVal true -> "True"
-              | MOBase_val MOTypeBoolVal false -> "False"
-              | MOBase_val MOTypeIntVal i -> sprintf "%d" i
-              | MOBase_val MOTypeFloatVal f -> sprintf "%f" f
+              | MOBase_val MOTypeStringVal str -> str.loc_val
+              | MOBase_val MOTypeBoolVal b -> 
+                  (match b.loc_val with
+                    | true -> "True"
+                    | false -> "False"
+                  )
+              | MOBase_val MOTypeIntVal i -> sprintf "%d" i.loc_val
+              | MOBase_val MOTypeFloatVal f -> sprintf "%f" f.loc_val
               | MOBase_val MOTypeCmdVal cmdseq -> 
-                  (match cmdseq with
+                  (match cmdseq.loc_val with
                     | MOSimpleCmd cmd -> 
-                        (match cmd.mocm_print with
+                        (match cmd.loc_val.mocm_print with
                           | None -> ""
                           | Some res -> sprintf "%s\n" res
                         )
@@ -1386,8 +1359,8 @@ let moval_to_type aval =
               | MOTuple_val tuplst ->
                   sprintf " ( %s) " 
                   (List.fold_left 
-                    (fun str el -> sprintf "%s -- %s " str (moval_to_string_basic el) ) 
-                    (sprintf "%s" (moval_to_string_basic (List.hd tuplst)))
+                    (fun str el -> sprintf "%s -- %s " str (moval_to_string_basic el.loc_val) ) 
+                    (sprintf "%s" (moval_to_string_basic (List.hd tuplst).loc_val))
                     (List.tl tuplst))
               | MOList_val [] ->
                   sprintf " [ ] " 
@@ -1395,19 +1368,19 @@ let moval_to_type aval =
 (*                   sprintf " [%s] " (List.fold_left (fun str el -> sprintf "%s %s, " str (moval_to_string_basic el) ) "" lst) *)
                   sprintf " [ %s] " 
                   (List.fold_left 
-                    (fun str el -> sprintf "%s , %s " str (moval_to_string_basic el) ) 
-                    (sprintf "%s" (moval_to_string_basic (List.hd lst)))
+                    (fun str el -> sprintf "%s , %s " str (moval_to_string_basic el.loc_val) ) 
+                    (sprintf "%s" (moval_to_string_basic (List.hd lst).loc_val))
                     (List.tl lst))
               | MONone_val -> "None"
-              | MOSome_val sv -> sprintf "Some (%s)" (moval_to_string_basic sv)
+              | MOSome_val sv -> sprintf "Some (%s)" (moval_to_string_basic sv.loc_val)
               | MOSet_val mset when MSet.is_empty mset -> 
                   sprintf " -< >- " 
               | MOSet_val mset -> 
                   let lst = MSet.elements mset in
                   sprintf " -< %s>- " 
                   (List.fold_left
-                    (fun str el -> sprintf "%s , %s " str (moval_to_string_basic (simple_to_core_val el)) ) 
-                    (sprintf "%s" (moval_to_string_basic (simple_to_core_val (List.hd lst))))
+                    (fun str el -> sprintf "%s , %s " str (moval_to_string_basic (simple_to_core_val el).loc_val)) 
+                    (sprintf "%s" (moval_to_string_basic (simple_to_core_val (List.hd lst)).loc_val))
                     (List.tl lst))
               | MOMap_val amap when MMap.is_empty amap -> 
                   sprintf " -< : >- "
@@ -1417,12 +1390,12 @@ let moval_to_type aval =
                   (List.fold_left
                     (fun str (key, el) -> 
                       sprintf "%s , %s : %s " str
-                        (moval_to_string_basic (simple_to_core_val key)) 
-                        (moval_to_string_basic el))
+                        (moval_to_string_basic (simple_to_core_val key).loc_val) 
+                        (moval_to_string_basic el.loc_val))
                     (let key, el = List.hd lst in
                       (sprintf "%s : %s" 
-                        (moval_to_string_basic (simple_to_core_val key)))
-                        (moval_to_string_basic el)
+                        (moval_to_string_basic (simple_to_core_val key).loc_val))
+                        (moval_to_string_basic el.loc_val)
                     )
                     (List.tl lst))
 
@@ -1441,7 +1414,7 @@ let moval_to_type aval =
             let varname_str = ref.morv_debugname in
             let args_str = 
               List.fold_left 
-                (fun acc arg -> acc ^ " -> " ^ (moval_to_string_basic arg) ) 
+                (fun acc arg -> acc ^ " -> " ^ (moval_to_string_basic arg.loc_val) ) 
               "" args
             in
             sprintf "ref %d.%d (%s): %s" modu_i varname_i varname_str args_str
@@ -1486,15 +1459,18 @@ let moval_to_type aval =
     match v with 
         | MOSimple_val sv ->
             (match sv with
-              | MOBase_val MOTypeStringVal str -> str
-              | MOBase_val MOTypeBoolVal true -> "True"
-              | MOBase_val MOTypeBoolVal false -> "False"
-              | MOBase_val MOTypeIntVal i -> sprintf "%d" i
-              | MOBase_val MOTypeFloatVal f -> sprintf "%f" f
+              | MOBase_val MOTypeStringVal str -> str.loc_val
+              | MOBase_val MOTypeBoolVal b -> 
+                  (match b.loc_val with
+                    | true -> "True"
+                    | false -> "False"
+                  )
+              | MOBase_val MOTypeIntVal i -> sprintf "%d" i.loc_val
+              | MOBase_val MOTypeFloatVal f -> sprintf "%f" f.loc_val
               | MOBase_val MOTypeCmdVal cmdseq -> 
-                  (match cmdseq with
+                  (match cmdseq.loc_val with
                     | MOSimpleCmd cmd -> 
-                        (match cmd.mocm_print with
+                        (match cmd.loc_val.mocm_print with
                           | None -> ""
                           | Some res -> sprintf "%s\n" res
                         )
@@ -1503,8 +1479,8 @@ let moval_to_type aval =
               | MOTuple_val tuplst ->
                   sprintf " ( %s) " 
                   (List.fold_left 
-                    (fun str el -> sprintf "%s -- %s " str (moval_to_string el) ) 
-                    (sprintf "%s" (moval_to_string (List.hd tuplst)))
+                    (fun str el -> sprintf "%s -- %s " str (moval_to_string el.loc_val) ) 
+                    (sprintf "%s" (moval_to_string (List.hd tuplst).loc_val))
                     (List.tl tuplst))
               | MOList_val [] ->
                   sprintf " [ ] " 
@@ -1512,19 +1488,19 @@ let moval_to_type aval =
 (*                   sprintf " [%s] " (List.fold_left (fun str el -> sprintf "%s %s, " str (moval_to_string el) ) "" lst) *)
                   sprintf " [ %s] " 
                   (List.fold_left 
-                    (fun str el -> sprintf "%s , %s " str (moval_to_string el) ) 
-                    (sprintf "%s" (moval_to_string (List.hd lst)))
+                    (fun str el -> sprintf "%s , %s " str (moval_to_string el.loc_val) ) 
+                    (sprintf "%s" (moval_to_string (List.hd lst).loc_val))
                     (List.tl lst))
               | MONone_val -> "None"
-              | MOSome_val sv -> sprintf "Some (%s)" (moval_to_string sv)
+              | MOSome_val sv -> sprintf "Some (%s)" (moval_to_string sv.loc_val)
               | MOSet_val mset when MSet.is_empty mset -> 
                   sprintf " -< >- " 
               | MOSet_val mset -> 
                   let lst = MSet.elements mset in
                   sprintf " -< %s>- " 
                   (List.fold_left
-                    (fun str el -> sprintf "%s , %s " str (moval_to_string (simple_to_core_val el)) ) 
-                    (sprintf "%s" (moval_to_string (simple_to_core_val (List.hd lst))))
+                    (fun str el -> sprintf "%s , %s " str (moval_to_string (simple_to_core_val el).loc_val) ) 
+                    (sprintf "%s" (moval_to_string (simple_to_core_val (List.hd lst)).loc_val))
                     (List.tl lst))
               | MOMap_val amap when MMap.is_empty amap -> 
                   sprintf " -< : >- "
@@ -1534,12 +1510,12 @@ let moval_to_type aval =
                   (List.fold_left
                     (fun str (key, el) -> 
                       sprintf "%s , %s : %s " str
-                        (moval_to_string (simple_to_core_val key)) 
-                        (moval_to_string el))
+                        (moval_to_string (simple_to_core_val key).loc_val) 
+                        (moval_to_string el.loc_val))
                     (let key, el = List.hd lst in
                       (sprintf "%s : %s" 
-                        (moval_to_string (simple_to_core_val key)))
-                        (moval_to_string el)
+                        (moval_to_string (simple_to_core_val key).loc_val))
+                        (moval_to_string el.loc_val)
                     )
                     (List.tl lst))
 
@@ -1548,7 +1524,7 @@ let moval_to_type aval =
                   (StringMap.fold 
                     (fun str i acc ->  sprintf "%s $%d(%s) ->" acc i str) 
                     fv.mofv_args_name "")
-                  (moval_to_string fv.mofv_body)
+                  (moval_to_string fv.mofv_body.loc_val)
               | MOEmpty_val -> ""
             )
         | MOComposed_val mct -> "-composed-"
@@ -1563,7 +1539,7 @@ let moval_to_type aval =
             let varname_str = ref.morv_debugname in
             let args_str = 
               List.fold_left 
-                (fun acc arg -> acc ^ " -> " ^ (moval_to_string arg) ) 
+                (fun acc arg -> acc ^ " -> " ^ (moval_to_string arg.loc_val) ) 
               "" args
             in
             sprintf "($%d.%d($%s) %s)" modu_i varname_i varname_str args_str
@@ -1592,12 +1568,12 @@ let moval_to_type aval =
                 | MHasSet -> "SHas"
                 | MHasMap -> "MHas"
             )
-            in sprintf "(%s %s %s )" (moval_to_string arga) symbol (moval_to_string argb)
+            in sprintf "(%s %s %s )" (moval_to_string arga.loc_val) symbol (moval_to_string argb.loc_val)
         | MOBind_val bd -> 
           sprintf "let %s " (print_mobinding_name bd.mobd_name)
         | MOIf_val (cond, thn, els) -> 
             sprintf "if (%s) then (%s) else (%s)" 
-              (moval_to_string cond)  (moval_to_string thn) (moval_to_string els)
+              (moval_to_string cond.loc_val)  (moval_to_string thn.loc_val) (moval_to_string els.loc_val)
         | MOComp_val (op, left, right) -> 
             let op_symb = 
               match op with
@@ -1608,16 +1584,18 @@ let moval_to_type aval =
                 | GreaterThan -> ">"
                 | GreaterOrEq -> ">="
             in
-            sprintf "%s %s %s" (moval_to_string left) op_symb (moval_to_string right)
+            sprintf "%s %s %s" (moval_to_string left.loc_val) op_symb (moval_to_string right.loc_val)
         | MOBody_val lstbodies -> 
           List.fold_left
-            (fun acc bd -> sprintf "%s ; %s" acc (moval_to_string bd)) 
+            (fun acc bd -> sprintf "%s ; %s" acc (moval_to_string bd.loc_val)) 
             "" lstbodies
 
+let moval_loc_to_string v = 
+  moval_to_string v.loc_val
 
 let topvar_to_string v = 
   match v with 
-    | MOTop_val v -> sprintf "%s" (moval_to_string v)
+    | MOTop_val v -> sprintf "%s" (moval_to_string v.loc_val)
     | MOTupEl_val (i, pos) -> sprintf "MOTupEl %d pos : [%s] " i 
                                       (List.fold_left
                                         (fun acc p -> sprintf "%s %d," acc p) 
