@@ -31,7 +31,7 @@ let maptypes = IntMap.empty
 let cardinal args scope =  
   match (lst_val_only args) with 
     |  [MOSimple_val (MOMap_val(mmap)) ] ->
-        box_loc (MOSimple_val (MOBase_val (MOTypeIntVal (box_loc (MMap.cardinal mmap)))))
+        box_loc (MOSimple_val (MOBase_val (MOTypeIntVal (box_loc (MMap.cardinal mmap.loc_val)))))
     | _ -> assert false 
 
 
@@ -42,7 +42,7 @@ let is_in args scope =
         | MOSimple_val (MOMap_val(mmap)) -> 
         box_loc(MOSimple_val (MOBase_val (MOTypeBoolVal 
           (box_loc(
-            MMap.mem ((core_to_simple_val kval)) mmap)))
+            MMap.mem ((core_to_simple_val kval)) mmap.loc_val)))
         ))
         | _ -> assert false
       )
@@ -51,7 +51,10 @@ let is_in args scope =
 let mwith args scope = 
   match (lst_val_only args) with
     |  [MOSimple_val (MOMap_val(mmap)); MOSimple_val (MOMap_val(mmap2)) ] ->
-      box_loc (MOSimple_val (MOMap_val (MMap.union (fun _k _a b -> (Some b)) mmap mmap2)))
+      box_loc (MOSimple_val 
+                (MOMap_val (box_loc (MMap.union (fun _k _a b -> (Some b)) 
+                  mmap.loc_val 
+                  mmap2.loc_val))))
     | _ -> assert false 
 
 let get args scope = 
@@ -59,7 +62,7 @@ let get args scope =
     |  [mmap; kval ] ->
       (match mmap.loc_val with
         | MOSimple_val (MOMap_val(mmap)) -> 
-          (match (MMap.find_opt ((core_to_simple_val kval)) mmap) with
+          (match (MMap.find_opt ((core_to_simple_val kval)) mmap.loc_val) with
             | None -> box_loc (MOSimple_val (MONone_val))
             | Some v -> box_loc (MOSimple_val (MOSome_val v))
           )
@@ -73,7 +76,8 @@ let add args scope =
     |  [mmap;kval; vval ] ->
       (match mmap.loc_val with
         | MOSimple_val (MOMap_val(mmap)) -> 
-          box_loc (MOSimple_val (MOMap_val (MMap.add (core_to_simple_val kval) vval mmap)))
+          box_loc (MOSimple_val 
+                    (MOMap_val (box_loc (MMap.add (core_to_simple_val kval) vval mmap.loc_val))))
           
         | _ -> assert false
       )
@@ -84,7 +88,8 @@ let rm args scope =
     |  [mmap;kval ] ->
       (match mmap.loc_val with
         | MOSimple_val (MOMap_val(mmap)) -> 
-          box_loc (MOSimple_val (MOMap_val (MMap.remove (core_to_simple_val kval) mmap)))
+          box_loc (MOSimple_val (MOMap_val (box_loc 
+                    (MMap.remove (core_to_simple_val kval) mmap.loc_val))))
           
         | _ -> assert false
       )

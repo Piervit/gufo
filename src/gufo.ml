@@ -131,7 +131,7 @@ struct
       
       and miref_val = {
         mirv_module : int option; 
-        mirv_varname : int * (int option * int) list; 
+        mirv_varname : int located * (int option * int) list; 
         mirv_index: mitype_val located list option;
         mirv_debugname: string;
       }
@@ -144,8 +144,8 @@ struct
       
       and misimple_type_val = 
         | MIBase_val of mibase_type_val 
-        | MITuple_val of mitype_val located list
-        | MIList_val of mitype_val located list
+        | MITuple_val of mitype_val located list located
+        | MIList_val of mitype_val located list located
         | MINone_val 
         | MISome_val of mitype_val located
         | MIFun_val of mifun_val
@@ -164,7 +164,7 @@ struct
                                                   * mitype_val located
         | MIBind_val of mibinding
         | MIIf_val of mitype_val located * mitype_val located * mitype_val located
-        | MIComp_val of micomp_op * mitype_val located * mitype_val located
+        | MIComp_val of micomp_op located * mitype_val located * mitype_val located
         | MIBody_val of mitype_val located list
 
       and micomp_op = GufoParsed.mcomp_op
@@ -219,6 +219,7 @@ struct
       type t = mitype_val located
 
       let rec mlist_compare ta tb = 
+        let ta, tb = ta.loc_val, tb.loc_val in
         let rec el_compare lsta lstb = 
           match lsta, lstb with
             | a::nlsta, b::nlstb ->
@@ -255,7 +256,7 @@ struct
         let comp_varname vnamea vnameb = 
           match vnamea, vnameb with
             | (i, lst), (ip, lstp) -> 
-                (match i - ip  with
+                (match i.loc_val - ip.loc_val  with
                   | 0 -> 
                       (match (List.length lst) - (List.length lstp) with
                         | 0 -> comp_fields lst lstp
@@ -484,7 +485,7 @@ struct
           | i -> i 
 
       and compare_comp (op1, left1, right1) (op2, left2, right2) = 
-        match op1, op2 with 
+        match op1.loc_val, op2.loc_val with 
           | Egal, Egal
           | NotEqual, NotEqual
           | LessThan, LessThan
@@ -666,7 +667,7 @@ struct
 
   and moref_val = {
     morv_module : int option; (* None if curmodule *)
-    morv_varname : int * (int option * int) list; (*varname * (fieldmoduleid * fieldsid *)
+    morv_varname : int located * (int option * int) list; (*varname * (fieldmoduleid * fieldsid *)
     morv_index : motype_val located list option;
     morv_debugname : string;
   }
@@ -750,12 +751,12 @@ struct
  
   and mosimple_type_val = 
     | MOBase_val of mobase_type_val 
-    | MOTuple_val of motype_val located list
-    | MOList_val of motype_val located list
+    | MOTuple_val of motype_val located list located
+    | MOList_val of motype_val located list located
     | MONone_val 
     | MOSome_val of motype_val located
-    | MOSet_val of MSet.t
-    | MOMap_val of motype_val located MMap.t
+    | MOSet_val of MSet.t located
+    | MOMap_val of motype_val located MMap.t located
     | MOFun_val of mofun_val
     | MOEmpty_val
   
@@ -771,7 +772,7 @@ struct
     | MOBasicFunBody_val of mo_expr_operation * motype_val located * motype_val located
     | MOBind_val of mobinding
     | MOIf_val of motype_val located * motype_val located * motype_val located
-    | MOComp_val of mocomp_op * motype_val located * motype_val located
+    | MOComp_val of mocomp_op located * motype_val located * motype_val located
     | MOBody_val of motype_val located list
 
   and mocomp_op = GufoParsed.mcomp_op
@@ -860,7 +861,7 @@ struct
 
   and topvar_val = 
     | MOTop_val of motype_val located
-    | MOTupEl_val of int * int list 
+    | MOTupEl_val of int located * int list 
 
   and moprocess = GufoParsed.mprocess
 
@@ -1029,9 +1030,12 @@ struct
     | MIBase_val MITypeCmdVal cseq ->
         MOBase_val (MOTypeCmdVal (simple_to_core_cmdseq_val cseq))
     | MITuple_val tuplist -> 
-        MOTuple_val (List.map (simple_to_core_val) tuplist)
+        MOTuple_val ({loc_val = List.map (simple_to_core_val) tuplist.loc_val; 
+                      loc_pos= tuplist.loc_pos})
     | MIList_val lst -> 
-        MOList_val (List.map (simple_to_core_val) lst)
+        MOList_val ({loc_val = List.map (simple_to_core_val) lst.loc_val;
+                     loc_pos = lst.loc_pos}
+                   )
     | MINone_val ->
         MONone_val
     | MISome_val somev ->
@@ -1186,7 +1190,8 @@ struct
                   MIBase_val (MITypeCmdVal( core_to_simple_cmdseq c))
               | MOTuple_val lst
               | MOList_val lst ->
-                  MIList_val (List.map core_to_simple_val lst )
+                  MIList_val ({loc_val = List.map core_to_simple_val lst.loc_val;
+                               loc_pos = lst.loc_pos })
               | MONone_val -> MINone_val 
               | MOSome_val v -> 
                   MISome_val (core_to_simple_val v )
@@ -1360,32 +1365,33 @@ struct
                   sprintf " ( %s) " 
                   (List.fold_left 
                     (fun str el -> sprintf "%s -- %s " str (moval_to_string_basic el.loc_val) ) 
-                    (sprintf "%s" (moval_to_string_basic (List.hd tuplst).loc_val))
-                    (List.tl tuplst))
-              | MOList_val [] ->
-                  sprintf " [ ] " 
+                    (sprintf "%s" (moval_to_string_basic (List.hd tuplst.loc_val).loc_val))
+                    (List.tl tuplst.loc_val))
               | MOList_val lst ->
-(*                   sprintf " [%s] " (List.fold_left (fun str el -> sprintf "%s %s, " str (moval_to_string_basic el) ) "" lst) *)
-                  sprintf " [ %s] " 
-                  (List.fold_left 
-                    (fun str el -> sprintf "%s , %s " str (moval_to_string_basic el.loc_val) ) 
-                    (sprintf "%s" (moval_to_string_basic (List.hd lst).loc_val))
-                    (List.tl lst))
+                  (match lst.loc_val with
+                    | [] -> sprintf " [ ] " 
+                    | lst -> 
+                      sprintf " [ %s] " 
+                      (List.fold_left 
+                        (fun str el -> sprintf "%s , %s " str (moval_to_string_basic el.loc_val) ) 
+                        (sprintf "%s" (moval_to_string_basic (List.hd lst).loc_val))
+                        (List.tl lst))
+                  )
               | MONone_val -> "None"
               | MOSome_val sv -> sprintf "Some (%s)" (moval_to_string_basic sv.loc_val)
-              | MOSet_val mset when MSet.is_empty mset -> 
+              | MOSet_val mset when MSet.is_empty mset.loc_val -> 
                   sprintf " -< >- " 
               | MOSet_val mset -> 
-                  let lst = MSet.elements mset in
+                  let lst = MSet.elements mset.loc_val in
                   sprintf " -< %s>- " 
                   (List.fold_left
                     (fun str el -> sprintf "%s , %s " str (moval_to_string_basic (simple_to_core_val el).loc_val)) 
                     (sprintf "%s" (moval_to_string_basic (simple_to_core_val (List.hd lst)).loc_val))
                     (List.tl lst))
-              | MOMap_val amap when MMap.is_empty amap -> 
+              | MOMap_val amap when MMap.is_empty amap.loc_val -> 
                   sprintf " -< : >- "
               | MOMap_val amap ->
-                  let lst = MMap.bindings amap in
+                  let lst = MMap.bindings amap.loc_val in
                   sprintf " -< %s>- " 
                   (List.fold_left
                     (fun str (key, el) -> 
@@ -1417,7 +1423,7 @@ struct
                 (fun acc arg -> acc ^ " -> " ^ (moval_to_string_basic arg.loc_val) ) 
               "" args
             in
-            sprintf "ref %d.%d (%s): %s" modu_i varname_i varname_str args_str
+            sprintf "ref %d.%d (%s): %s" modu_i varname_i.loc_val varname_str args_str
 
         | MOEnvRef_val (var) -> var
         | MOBasicFunBody_val (op, arga, argb) -> "-basicfun-"
@@ -1480,32 +1486,33 @@ struct
                   sprintf " ( %s) " 
                   (List.fold_left 
                     (fun str el -> sprintf "%s -- %s " str (moval_to_string el.loc_val) ) 
-                    (sprintf "%s" (moval_to_string (List.hd tuplst).loc_val))
-                    (List.tl tuplst))
-              | MOList_val [] ->
-                  sprintf " [ ] " 
+                    (sprintf "%s" (moval_to_string (List.hd tuplst.loc_val).loc_val))
+                    (List.tl tuplst.loc_val))
               | MOList_val lst ->
-(*                   sprintf " [%s] " (List.fold_left (fun str el -> sprintf "%s %s, " str (moval_to_string el) ) "" lst) *)
-                  sprintf " [ %s] " 
-                  (List.fold_left 
-                    (fun str el -> sprintf "%s , %s " str (moval_to_string el.loc_val) ) 
-                    (sprintf "%s" (moval_to_string (List.hd lst).loc_val))
-                    (List.tl lst))
+                  (match lst.loc_val with
+                    | [] -> sprintf " [ ] " 
+                    | lst -> 
+                      sprintf " [ %s] " 
+                      (List.fold_left 
+                        (fun str el -> sprintf "%s , %s " str (moval_to_string el.loc_val) ) 
+                        (sprintf "%s" (moval_to_string (List.hd lst).loc_val))
+                        (List.tl lst))
+                  )
               | MONone_val -> "None"
               | MOSome_val sv -> sprintf "Some (%s)" (moval_to_string sv.loc_val)
-              | MOSet_val mset when MSet.is_empty mset -> 
+              | MOSet_val mset when MSet.is_empty mset.loc_val -> 
                   sprintf " -< >- " 
               | MOSet_val mset -> 
-                  let lst = MSet.elements mset in
+                  let lst = MSet.elements mset.loc_val in
                   sprintf " -< %s>- " 
                   (List.fold_left
                     (fun str el -> sprintf "%s , %s " str (moval_to_string (simple_to_core_val el).loc_val) ) 
                     (sprintf "%s" (moval_to_string (simple_to_core_val (List.hd lst)).loc_val))
                     (List.tl lst))
-              | MOMap_val amap when MMap.is_empty amap -> 
+              | MOMap_val amap when MMap.is_empty amap.loc_val -> 
                   sprintf " -< : >- "
               | MOMap_val amap ->
-                  let lst = MMap.bindings amap in
+                  let lst = MMap.bindings amap.loc_val in
                   sprintf " -< %s>- " 
                   (List.fold_left
                     (fun str (key, el) -> 
@@ -1542,7 +1549,7 @@ struct
                 (fun acc arg -> acc ^ " -> " ^ (moval_to_string arg.loc_val) ) 
               "" args
             in
-            sprintf "($%d.%d($%s) %s)" modu_i varname_i varname_str args_str
+            sprintf "($%d.%d($%s) %s)" modu_i varname_i.loc_val varname_str args_str
 
         | MOEnvRef_val (var) -> var
         | MOBasicFunBody_val (op, arga, argb) -> 
@@ -1576,7 +1583,7 @@ struct
               (moval_to_string cond.loc_val)  (moval_to_string thn.loc_val) (moval_to_string els.loc_val)
         | MOComp_val (op, left, right) -> 
             let op_symb = 
-              match op with
+              match op.loc_val with
                 | Egal -> "=="
                 | NotEqual -> "!=" 
                 | LessThan -> "<" 
@@ -1596,7 +1603,7 @@ let moval_loc_to_string v =
 let topvar_to_string v = 
   match v with 
     | MOTop_val v -> sprintf "%s" (moval_to_string v.loc_val)
-    | MOTupEl_val (i, pos) -> sprintf "MOTupEl %d pos : [%s] " i 
+    | MOTupEl_val (i, pos) -> sprintf "MOTupEl %d pos : [%s] " i.loc_val 
                                       (List.fold_left
                                         (fun acc p -> sprintf "%s %d," acc p) 
                                         "" pos

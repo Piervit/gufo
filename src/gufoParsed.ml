@@ -166,13 +166,13 @@ and msimple_type =
 
 and msimple_type_val = 
   | MBase_val of mbase_type_val 
-  | MTuple_val of mtype_val located list
-  | MList_val of mtype_val located list
+  | MTuple_val of mtype_val located list located
+  | MList_val of mtype_val located list located 
   | MEmpty_val
   | MNone_val 
   | MSome_val of mtype_val located
-  | MSet_val of  mtype_val located list
-  | MMap_val of (mtype_val located * mtype_val located) list (*(key * value list ) Type info will come next. *)
+  | MSet_val of  mtype_val located list located
+  | MMap_val of (mtype_val located * mtype_val located) list located (*(key * value list ) Type info will come next. *)
   | MFun_val of mfunarg list * mtype_val located (* args name * body_expr *)
 
 and mfunarg = 
@@ -191,7 +191,7 @@ and mtype_val =
   | MBasicFunBody_val of m_expr_operation * mtype_val located list
   | MBind_val of mbinding
   | MIf_val of mtype_val located * mtype_val located * mtype_val located
-  | MComp_val of mcomp_op * mtype_val located * mtype_val located (* comp_op * left_expr * right_expr *)
+  | MComp_val of mcomp_op located * mtype_val located * mtype_val located (* comp_op * left_expr * right_expr *)
   | MBody_val of mtype_val located list (*this is used to express complex body using unit
                           * mtype for side effect.
                           * For exemple like "printf "aa";; true" 
@@ -436,14 +436,14 @@ and dump_cmd_val cmdval =
     | OrCmd (cmdval1, cmdval2)-> dump_2op " || " cmdval1.loc_val cmdval2.loc_val
     | SequenceCmd (cmdval1, cmdval2)-> dump_2op " ; " cmdval1.loc_val cmdval2.loc_val
     | PipedCmd (cmdval1, cmdval2)-> dump_2op " | " cmdval1.loc_val cmdval2.loc_val
-  and dump_arg arg = 
+and dump_arg arg = 
     match arg with
       | MBaseArg arg -> print_string arg.loc_val; print_space ()
       | MTupleArg arglst -> 
           print_string "(";
           List.iter (fun arg -> dump_arg arg; print_string " -- ") arglst.loc_val;
           print_string ")"
-  and dump_mtype_val varval = 
+and dump_mtype_val varval = 
     let print_call op args = 
       print_string "( ";
               print_string op;
@@ -476,19 +476,22 @@ and dump_cmd_val cmdval =
          dump_cmd_val v.loc_val 
          | MTuple_val lvals ->
            print_string "tuple [ ";
-           List.iter (fun v -> dump_mtype_val v.loc_val) lvals;
+           List.iter (fun v -> dump_mtype_val v.loc_val) lvals.loc_val;
            print_string "] "
          | MList_val lvals ->
            print_string "list [ ";
-           List.iter (fun arg -> dump_mtype_val arg.loc_val; print_string ", ") lvals;
+           List.iter (fun arg -> dump_mtype_val arg.loc_val; print_string ", ") lvals.loc_val;
            print_string "] "
          | MSet_val vals ->
            print_string "set [ ";
-           List.iter (fun arg -> dump_mtype_val arg.loc_val; print_string ", ") vals;
+           List.iter (fun arg -> dump_mtype_val arg.loc_val; print_string ", ") vals.loc_val;
            print_string "] ";
          | MMap_val vals ->
            print_string "map[ ";
-           List.iter (fun (key,aval) -> dump_mtype_val key.loc_val ;print_string ": ";dump_mtype_val aval.loc_val; print_string ", ") vals;
+           List.iter (fun (key,aval) -> dump_mtype_val key.loc_val ;
+                                        print_string ": ";dump_mtype_val aval.loc_val; 
+                                        print_string ", ") 
+                      vals.loc_val;
            print_string "] ";
 
          | MFun_val (fargs, fexpr) ->
@@ -579,7 +582,7 @@ and dump_cmd_val cmdval =
             print_string op;
             dump_mtype_val right.loc_val
           in
-          (match comp_op with 
+          (match comp_op.loc_val with 
             | Egal ->
                 print_comp " == " 
             | NotEqual ->

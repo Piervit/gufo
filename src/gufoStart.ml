@@ -120,7 +120,8 @@ let handle_program p curMod =
         mfp_progmap_debug = add_mainprog_to_progmap_debug curMod progmap_debug;
         
       }
-  in dump_fullprog prog; prog
+  in (*dump_fullprog prog; *)
+    prog
 
 let handle_consolprog p previous_fulloptiprog = 
   debug_info (debug_title1 "Start converting a gufo console program using the info already acquired from existing program.");
@@ -146,7 +147,8 @@ let handle_consolprog p previous_fulloptiprog =
           mfp_progmap = previous_fulloptiprog.mofp_progmap;
           mfp_progmap_debug = previous_fulloptiprog.mofp_progmap_debug;
         }
-  in dump_fullprog prog ; prog
+  in (* dump_fullprog prog ;*)
+     prog
 
 
 

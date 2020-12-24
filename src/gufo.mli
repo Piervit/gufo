@@ -201,7 +201,7 @@ sig
 
   and moref_val = {
     morv_module : int option; (* None if defined in current module.*)
-    morv_varname : int * (int option * int) list; (*varname * (fieldmoduleid * fieldsid *)
+    morv_varname : int located * (int option * int ) list; (*varname * (fieldmoduleid * fieldsid *)
     morv_index : motype_val located list option; (*in case we access a list element of the
                                     reference, such as in $a[$b][$c].
                                     $a will have mrv_index as Some [mref($b); 
@@ -289,12 +289,12 @@ sig
  
   and mosimple_type_val = 
     | MOBase_val of mobase_type_val 
-    | MOTuple_val of motype_val located list
-    | MOList_val of motype_val located list
+    | MOTuple_val of motype_val located list located
+    | MOList_val of motype_val located list located
     | MONone_val 
     | MOSome_val of motype_val located
-    | MOSet_val of MSet.t
-    | MOMap_val of motype_val located MMap.t
+    | MOSet_val of MSet.t located
+    | MOMap_val of motype_val located MMap.t located
     | MOFun_val of mofun_val
     | MOEmpty_val
   
@@ -313,7 +313,7 @@ sig
     | MOBasicFunBody_val of mo_expr_operation * motype_val located * motype_val located
     | MOBind_val of mobinding
     | MOIf_val of motype_val located * motype_val located * motype_val located
-    | MOComp_val of mocomp_op * motype_val located * motype_val located (* comp_op * left_expr * right_expr *)
+    | MOComp_val of mocomp_op located * motype_val located * motype_val located (* comp_op * left_expr * right_expr *)
     | MOBody_val of motype_val located list
 
   and mocomp_op = GufoParsed.mcomp_op
@@ -413,7 +413,7 @@ sig
 
   and topvar_val = 
     | MOTop_val of motype_val located
-    | MOTupEl_val of int * int list (*reference of the tupel, position in the tuple. This is a list for multi dimensional tuple*)
+    | MOTupEl_val of int located * int list (*reference of the tupel, position in the tuple. This is a list for multi dimensional tuple*)
 
   and moprocess = GufoParsed.mprocess
 

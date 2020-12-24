@@ -172,13 +172,13 @@ and msimple_type =
 
 and msimple_type_val = 
   | MBase_val of mbase_type_val 
-  | MTuple_val of mtype_val located list
-  | MList_val of mtype_val located list
+  | MTuple_val of mtype_val located list located
+  | MList_val of mtype_val located list located
   | MEmpty_val
   | MNone_val 
   | MSome_val of mtype_val located
-  | MSet_val of  mtype_val located list
-  | MMap_val of (mtype_val located * mtype_val located) list (*(key * value list ) Type info will come next. *)
+  | MSet_val of  mtype_val located list located
+  | MMap_val of (mtype_val located * mtype_val located) list located(*(key * value list ) Type info will come next. *)
   | MFun_val of mfunarg list * mtype_val located (* args name * body_expr *)
 
 and mfunarg = 
@@ -197,7 +197,7 @@ and mtype_val =
   | MBasicFunBody_val of m_expr_operation * mtype_val located list
   | MBind_val of mbinding
   | MIf_val of mtype_val located * mtype_val located * mtype_val located
-  | MComp_val of mcomp_op * mtype_val located * mtype_val located (* comp_op * left_expr * right_expr *)
+  | MComp_val of mcomp_op located * mtype_val located * mtype_val located (* comp_op * left_expr * right_expr *)
   | MBody_val of mtype_val located list (*this is used to express complex body using unit
                           * mtype for side effect.
                           * For exemple like "printf "aa";; true" 

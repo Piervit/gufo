@@ -30,3 +30,27 @@ let string_of_int_loc iloc =
 let box_loc v = box_with_dummy_pos v
 
 let lst_val_only loc_lst = List.map (fun a -> a.loc_val) loc_lst
+
+let pos_merging pos_a pos_b =
+  (*We check the earlier starting position*)
+  
+  let start_a, start_b = pos_a.ppos_start, pos_b.ppos_start in
+  let end_a, end_b = pos_a.ppos_end, pos_b.ppos_end in
+  let earlier = 
+    match start_a.pos_cnum - start_b.pos_cnum with
+      | i when i < 0 -> start_a
+      | _ -> start_b
+  in 
+  let last =  
+    match end_a.pos_cnum - end_b.pos_cnum with
+      | i when i < 0 -> end_b
+      | _ -> end_a
+  in 
+  {
+    ppos_start = earlier;
+    ppos_end = last;
+  }
+
+let val_at_pos v pos = {loc_val = v; loc_pos = pos}
+
+

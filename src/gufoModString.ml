@@ -33,7 +33,7 @@ let split args scope =
         let res =
         List.map (fun str -> box_loc (MOSimple_val 
                     (MOBase_val (MOTypeStringVal(box_loc(String.trim str)))))) res
-        in box_loc (MOSimple_val (MOList_val res))
+        in box_loc (MOSimple_val (MOList_val (box_loc res)))
     | _ -> assert false 
 
 

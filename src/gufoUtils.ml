@@ -49,7 +49,7 @@ open GufoParsed
         | MList_val mtyplst
         | MSet_val mtyplst
         | MTuple_val mtyplst ->
-            List.fold_left (fun acc v -> fold_over_cmd_val apply_fun acc v.loc_val) acc mtyplst
+            List.fold_left (fun acc v -> fold_over_cmd_val apply_fun acc v.loc_val) acc mtyplst.loc_val
         | MFun_val (_, mtype) 
         | MSome_val mtype -> fold_over_cmd_val apply_fun acc mtype.loc_val
         | MMap_val keyValLst ->
@@ -57,7 +57,7 @@ open GufoParsed
               fold_over_cmd_val apply_fun 
                                 (fold_over_cmd_val apply_fun acc v.loc_val) 
                                 key.loc_val) 
-            acc keyValLst
+            acc keyValLst.loc_val
       )
     | MBody_val (mtyplst) 
     | MBasicFunBody_val (_, mtyplst) -> 
@@ -127,7 +127,7 @@ open GufoParsed
         | MList_val mtypelst
         | MSet_val mtypelst
         | MTuple_val mtypelst ->
-            List.fold_left (fun acc v -> fold_over_composed_type_val apply_fun acc v.loc_val) acc mtypelst
+            List.fold_left (fun acc v -> fold_over_composed_type_val apply_fun acc v.loc_val) acc mtypelst.loc_val
         | MFun_val (_, mtype) 
         | MSome_val mtype -> fold_over_composed_type_val apply_fun acc mtype.loc_val
         | MMap_val keyValLst ->
@@ -135,7 +135,7 @@ open GufoParsed
               fold_over_composed_type_val apply_fun 
                                           (fold_over_composed_type_val apply_fun acc v.loc_val) 
                                           key.loc_val) 
-            acc keyValLst
+            acc keyValLst.loc_val
       )
     | MBody_val (mtyplst) 
     | MBasicFunBody_val (_, mtyplst) ->
@@ -206,7 +206,7 @@ open GufoParsed
         | MList_val mtypelst
         | MSet_val mtypelst
         | MTuple_val mtypelst ->
-            List.fold_left (fun acc v -> fold_over_mref_val apply_fun acc v.loc_val) acc mtypelst
+            List.fold_left (fun acc v -> fold_over_mref_val apply_fun acc v.loc_val) acc mtypelst.loc_val
         | MFun_val (_, mtype) 
         | MSome_val mtype -> fold_over_mref_val apply_fun acc mtype.loc_val
         | MMap_val keyValLst ->
@@ -214,7 +214,7 @@ open GufoParsed
               (fun acc (key, v) -> fold_over_mref_val apply_fun 
                                                       (fold_over_mref_val apply_fun acc v.loc_val) 
                                                       key.loc_val) 
-              acc keyValLst
+              acc keyValLst.loc_val
       )
     | MBody_val (mtypelst) 
     | MBasicFunBody_val (_, mtypelst) ->
@@ -310,14 +310,14 @@ open GufoParsed
         | MList_val mtypelst
         | MSet_val mtypelst
         | MTuple_val mtypelst ->
-            List.fold_left (fun acc v -> fold_over_binding_val apply_fun acc v.loc_val) acc mtypelst
+            List.fold_left (fun acc v -> fold_over_binding_val apply_fun acc v.loc_val) acc mtypelst.loc_val
         | MFun_val (_, mtype) 
         | MSome_val mtype -> fold_over_binding_val apply_fun acc mtype.loc_val
         | MMap_val keyValLst ->
             List.fold_left 
               (fun acc (key, v) -> fold_over_binding_val apply_fun 
                                                          (fold_over_binding_val apply_fun acc v.loc_val) key.loc_val) 
-            acc keyValLst
+            acc keyValLst.loc_val
       )
     | MBody_val (mtyplst) 
     | MBasicFunBody_val (_, mtyplst) ->

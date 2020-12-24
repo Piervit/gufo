@@ -482,22 +482,25 @@ leaf_expr:
         }))}
   | f = located (FLOAT)
     {MSimple_val (MBase_val (MTypeFloatVal f))}
-  | MINUS_OPENING_CHEVRON; set = listSetEl; MINUS_CLOSING_CHEVRON
+  | MINUS_OPENING_CHEVRON; set = located(listSetEl); MINUS_CLOSING_CHEVRON
     {
       MSimple_val (MSet_val set)
     }
-  | MINUS_OPENING_CHEVRON;  MINUS_CLOSING_CHEVRON
+  | start = located(MINUS_OPENING_CHEVRON);  MINUS_CLOSING_CHEVRON
     {
-      MSimple_val (MSet_val [])
+      MSimple_val (MSet_val {loc_val = []; loc_pos = start.loc_pos})
     }
 
-  | MINUS_OPENING_CHEVRON; COLON;   MINUS_CLOSING_CHEVRON
+  | start = located (MINUS_OPENING_CHEVRON); COLON;   MINUS_CLOSING_CHEVRON
     {
-      MSimple_val (MMap_val[])
+      MSimple_val (MMap_val {loc_val = []; loc_pos = start.loc_pos })
     }
-  | MINUS_OPENING_CHEVRON; map = mapEl; MINUS_CLOSING_CHEVRON
+  | start = located (MINUS_OPENING_CHEVRON); map = mapEl; fin = located (MINUS_CLOSING_CHEVRON)
     {
-      MSimple_val (MMap_val map)
+      MSimple_val (MMap_val ({loc_val = map; 
+                              loc_pos = GufoLocHelper.pos_merging start.loc_pos 
+                                                                  fin.loc_pos 
+                             }))
     }
   |  cmdas = located(cmd_expr);
     { MSimple_val (MBase_val (MTypeCmdVal cmdas)) }
@@ -540,9 +543,9 @@ basic_expr:
      {MRef_val (funcall, funargs)}
   | op = operation ; 
     {op}
-  | OPEN_SQRBRACKET ; CLOSE_SQRBRACKET
-      {MSimple_val (MList_val [])}
-  | OPEN_SQRBRACKET ; lst = listSetEl; CLOSE_SQRBRACKET
+  | start = located(OPEN_SQRBRACKET) ; CLOSE_SQRBRACKET
+      {MSimple_val (MList_val {loc_val = []; loc_pos = start.loc_pos})}
+  | OPEN_SQRBRACKET ; lst = located(listSetEl); CLOSE_SQRBRACKET
     {
       MSimple_val (MList_val lst)
     }
@@ -565,7 +568,13 @@ top_expr :
   | var = basic_expr
     {var}
   | var1 = located(varassign_in_expr) ; DOUBLE_MINUS; seq=in_tuple_assign
-    { MSimple_val (MTuple_val  (var1 :: seq)) }
+    {let first_pos = var1.loc_pos in
+     let last_pos = (List.nth seq ((List.length seq) - 1)).loc_pos  in
+
+    MSimple_val (MTuple_val {
+                              loc_val = (var1 :: seq); 
+                              loc_pos = GufoLocHelper.pos_merging first_pos last_pos}) 
+    }
 
 varassign_in_expr : 
   | a = leaf_expr
@@ -582,9 +591,11 @@ varassign_in_expr :
     MComposed_val 
       {mcv_module_def = Some ({md with loc_val = rm_first_char md.loc_val}); mcv_fields=fds} 
     }
-  | OPEN_SQRBRACKET ; CLOSE_SQRBRACKET
-      {MSimple_val (MList_val [])}
-  | OPEN_SQRBRACKET ; lst = listSetEl; CLOSE_SQRBRACKET
+  | start = located (OPEN_SQRBRACKET) ; CLOSE_SQRBRACKET
+      {
+        MSimple_val (MList_val ({loc_val = []; loc_pos = start.loc_pos }))
+      }
+  | OPEN_SQRBRACKET ; lst = located(listSetEl); CLOSE_SQRBRACKET
     {
       MSimple_val (MList_val lst)
     }
@@ -593,18 +604,18 @@ varassign_in_expr :
 
 
 comp_expr :
-  | expr1 = located(varassign_in_expr) ; EQUALITY; expr2 = located(varassign_in_expr)
-    {MComp_val (Egal, expr1, expr2) }
-  | expr1 = located(varassign_in_expr) ; INEQUALITY; expr2 = located(varassign_in_expr)
-    {MComp_val (NotEqual, expr1, expr2) }
-  | expr1 = located(varassign_in_expr) ; CLOSING_CHEVRON ; expr2 = located(varassign_in_expr)
-    {MComp_val (GreaterThan, expr1, expr2) }
-  | expr1 = located(varassign_in_expr) ; EQ_CLOSING_CHEVRON; expr2 = located(varassign_in_expr)
-    {MComp_val (GreaterOrEq, expr1, expr2) }
-  | expr1 = located(varassign_in_expr) ; OPENING_CHEVRON ; expr2 = located(varassign_in_expr)
-    {MComp_val (LessThan, expr1, expr2) }
-  | expr1 = located(varassign_in_expr) ; EQ_OPENING_CHEVRON; expr2 = located(varassign_in_expr)
-    {MComp_val (LessOrEq, expr1, expr2) }
+  | expr1 = located(varassign_in_expr) ; eq=located(EQUALITY); expr2 = located(varassign_in_expr)
+    {MComp_val ({loc_val=Egal;loc_pos=eq.loc_pos}, expr1, expr2) }
+  | expr1 = located(varassign_in_expr) ; eq=located(INEQUALITY); expr2 = located(varassign_in_expr)
+    {MComp_val ({loc_val=NotEqual;loc_pos=eq.loc_pos}, expr1, expr2) }
+  | expr1 = located(varassign_in_expr) ; eq=located(CLOSING_CHEVRON) ; expr2 = located(varassign_in_expr)
+    {MComp_val ({loc_val=GreaterThan;loc_pos=eq.loc_pos}, expr1, expr2) }
+  | expr1 = located(varassign_in_expr) ; eq=located(EQ_CLOSING_CHEVRON); expr2 = located(varassign_in_expr)
+    {MComp_val ({loc_val=GreaterOrEq;loc_pos=eq.loc_pos}, expr1, expr2) }
+  | expr1 = located(varassign_in_expr) ; eq=located(OPENING_CHEVRON) ; expr2 = located(varassign_in_expr)
+    {MComp_val ({loc_val=LessThan;loc_pos=eq.loc_pos}, expr1, expr2) }
+  | expr1 = located(varassign_in_expr) ; eq=located(EQ_OPENING_CHEVRON); expr2 = located(varassign_in_expr)
+    {MComp_val ({loc_val=LessOrEq;loc_pos=eq.loc_pos}, expr1, expr2) }
 
 anonymousfun: 
   | OPEN_BRACKET; FUN; args = funargs_top; ARROW;   body = located(topvarassign); CLOSE_BRACKET; 

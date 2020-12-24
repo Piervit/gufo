@@ -30,7 +30,7 @@ let settypes = IntMap.empty
 let cardinal args scope =  
   match (lst_val_only args) with 
     |  [MOSimple_val (MOSet_val(mset)); ] ->
-        box_loc (MOSimple_val (MOBase_val (MOTypeIntVal (box_loc (MSet.cardinal mset)))))
+        box_loc (MOSimple_val (MOBase_val (MOTypeIntVal (box_loc (MSet.cardinal mset.loc_val)))))
 
     | _ -> assert false 
 
@@ -41,7 +41,7 @@ let is_in args scope =
         | MOSimple_val (MOSet_val(mset)) -> 
         box_loc(MOSimple_val (MOBase_val (MOTypeBoolVal 
           (box_loc(
-            MSet.mem ((core_to_simple_val kval)) mset)))
+            MSet.mem ((core_to_simple_val kval)) mset.loc_val)))
         ))
         | _ -> assert false
       )
@@ -50,7 +50,7 @@ let is_in args scope =
 let union args scope = 
   match (lst_val_only args) with 
     |  [MOSimple_val (MOSet_val(mset)); MOSimple_val (MOSet_val(mset2))] ->
-        box_loc (MOSimple_val (MOSet_val (MSet.union  mset mset2)))
+        box_loc (MOSimple_val (MOSet_val (box_loc (MSet.union  mset.loc_val mset2.loc_val))))
     | _ -> assert false 
 
 let add args scope = 
@@ -58,7 +58,7 @@ let add args scope =
     |  [mset; el_val] ->
       (match mset.loc_val with
         | MOSimple_val (MOSet_val(mset)) -> 
-          box_loc (MOSimple_val (MOSet_val (MSet.add (core_to_simple_val el_val) mset)))
+          box_loc (MOSimple_val (MOSet_val (box_loc (MSet.add (core_to_simple_val el_val) mset.loc_val))))
         | _ -> assert false
       )
     | _ -> assert false 
@@ -68,7 +68,7 @@ let rm args scope =
     |  [mset; el_val] ->
       (match mset.loc_val with
         | MOSimple_val (MOSet_val(mset)) -> 
-        box_loc (MOSimple_val (MOSet_val (MSet.remove (core_to_simple_val el_val) mset)))
+        box_loc (MOSimple_val (MOSet_val (box_loc (MSet.remove (core_to_simple_val el_val) mset.loc_val))))
         | _ -> assert false 
       )
     | _ -> assert false

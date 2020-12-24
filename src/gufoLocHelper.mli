@@ -24,4 +24,9 @@ val string_of_float_loc: float located -> string located
 val string_of_int_loc: int located -> string located
 val box_loc : 'a -> 'a located
 
+val val_at_pos : 'a -> pars_position -> 'a located
+
 val lst_val_only : 'a located list -> 'a list
+
+(*Merge both position in one.*)
+val pos_merging : pars_position -> pars_position -> pars_position

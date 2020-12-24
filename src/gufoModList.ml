@@ -38,7 +38,7 @@ let length args scope =
   match (lst_val_only args) with
     | [MOSimple_val (MOList_val mtvlist);] ->
       box_loc(MOSimple_val (MOBase_val 
-        (MOTypeIntVal (box_loc(List.length mtvlist)))))
+        (MOTypeIntVal (box_loc(List.length mtvlist.loc_val)))))
     | _ -> assert false
 
 

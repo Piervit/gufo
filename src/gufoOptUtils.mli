@@ -17,13 +17,15 @@
     Author: Pierre Vittet
 *)
 
+open GufoParsed
+
 (*
   fold_over_obinding_val : apply_fun -> accumulator -> expr -> accumulator
   Recursively apply apply_fun to every mobinding found within expr and add
   result in accumulator.
 
 *)
-val fold_over_obinding_val : ('a -> Gufo.MCore.mobinding -> 'a) -> 'a -> Gufo.MCore.motype_val -> 'a
+val fold_over_obinding_val : ('a -> Gufo.MCore.mobinding -> 'a) -> 'a -> Gufo.MCore.motype_val located -> 'a
 
 (*
   fold_over_obinding_and_ofun_val: apply_fun -> accumulator -> expr ->
@@ -33,15 +35,15 @@ val fold_over_obinding_val : ('a -> Gufo.MCore.mobinding -> 'a) -> 'a -> Gufo.MC
 val fold_over_obinding_and_ofun_val : 
   ('a -> Gufo.MCore.mobinding -> 'a) -> 
   ('a -> Gufo.MCore.mofun_val  -> 'a) -> 
-                                       'a -> 
-                                        Gufo.MCore.motype_val -> 'a
+   'a -> Gufo.MCore.motype_val located -> 'a
 
 (*
   fold_over_oref_val: apply_fun -> accumulator -> expr ->
   accumulator Recursively apply apply_fun to every moref_val found
   within expr and add result in accumulator.
 *)
-val fold_over_oref_val : ('a -> Gufo.MCore.moref_val -> 'a) -> 'a -> Gufo.MCore.motype_val -> 'a
+val fold_over_oref_val : ('a -> Gufo.MCore.moref_val -> 'a) -> 
+                          'a -> Gufo.MCore.motype_val located -> 'a
 
 (* transform_ref_in_funcall transform_fun -> val -> newval
    transform every moref_val within val into mofun_val (using the

@@ -53,21 +53,22 @@ let fold_over_obinding_val apply_fun acc expr =
           | MOCMDIStdIn -> acc 
           | MOCMDIFile sor -> over_moStringOrRef acc sor 
       in
-        match seq with 
+        match seq.loc_val with 
         | MOSimpleCmd cmd -> 
-            let acc = List.fold_left over_moStringOrRef acc cmd.mocm_args in
-            let acc = over_cmd_output acc cmd.mocm_output in
-            let acc = over_cmd_outputerr acc cmd.mocm_outputerr in
-            over_cmd_input acc cmd.mocm_input_src 
-        | MOForkedCmd seq -> fold_over_cmd_val_from_cmdseq acc seq 
+            let cmdv = cmd.loc_val in
+            let acc = List.fold_left over_moStringOrRef acc cmdv.mocm_args in
+            let acc = over_cmd_output acc cmdv.mocm_output in
+            let acc = over_cmd_outputerr acc cmdv.mocm_outputerr in
+            over_cmd_input acc cmdv.mocm_input_src 
+        | MOForkedCmd seq -> fold_over_cmd_val_from_cmdseq acc seq
         | MOOrCmd (seq1, seq2)
         | MOSequenceCmd (seq1, seq2)
         | MOPipedCmd (seq1, seq2)
         | MOAndCmd (seq1, seq2) -> fold_over_cmd_val_from_cmdseq 
-                                  (fold_over_cmd_val_from_cmdseq acc seq2 ) 
+                                  (fold_over_cmd_val_from_cmdseq acc seq2) 
                                   seq1
     in
-      match expr with
+      match expr.loc_val with
       | MOComposed_val ct -> 
           IntMap.fold (fun _i expr acc -> fold_over_obinding_val_ acc expr) ct.mocv_fields acc
       | MOSimple_val msimple ->
@@ -78,10 +79,10 @@ let fold_over_obinding_val apply_fun acc expr =
               | MOTypeCmdVal cseq -> fold_over_cmd_val_from_cmdseq acc cseq 
               | MOTypeStringVal _ | MOTypeBoolVal _ | MOTypeIntVal _ | MOTypeFloatVal _ -> acc
             )
-          | MOSet_val set -> MSet.fold (fun el acc -> fold_over_obinding_val_  acc (simple_to_core_val el) ) set acc
+          | MOSet_val set -> MSet.fold (fun el acc -> fold_over_obinding_val_ acc (simple_to_core_val el) ) set.loc_val acc
           | MOList_val mtypelst
           | MOTuple_val mtypelst ->
-              List.fold_left fold_over_obinding_val_ acc mtypelst
+              List.fold_left fold_over_obinding_val_ acc mtypelst.loc_val
           | MOFun_val fv ->
               fold_over_obinding_val_ acc fv.mofv_body
           | MOSome_val mtype -> fold_over_obinding_val_ acc mtype
@@ -90,7 +91,7 @@ let fold_over_obinding_val apply_fun acc expr =
                 fold_over_obinding_val_
                   (fold_over_obinding_val_ acc v) 
                   (simple_to_core_val key)) 
-              keyValLst acc 
+              (keyValLst.loc_val) acc 
           | MOEmpty_val -> acc
         )
       | MOBasicFunBody_val (_, e1, e2) ->
@@ -153,12 +154,13 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
           | MOCMDIStdIn -> acc 
           | MOCMDIFile sor -> over_moStringOrRef acc sor 
       in
-        match seq with 
+        match seq.loc_val with 
         | MOSimpleCmd cmd -> 
-            let acc = List.fold_left over_moStringOrRef acc cmd.mocm_args in
-            let acc = over_cmd_output acc cmd.mocm_output in
-            let acc = over_cmd_outputerr acc cmd.mocm_outputerr in
-            over_cmd_input acc cmd.mocm_input_src 
+            let cmdv = cmd.loc_val in
+            let acc = List.fold_left over_moStringOrRef acc cmdv.mocm_args in
+            let acc = over_cmd_output acc cmdv.mocm_output in
+            let acc = over_cmd_outputerr acc cmdv.mocm_outputerr in
+            over_cmd_input acc cmdv.mocm_input_src 
         | MOForkedCmd seq -> fold_over_cmd_val_from_cmdseq acc seq 
         | MOOrCmd (seq1, seq2)
         | MOSequenceCmd (seq1, seq2)
@@ -167,7 +169,7 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
                                   (fold_over_cmd_val_from_cmdseq acc seq2 ) 
                                   seq1
     in
-      match expr with
+      match expr.loc_val with
       | MOComposed_val ct -> 
           IntMap.fold (fun _i expr acc -> fold_over_obinding_and_ofun_val_ acc expr) ct.mocv_fields acc
       | MOSimple_val msimple ->
@@ -178,10 +180,10 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
               | MOTypeCmdVal cseq -> fold_over_cmd_val_from_cmdseq acc cseq 
               | MOTypeStringVal _ | MOTypeBoolVal _ | MOTypeIntVal _ | MOTypeFloatVal _ -> acc
             )
-          | MOSet_val set -> MSet.fold (fun el acc -> fold_over_obinding_and_ofun_val_ acc (simple_to_core_val el) ) set acc
+          | MOSet_val set -> MSet.fold (fun el acc -> fold_over_obinding_and_ofun_val_ acc (simple_to_core_val el) ) set.loc_val acc
           | MOList_val mtypelst
           | MOTuple_val mtypelst ->
-              List.fold_left fold_over_obinding_and_ofun_val_ acc mtypelst
+              List.fold_left fold_over_obinding_and_ofun_val_ acc mtypelst.loc_val
           | MOFun_val fv ->
               let acc = apply_fun_fun acc fv in
               fold_over_obinding_and_ofun_val_ acc fv.mofv_body
@@ -191,7 +193,7 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
                 fold_over_obinding_and_ofun_val_
                   (fold_over_obinding_and_ofun_val_ acc v) 
                   (simple_to_core_val key)) 
-              keyValLst acc 
+              (keyValLst.loc_val) acc 
           | MOEmpty_val -> acc
         )
       | MOBasicFunBody_val (_, e1, e2) ->
@@ -254,12 +256,13 @@ let fold_over_oref_val apply_fun acc expr =
           | MOCMDIStdIn -> acc 
           | MOCMDIFile sor -> over_moStringOrRef acc sor 
       in
-        match seq with 
+        match seq.loc_val with 
         | MOSimpleCmd cmd -> 
-            let acc = List.fold_left over_moStringOrRef acc cmd.mocm_args in
-            let acc = over_cmd_output acc cmd.mocm_output in
-            let acc = over_cmd_outputerr acc cmd.mocm_outputerr in
-            over_cmd_input acc cmd.mocm_input_src 
+            let cmdv = cmd.loc_val in
+            let acc = List.fold_left over_moStringOrRef acc cmdv.mocm_args in
+            let acc = over_cmd_output acc cmdv.mocm_output in
+            let acc = over_cmd_outputerr acc cmdv.mocm_outputerr in
+            over_cmd_input acc cmdv.mocm_input_src 
         | MOForkedCmd seq -> fold_over_cmd_val_from_cmdseq acc seq 
         | MOOrCmd (seq1, seq2)
         | MOSequenceCmd (seq1, seq2)
@@ -268,7 +271,7 @@ let fold_over_oref_val apply_fun acc expr =
                                   (fold_over_cmd_val_from_cmdseq acc seq2 ) 
                                   seq1
     in
-      match expr with
+      match expr.loc_val with
       | MOComposed_val ct -> 
           IntMap.fold (fun _i expr acc -> fold_over_oref_val_ acc expr) ct.mocv_fields acc
       | MOSimple_val msimple ->
@@ -279,10 +282,10 @@ let fold_over_oref_val apply_fun acc expr =
               | MOTypeCmdVal cseq -> fold_over_cmd_val_from_cmdseq acc cseq 
               | MOTypeStringVal _ | MOTypeBoolVal _ | MOTypeIntVal _ | MOTypeFloatVal _ -> acc
             )
-          | MOSet_val set -> MSet.fold (fun el acc -> fold_over_oref_val_  acc (simple_to_core_val el) ) set acc
+          | MOSet_val set -> MSet.fold (fun el acc -> fold_over_oref_val_  acc (simple_to_core_val el) ) set.loc_val acc
           | MOList_val mtypelst
           | MOTuple_val mtypelst ->
-              List.fold_left fold_over_oref_val_ acc mtypelst
+              List.fold_left fold_over_oref_val_ acc mtypelst.loc_val
           | MOFun_val fv ->
               fold_over_oref_val_ acc fv.mofv_body
           | MOSome_val mtype -> fold_over_oref_val_ acc mtype
@@ -291,7 +294,7 @@ let fold_over_oref_val apply_fun acc expr =
                 fold_over_oref_val_
                   (fold_over_oref_val_ acc v) 
                   (simple_to_core_val key)) 
-              keyValLst acc 
+              (keyValLst.loc_val) acc 
           | MOEmpty_val -> acc
         )
       | MOBasicFunBody_val (_, e1, e2) ->
@@ -558,7 +561,7 @@ let get_type_from_ref fulloptiprog optiprog typScope ref =
       | Some i -> i
   in
   let id_var, fields = ref.morv_varname in 
-  let base_type = IntMap.find id_var (IntMap.find modi typScope) in
+  let base_type = IntMap.find id_var.loc_val (IntMap.find modi typScope) in
   (*we have to check the fields*)
   let typ_with_field = 
     match fields with

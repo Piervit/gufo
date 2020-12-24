@@ -228,12 +228,14 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
 
 (* PART TYPE COMPARE *)
   let rec mlist_compare la lb = 
+      let la, lb = la.loc_val, lb.loc_val in
       match (List.length la) - (List.length lb) with 
         | 0 ->
             list_compare val_compare la lb
         | i -> i 
 
   and mtuple_compare ta tb = 
+    let ta, tb = ta.loc_val, tb.loc_val in
     let rec el_compare lsta lstb = 
       match lsta, lstb with
         | a::nlsta, b::nlstb ->
@@ -351,6 +353,8 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
     let comp_varname vnamea vnameb = 
       match vnamea, vnameb with
         | (i, lst), (ip, lstp) -> 
+            (*We don't use the location information when comparing.*)
+            let i, ip = i.loc_val, ip.loc_val in
             (match i - ip  with
               | 0 -> 
                   (match (List.length lst) - (List.length lstp) with
@@ -386,8 +390,9 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
                 | _,_ -> 0
               )
             | MOTypeIntVal aaaa, MOTypeIntVal bbbb ->
-                  compare aaaa bbbb
+                  Stdlib.compare aaaa.loc_val bbbb.loc_val
             | MOTypeFloatVal aaaa, MOTypeFloatVal bbbb ->
+                let aaaa, bbbb = aaaa.loc_val, bbbb.loc_val in
                 if aaaa = bbbb then 0 
                 else 
                   if aaaa > bbbb then 1
@@ -405,9 +410,9 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
       | MONone_val, MOSome_val _ -> 1
       | MOSome_val _ , MONone_val -> -1
       | MOSome_val a, MOSome_val b -> val_compare a b
-      | MOSet_val a, MOSet_val b -> MSet.compare a b 
+      | MOSet_val a, MOSet_val b -> MSet.compare a.loc_val b.loc_val
       | MOMap_val a, MOMap_val b -> 
-          MMap.compare val_compare a b
+          MMap.compare val_compare a.loc_val b.loc_val
       
       | MOFun_val aaa, MOFun_val bbb -> 
           fun_compare (aaa.mofv_args_id, aaa.mofv_body) (bbb.mofv_args_id, bbb.mofv_body)
@@ -426,9 +431,6 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
           mref_compare refa refb 
       | MOEnvRef_val (vara), MOEnvRef_val (varb) ->
           String.compare vara varb
-
-
-
       | _ , _ -> raise (TypeError "Bad type comparison")
   
   let compare a b = simple_val_compare a b
@@ -571,11 +573,11 @@ let find_var_in_prog varname scope =
       | [] ->  raise (ExecutionError "internal error")
       | [i] -> 
         (match tup_val.loc_val with
-          | MOSimple_val (MOTuple_val lst) -> List.nth lst i 
+          | MOSimple_val (MOTuple_val lst) -> List.nth lst.loc_val i 
             | _ -> raise (ExecutionError (sprintf "internal error(expecting tuple value but found %s \n" (moval_loc_to_string tup_val))))
       | i::lst -> 
           (match tup_val.loc_val with
-            | MOSimple_val (MOTuple_val tuplst) -> find_with_pos lst (List.nth tuplst i)
+            | MOSimple_val (MOTuple_val tuplst) -> find_with_pos lst (List.nth tuplst.loc_val i)
             | _ -> raise (ExecutionError "internal error")
           )
    in 
@@ -583,7 +585,7 @@ let find_var_in_prog varname scope =
     match IntMap.find i scope with
       | MOTop_val tv -> tv 
       | MOTupEl_val (id_tupel, pos) -> 
-          let tup_val = IntMap.find id_tupel scope in
+          let tup_val = IntMap.find id_tupel.loc_val scope in
           (match tup_val with
             | MOTop_val moval -> find_with_pos pos moval
             | _ -> raise (ExecutionError "Internal error")
@@ -591,10 +593,12 @@ let find_var_in_prog varname scope =
   in
   match varname with 
     | i,[] -> 
+        let i = i.loc_val in
         (try find_in_topvar i
         with 
           | Not_found -> raise (ExecutionError (sprintf "Internal error, variable %d not found." i)))
     | i,fields ->  (* $a.field.field *)
+        let i = i.loc_val in
         let from_var = 
           ( try find_in_topvar i
             with 
@@ -605,7 +609,7 @@ let find_var_in_prog varname scope =
 
 let find_var_in_sysmod varname sysmod = 
   match varname with 
-    | i, [] -> IntMap.find i sysmod.mosm_topvar
+    | i, [] -> IntMap.find i.loc_val sysmod.mosm_topvar
     | _ -> assert false
 
 
@@ -621,7 +625,7 @@ let rec apply_opcomp toplevel arg2valMap op leftv rightv =
     (apply_motype_val toplevel arg2valMap leftv, apply_motype_val toplevel arg2valMap rightv)
   in
   let (red_leftv, red_rightv) = (red_left.loc_val, red_right.loc_val) in
-  match op with 
+  match op.loc_val with 
   | Egal -> 
       box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(( val_compare red_left red_right) == 0)))))
   | NotEqual ->
@@ -686,18 +690,18 @@ The interpretation will be:
 and systemvar_partial_interpretation ref sysmodulevar argslst =
   let sysfun_nb_args = GufoModuleUtils.getNbArgsFromCoreFunction sysmodulevar in
   let anofun_args_id = List.init (sysfun_nb_args - (List.length argslst)) 
-    (fun i -> GufoParsedToOpt.get_fresh_int ())
+    (fun i -> box_loc (GufoParsedToOpt.get_fresh_int ()))
   in
-  let anofun_args = List.map (fun i -> MOBaseArg i ) anofun_args_id
+  let anofun_args = List.map (fun i -> MOBaseArg i.loc_val ) anofun_args_id
   in
   let body_binding =
     let bd_name = 
       List.init (List.length argslst) 
         (fun i -> GufoParsedToOpt.get_fresh_int ( ), [i])
     in
-    let bd_value = box_loc(MOSimple_val (MOTuple_val (argslst))) in
+    let bd_value = box_loc(MOSimple_val (MOTuple_val (box_loc (argslst)))) in
     let bd_body = 
-      let args_from_binding = List.map (fun (i,_) -> i ) bd_name in
+      let args_from_binding = List.map (fun (i,_) -> box_loc i ) bd_name in
       let ref_args = 
         List.map 
           (fun i -> box_loc (MORef_val ({
@@ -784,7 +788,7 @@ and list_iter args scope =
           in 
           ()
         )
-        mtvlist
+        mtvlist.loc_val
         in box_loc (MOSimple_val (MOEmpty_val))
     | _ -> assert false 
 
@@ -795,7 +799,7 @@ and list_filter args scope =
       | [MOSimple_val (MOFun_val fval);
          MOSimple_val (MOList_val mtvlist);
         ] ->
-        box_loc (MOSimple_val (MOList_val 
+        box_loc (MOSimple_val (MOList_val (box_loc
         (List.filter 
           (fun el -> 
             let fun_res = 
@@ -806,8 +810,8 @@ and list_filter args scope =
               | _ -> false
             )
           )
-          mtvlist
-        )))
+          mtvlist.loc_val
+        ))))
       | _ -> 
         assert false
 
@@ -816,13 +820,13 @@ and list_map args scope =
       | [MOSimple_val (MOFun_val fval);
          MOSimple_val (MOList_val mtvlist);
         ] ->
-        box_loc (MOSimple_val (MOList_val 
+        box_loc (MOSimple_val (MOList_val (box_loc
         (List.map
           (fun el -> 
               apply_fun true scope (MOSimple_val (MOFun_val fval)) [el]
           )
-          mtvlist
-        )))
+          mtvlist.loc_val
+        ))))
       | _ -> 
         assert false
 
@@ -837,7 +841,7 @@ and list_fold_left args scope =
           (fun acc el -> 
               apply_fun true scope (MOSimple_val (MOFun_val fval)) [acc; el] 
           )
-          (box_loc acc) mtvlist
+          (box_loc acc) mtvlist.loc_val
         )
       | _ -> 
         assert false
@@ -862,7 +866,7 @@ and apply_fun toplevel arg2valMap funval arglst =
         match mofunarg, argval.loc_val with
           | MOBaseArg i, _ -> (IntMap.add i (MOTop_val argval) acc, pos + 1)
           | MOTupleArg mofunarglst, MOSimple_val (MOTuple_val tuplst) -> 
-              create_pointer acc mofunarglst tuplst
+              create_pointer acc mofunarglst tuplst.loc_val
           | MOTupleArg mofunarglst, _ -> assert false
       ) 
       (acc, 0) arglst
@@ -896,7 +900,7 @@ and apply_fun toplevel arg2valMap funval arglst =
     | MOSimple_val(MOFun_val fv) -> 
       (*apply the code using arg2valMap when needed.*)
       (*we check if it is a partial application *)
-      (match (Pervasives.compare (List.length arglst) (List.length fv.mofv_args_id)) with
+      (match (Stdlib.compare (List.length arglst) (List.length fv.mofv_args_id)) with
         | i when i < 0 -> 
             box_loc (apply_partial_fun funval arglst)
         | 0 -> 
@@ -1264,38 +1268,38 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   | MModuloFloat, _, _ -> raise (InternalError "Execution engine error")
             (** With **)
   | MWithList, MOSimple_val(MOList_val lst1), MOSimple_val (MOList_val lst2) ->
-      MOSimple_val(MOList_val (List.concat [lst1; lst2]))
+      MOSimple_val(MOList_val (box_loc (List.concat [lst1.loc_val; lst2.loc_val])))
   | MWithSet, MOSimple_val(MOSet_val set1), MOSimple_val (MOSet_val set2) ->
-      MOSimple_val(MOSet_val (MSet.union set1 set2))
+      MOSimple_val(MOSet_val (box_loc(MSet.union set1.loc_val set2.loc_val)))
   | MWithMap, MOSimple_val(MOMap_val map1), MOSimple_val (MOMap_val map2) ->
-      MOSimple_val(MOMap_val (MMap.merge (fun k v1 v2 -> 
+      MOSimple_val(MOMap_val (box_loc (MMap.merge (fun k v1 v2 -> 
                                             match v1, v2 with
                                               | None, Some v -> Some v
                                               | Some v, None -> Some v
                                               | Some v1, Some v2 -> Some v2
                                               | None, None -> None
-                                          ) map1 map2))
+                                          ) map1.loc_val map2.loc_val)))
   | MWithList, _, _ -> raise (InternalError "Execution engine error")
   | MWithMap, _, _ -> raise (InternalError "Execution engine error")
   | MWithSet, _, _ -> raise (InternalError "Execution engine error")
             (** Has **)
   | MHasSet, MOSimple_val(MOSet_val set1), possibleEl ->
-    MOSimple_val( MOBase_val (MOTypeBoolVal (box_loc (MSet.mem (core_to_simple_val reduced_argb) set1))))
+    MOSimple_val( MOBase_val (MOTypeBoolVal (box_loc (MSet.mem (core_to_simple_val reduced_argb) set1.loc_val))))
   | MHasMap, MOSimple_val(MOMap_val map1), possibleEl ->
-    MOSimple_val( MOBase_val (MOTypeBoolVal (box_loc (MMap.mem (core_to_simple_val reduced_argb) map1))))
+    MOSimple_val( MOBase_val (MOTypeBoolVal (box_loc (MMap.mem (core_to_simple_val reduced_argb) map1.loc_val))))
   | MHasSet, _, _ -> raise (InternalError "Execution engine error")
   | MHasMap, _, _ -> raise (InternalError "Execution engine error")
             (** without **)
   | MWithoutSet, MOSimple_val(MOSet_val set1), MOSimple_val (MOSet_val set2) ->
-      MOSimple_val(MOSet_val (MSet.diff set1 set2))
+      MOSimple_val(MOSet_val (box_loc(MSet.diff set1.loc_val set2.loc_val)))
   | MWithoutMap, MOSimple_val(MOMap_val map1), MOSimple_val (MOMap_val map2) ->
-      MOSimple_val(MOMap_val (MMap.merge (fun k v1 v2 -> 
+      MOSimple_val(MOMap_val (box_loc (MMap.merge (fun k v1 v2 -> 
                                             match v1, v2 with
                                               | None, Some v -> None
                                               | Some v, None -> Some v
                                               | Some v1, Some v2 -> None
                                               | None, None -> None
-                                          ) map1 map2))
+                                          ) map1.loc_val map2.loc_val)))
   | _ -> raise (InternalError "Execution engine error")
 
 
@@ -1308,12 +1312,12 @@ and apply_binding toplevel arg2valMap mbind =
       | [] -> MOTop_val (res_value) (*not a tuple, we immediatly return the value.*)
       | [i] -> (*one dimension tuple *)
           (match res_value.loc_val with
-            | MOSimple_val (MOTuple_val tupv) -> MOTop_val (List.nth tupv i)
+            | MOSimple_val (MOTuple_val tupv) -> MOTop_val (List.nth tupv.loc_val i)
             | _ -> raise (ExecutionError "This is an internal error from gufo. Please complain.")
           )
       | i::lst ->
           (match res_value.loc_val with 
-            | MOSimple_val (MOTuple_val tupv) -> get_value_from_position lst (List.nth tupv i)
+            | MOSimple_val (MOTuple_val tupv) -> get_value_from_position lst (List.nth tupv.loc_val i)
             | _ -> raise (ExecutionError "This is an internal error from gufo. Please complain.")
           )
   in
@@ -1344,24 +1348,24 @@ and apply_mosimpletype_val toplevel arg2valMap aval =
         MOSimple_val (MOBase_val (MOTypeCmdVal (box_loc cmd)))
     | MOBase_val bv -> MOSimple_val (MOBase_val bv)
     | MOTuple_val tuplst ->
-        MOSimple_val (MOTuple_val (List.map (apply_motype_val toplevel arg2valMap) tuplst))
+        MOSimple_val (MOTuple_val (box_loc (List.map (apply_motype_val toplevel arg2valMap) tuplst.loc_val)))
     | MOList_val lst ->
-        MOSimple_val (MOList_val (List.map (apply_motype_val toplevel arg2valMap) lst))
+        MOSimple_val (MOList_val (box_loc (List.map (apply_motype_val toplevel arg2valMap) lst.loc_val)))
     | MOSet_val set ->
         let nset = MSet.fold (fun aval nset -> 
           MSet.add (core_to_simple_val (apply_motype_val toplevel arg2valMap 
-                    (simple_to_core_val aval))) nset) set MSet.empty
+                    (simple_to_core_val aval))) nset) set.loc_val MSet.empty
         in
-        MOSimple_val (MOSet_val nset)
+        MOSimple_val (MOSet_val (box_loc nset))
     | MOMap_val mmap ->
-        MOSimple_val (MOMap_val (
+        MOSimple_val (MOMap_val (box_loc(
           MMap.fold 
           (fun key value newmap ->
             MMap.add 
               (core_to_simple_val
                 (apply_motype_val toplevel arg2valMap (simple_to_core_val key))) 
             (apply_motype_val toplevel arg2valMap value) newmap
-          ) mmap MMap.empty))
+          ) mmap.loc_val MMap.empty)))
     | MONone_val  -> MOSimple_val (MONone_val)
     | MOSome_val sv -> MOSimple_val (MOSome_val (apply_motype_val toplevel arg2valMap sv))
 
@@ -1378,13 +1382,13 @@ and apply_in_list toplevel arg2valMap ref indices =
               | [] -> assert false
               | [idx] -> 
                   (match idx.loc_val with 
-                    | MOSimple_val (MOBase_val (MOTypeIntVal i))-> List.nth lst_val i.loc_val
+                    | MOSimple_val (MOBase_val (MOTypeIntVal i))-> List.nth lst_val.loc_val i.loc_val
                     | _ -> assert false
                   )
               | idx::others_idx -> 
                   (match idx.loc_val with 
                     | MOSimple_val (MOBase_val (MOTypeIntVal i)) -> 
-                      apply_in_list_ (List.nth lst_val i.loc_val).loc_val others_idx
+                      apply_in_list_ (List.nth lst_val.loc_val i.loc_val).loc_val others_idx
                     | _ -> assert false
                   )
             )
