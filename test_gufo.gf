@@ -33,7 +33,7 @@ let $run_valid_tests_ $cur_test $file =
       else (
         (echo $cmd.Cmd.print; echo "SUCCESS\n" ) )
   in (
-    if ($cur_test  == 1 )
+    if ($cur_test == 1 )
     then (
       #termination case: last file
       let $cmd = $run_test 1 $file in

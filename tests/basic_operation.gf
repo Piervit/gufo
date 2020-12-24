@@ -54,3 +54,8 @@ if ( (1 ;; 2 )   == 2 ) then (true) else (assert_false)
 **START**
 if ( ("1" ;; 4 )   == 4 ) then (true) else (assert_false)
 #END PROGRAM 
+
+#PROGRAM 7
+**START**
+if ( ( 5 * 2 % 5 )   == 2 ) then (true) else (assert_false)
+#END PROGRAM 
