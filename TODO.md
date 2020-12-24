@@ -5,9 +5,9 @@ NEEDED FOR A FIRST USABLE RELEASE
 ===================================
 
 Provide documentation.
+Provide logical operator (or , and)
 Add standard libraries (type transformations, iterator, various utility functions).
-Debug and improve the console(user interface): multiline commands and errors.
-Test the module system
+Add localisation for errors
 
 NEEDED FOR A STABLE RELEASE
 =========================
