@@ -100,3 +100,11 @@ let box_with_dummy_pos a =
     loc_val = a; 
     loc_pos = dummy_position; 
   }
+
+let raise_typeError msg pos = 
+  let msg = Printf.sprintf "%s Position: %s" msg 
+            (string_of_position pos) in
+  raise (TypeError {loc_val = msg ; loc_pos = pos})
+
+
+

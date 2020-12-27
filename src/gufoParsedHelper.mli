@@ -46,6 +46,9 @@ val emacs_position : string -> int -> int list -> string
 val string_of_lexing_position : Lexing.position -> string
 val string_of_position : pars_position -> string
 
+(*raise a type error exception*)
+val raise_typeError : string -> GufoParsed.pars_position -> 'a
+
 val compare_positions : pars_position -> pars_position -> int
 
 val box_with_dummy_pos : 't -> 't located 

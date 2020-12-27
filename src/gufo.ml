@@ -21,6 +21,7 @@ open GenUtils
 open GufoParsed
 open GufoUtils
 open GufoLocHelper
+open GufoParsedHelper
 
 
 module MCore =
@@ -28,7 +29,7 @@ struct
   open Format
 
   type motype_field = {
-    motf_name : int;
+    motf_name : int located;
     motf_type: motype;
     motf_debugname : string;
   }
@@ -138,7 +139,7 @@ struct
 
       and mifun_val = {
         mifv_args_name : int StringMap.t;  
-        mifv_args_id : mifunarg list; 
+        mifv_args_id : mifunarg list located; 
         mifv_body : mitype_val located;
         }
       
@@ -148,12 +149,12 @@ struct
         | MIList_val of mitype_val located list located
         | MINone_val 
         | MISome_val of mitype_val located
-        | MIFun_val of mifun_val
+        | MIFun_val of mifun_val located
         | MIEmpty_val
       
       and mifunarg = 
-        | MIBaseArg of int
-        | MITupleArg of mifunarg list
+        | MIBaseArg of int located
+        | MITupleArg of mifunarg list located
       
       and mitype_val = 
         | MISimple_val of misimple_type_val
@@ -170,7 +171,7 @@ struct
       and micomp_op = GufoParsed.mcomp_op
 
       and mibinding = {
-        mibd_name : (int * int list) list;
+        mibd_name : (int * pars_position * int list) list;
         mibd_debugnames: string IntMap.t;
         mibd_value: mitype_val located;
         mibd_body: mitype_val located;
@@ -216,14 +217,14 @@ struct
 
       and miprocess = GufoParsed.mprocess
  
-      type t = mitype_val located
+      type t =  mitype_val located
 
       let rec mlist_compare ta tb = 
         let ta, tb = ta.loc_val, tb.loc_val in
         let rec el_compare lsta lstb = 
           match lsta, lstb with
             | a::nlsta, b::nlstb ->
-                (match type_compare a.loc_val b.loc_val with
+                (match type_compare a b with
                   | 0 -> el_compare nlsta nlstb
                   | i -> i
                 )
@@ -300,7 +301,7 @@ struct
                       | MISORExpr a, MISORString b -> -1
                       | MISORString a, MISORString b -> 
                         String.compare a.loc_val b.loc_val
-                      | MISORExpr a, MISORExpr b -> type_compare a.loc_val b.loc_val
+                      | MISORExpr a, MISORExpr b -> type_compare a b
                   ) cmda.micm_args cmdb.micm_args 
                 with
                   | 0 ->
@@ -355,12 +356,13 @@ struct
 
       and funarg_compare a b =
         match a, b with
-          | MIBaseArg a, MIBaseArg b -> a -b 
+          | MIBaseArg a, MIBaseArg b -> a.loc_val - b.loc_val
           | MITupleArg a, MITupleArg b -> funargs_compare a b
           | _,_ -> assert false
 
 
       and funargs_compare alst blst = 
+        let alst, blst = alst.loc_val, blst.loc_val in
           let rec stop_at_diff alst blst =
             match alst, blst with
               | [],[] -> 0
@@ -376,39 +378,18 @@ struct
 
       and fun_compare (aargs, abody) (bargs, bbody)  = 
         match funargs_compare aargs bargs with
-          | 0 -> type_compare abody.loc_val bbody.loc_val (*THIS SHOULD BE THOUGH AND IMPROVED*)
+          | 0 -> type_compare abody bbody (*THIS SHOULD BE THOUGH AND IMPROVED*)
           | i -> i 
 
       and composedType_compare sa sb = assert false
 
       and compare_basicfun (opa, arga1, arga2) (opb, argb1, argb2) = 
         let comp_args  = 
-                (match type_compare arga1.loc_val argb1.loc_val with 
-                | 0 -> type_compare arga2.loc_val argb2.loc_val
+                (match type_compare arga1 argb1 with 
+                | 0 -> type_compare arga2 argb2
                 | i -> i
                 )
         in
-
-(*
-  | MConcatenation
-  | MAddition 
-  | MAdditionFloat
-  | MSoustraction
-  | MSoustractionFloat
-  | MMultiplication
-  | MMultiplicationFLoat
-  | MDivision
-  | MDivisionFloat
-  | MModulo
-  | MModuloFloat
-  | MWithList
-  | MWithSet
-  | MWithMap
-  | MWithoutSet
-  | MWithoutMap
-  | MHasSet
-  | MHasMap
-*)
 
         match opa, opb with 
           | MConcatenation, MConcatenation
@@ -466,7 +447,7 @@ struct
         match (List.length bda.mibd_name) - (List.length bdb.mibd_name) with
           | 0 ->
               list_compare
-                (fun (ida, posa) (idb, posb) ->
+                (fun (ida, _parsposa, posa) (idb, _parsposb, posb) ->
                   match ida - idb with
                     | 0 -> 
                         (list_compare (fun posa posb -> posa -posb) posa posb)
@@ -476,10 +457,10 @@ struct
           | i -> i 
 
       and compare_if (cond1,thn1, els1) (cond2, thn2, els2) =
-        match type_compare cond1.loc_val cond2.loc_val with
+        match type_compare cond1 cond2 with
           | 0 -> 
-              (match type_compare thn1.loc_val thn2.loc_val with
-                | 0 -> type_compare els1.loc_val els2.loc_val
+              (match type_compare thn1 thn2 with
+                | 0 -> type_compare els1 els2
                 | i -> i 
               )
           | i -> i 
@@ -492,8 +473,8 @@ struct
           | LessOrEq, LessOrEq
           | GreaterThan, GreaterThan
           | GreaterOrEq, GreaterOrEq ->
-              (match type_compare left1.loc_val left2.loc_val with
-                | 0 -> type_compare right1.loc_val right2.loc_val
+              (match type_compare left1 left2 with
+                | 0 -> type_compare right1 right2
                 | i -> i
               )
           | Egal, _ -> 1
@@ -511,13 +492,13 @@ struct
           match bdlst1, bdlst2 with
             | [],[] -> 0
             | ela::lsta, elb::lstb -> 
-                (match type_compare ela.loc_val elb.loc_val with
+                (match type_compare ela elb with
                 | 0 -> compare_body lsta lstb 
                 | i -> i )
             | _, _ -> assert false
 
       and simple_type_compare a b = 
-        match a, b with
+        match a.loc_val, b.loc_val with
           | MIBase_val aaa, MIBase_val bbb -> 
           (*TODO definir pour chaque type de base une fonction de comparaison*)
               (match aaa, bbb with
@@ -538,24 +519,24 @@ struct
                       else -1
                 | MITypeCmdVal aaaa, MITypeCmdVal bbbb ->
                       cmd_seq_compare aaaa bbbb
-          | _ , _ -> raise (TypeError "Bad type comparison")
+          | _ , _ -> raise_typeError ("Bad type comparison") b.loc_pos
               )
           | MITuple_val aaa, MITuple_val bbb -> 
               mlist_compare aaa bbb
           | MIList_val aaa, MIList_val bbb -> 
               mlist_compare aaa bbb
           | MIFun_val aaa, MIFun_val bbb -> 
-              fun_compare (aaa.mifv_args_id, aaa.mifv_body) 
-                          (bbb.mifv_args_id, bbb.mifv_body)
+              fun_compare (aaa.loc_val.mifv_args_id, aaa.loc_val.mifv_body) 
+                          (bbb.loc_val.mifv_args_id, bbb.loc_val.mifv_body)
           | MIEmpty_val, MIEmpty_val -> 0
           | MIEmpty_val, _ -> 1 
           | _, MIEmpty_val -> -1
-          | _ , _ -> raise (TypeError "Bad type comparison")
+          | _ , _ -> raise_typeError "Bad type comparison" b.loc_pos
       
       and type_compare a b =
-          match a, b with 
+          match a.loc_val, b.loc_val with 
           | MISimple_val  aa , MISimple_val bb ->
-              simple_type_compare aa bb
+              simple_type_compare {a with loc_val = aa} {b with loc_val = bb}
           | MIComposed_val aa , MIComposed_val bb ->
               composedType_compare aa bb
           | MIRef_val (refa,argsa), MIRef_val (refb,argsb) ->
@@ -651,9 +632,9 @@ struct
           | MIBody_val _ , MIComp_val _ ->
               -1
 
-          | _ , _ -> raise (TypeError "Bad type comparison")
+          | _ , _ -> raise_typeError "Bad type comparison" b.loc_pos
       
-      let compare a b = type_compare a.loc_val b.loc_val
+      let compare a b = type_compare a b
    end
 
   module MMap = Map.Make(SimpleCore)
@@ -745,7 +726,7 @@ struct
   
   and mofun_val = {
     mofv_args_name : int StringMap.t; (*args name map (for debug + color)*) 
-    mofv_args_id : mofunarg list; 
+    mofv_args_id : mofunarg list located; 
     mofv_body : motype_val located;
   } 
  
@@ -757,12 +738,12 @@ struct
     | MOSome_val of motype_val located
     | MOSet_val of MSet.t located
     | MOMap_val of motype_val located MMap.t located
-    | MOFun_val of mofun_val
+    | MOFun_val of mofun_val located
     | MOEmpty_val
   
   and mofunarg = 
-    | MOBaseArg of int
-    | MOTupleArg of mofunarg list
+    | MOBaseArg of int located
+    | MOTupleArg of mofunarg list located
   
   and motype_val = 
     | MOSimple_val of mosimple_type_val
@@ -778,7 +759,7 @@ struct
   and mocomp_op = GufoParsed.mcomp_op
 
   and mobinding = {
-    mobd_name : (int * int list) list; 
+    mobd_name : (int * pars_position * int list) list; 
     mobd_debugnames : string IntMap.t;
     mobd_value: motype_val located;
     mobd_body: motype_val located;
@@ -1008,7 +989,9 @@ struct
   and simple_to_core_funarg funarg = 
     match funarg with 
       | MIBaseArg i -> MOBaseArg i
-      | MITupleArg funarglst -> MOTupleArg (List.map simple_to_core_funarg funarglst) 
+      | MITupleArg funarglst -> 
+          MOTupleArg {funarglst 
+            with loc_val = (List.map simple_to_core_funarg funarglst.loc_val)}
 
   and simple_to_core_composed_val cval = 
     {
@@ -1045,10 +1028,15 @@ struct
     | MIEmpty_val -> MOEmpty_val
 
   and simple_to_core_fun_val fv = 
-    {
-      mofv_args_name= fv.mifv_args_name;
-      mofv_args_id = List.map simple_to_core_funarg fv.mifv_args_id;
-      mofv_body = simple_to_core_val fv.mifv_body;
+    let fv_val = fv.loc_val in
+    {fv with loc_val = 
+      {
+        mofv_args_name= fv_val.mifv_args_name;
+        mofv_args_id = 
+          {fv_val.mifv_args_id with 
+            loc_val = List.map simple_to_core_funarg fv_val.mifv_args_id.loc_val};
+        mofv_body = simple_to_core_val fv_val.mifv_body;
+      }
     }
 
   and simple_to_core_ref_val rf = 
@@ -1107,7 +1095,9 @@ struct
     and core_to_simple_funarg funarg = 
       match funarg with
        | MOBaseArg i -> MIBaseArg i 
-       | MOTupleArg funarglst -> MITupleArg (List.map core_to_simple_funarg funarglst)
+       | MOTupleArg funarglst -> 
+          MITupleArg ({funarglst with 
+                        loc_val = List.map core_to_simple_funarg funarglst.loc_val})
 
     and core_to_simple_stringOrRef sor = 
       match sor with
@@ -1171,7 +1161,9 @@ struct
    and core_to_simple_fun_val fv = 
     {
       mifv_args_name= fv.mofv_args_name;
-      mifv_args_id = List.map core_to_simple_funarg fv.mofv_args_id;
+      mifv_args_id = 
+        {fv.mofv_args_id with 
+          loc_val = List.map core_to_simple_funarg fv.mofv_args_id.loc_val};
       mifv_body = core_to_simple_val fv.mofv_body;
     }
 
@@ -1196,10 +1188,14 @@ struct
               | MOSome_val v -> 
                   MISome_val (core_to_simple_val v )
               | MOFun_val fv -> 
-                  MIFun_val (core_to_simple_fun_val fv)
+                  MIFun_val {fv with loc_val = core_to_simple_fun_val fv.loc_val }
               | MOEmpty_val -> MIEmpty_val
-              | MOSet_val _ -> raise (TypeError "We cannot have set of set, nor use set as map key.")
-              | MOMap_val _ ->  raise (TypeError "We cannot have set of map, nor use map as map key.")
+              | MOSet_val s -> GufoParsedHelper.raise_typeError 
+                                 "We cannot have set of set, nor use set as map key." 
+                                  s.loc_pos
+              | MOMap_val m ->  raise_typeError 
+                                 "We cannot have set of map, nor use map as map key."
+                                 m.loc_pos
 
 
     and core_to_simple_ref_val rf = 
@@ -1220,7 +1216,6 @@ struct
         mibd_value= core_to_simple_val bd.mobd_value ;
         mibd_body=  core_to_simple_val bd.mobd_body;
       }
-
 
     and core_to_simple_val v = 
       let new_val = core_to_simple_val_no_loc v.loc_val 
@@ -1441,7 +1436,7 @@ struct
       let rec print_name (curpos, acc) name = 
         match name with
           | [] -> acc 
-          | (id, pos)::next_name -> 
+          | (id, _pars_pos , pos)::next_name -> 
             (
               match (List.length curpos) - (List.length pos) with
                 | 0 -> 
@@ -1530,8 +1525,8 @@ struct
                 sprintf "(fun %s %s )" 
                   (StringMap.fold 
                     (fun str i acc ->  sprintf "%s $%d(%s) ->" acc i str) 
-                    fv.mofv_args_name "")
-                  (moval_to_string fv.mofv_body.loc_val)
+                    fv.loc_val.mofv_args_name "")
+                  (moval_to_string fv.loc_val.mofv_body.loc_val)
               | MOEmpty_val -> ""
             )
         | MOComposed_val mct -> "-composed-"

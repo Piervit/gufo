@@ -84,7 +84,7 @@ let fold_over_obinding_val apply_fun acc expr =
           | MOTuple_val mtypelst ->
               List.fold_left fold_over_obinding_val_ acc mtypelst.loc_val
           | MOFun_val fv ->
-              fold_over_obinding_val_ acc fv.mofv_body
+              fold_over_obinding_val_ acc fv.loc_val.mofv_body
           | MOSome_val mtype -> fold_over_obinding_val_ acc mtype
           | MOMap_val keyValLst ->
               MMap.fold(fun key v acc  -> 
@@ -185,6 +185,7 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
           | MOTuple_val mtypelst ->
               List.fold_left fold_over_obinding_and_ofun_val_ acc mtypelst.loc_val
           | MOFun_val fv ->
+              let fv = fv.loc_val in
               let acc = apply_fun_fun acc fv in
               fold_over_obinding_and_ofun_val_ acc fv.mofv_body
           | MOSome_val mtype -> fold_over_obinding_and_ofun_val_ acc mtype
@@ -287,7 +288,7 @@ let fold_over_oref_val apply_fun acc expr =
           | MOTuple_val mtypelst ->
               List.fold_left fold_over_oref_val_ acc mtypelst.loc_val
           | MOFun_val fv ->
-              fold_over_oref_val_ acc fv.mofv_body
+              fold_over_oref_val_ acc fv.loc_val.mofv_body
           | MOSome_val mtype -> fold_over_oref_val_ acc mtype
           | MOMap_val keyValLst ->
               MMap.fold(fun key v acc  -> 
@@ -456,19 +457,19 @@ let transform_ref_in_funcall transform_fun expr =
 (*for a funarg type, return the type unfolded list of arguments. *)
 let rec unstack_args arg = 
   match arg with 
-    | MOBaseArg i -> [i]  
+    | MOBaseArg i -> [i.loc_val]  
     | MOTupleArg arglst ->
        List.fold_left 
         (fun alreadylst arg -> 
           let newlst = unstack_args arg in
           List.append newlst alreadylst
-        ) [] arglst
+        ) [] arglst.loc_val
 
 (*for a funarg type, return the type unfolded list of arguments. *)
 let unstack_args_with_pos arg = 
   let rec unstack_args_with_pos_ arg pos  = 
     match arg with 
-      | MOBaseArg i -> [i, List.rev pos] , pos
+      | MOBaseArg i -> [i.loc_val, List.rev pos] , pos
       | MOTupleArg arglst ->
           let pos = 0::pos in
          List.fold_left 
@@ -477,12 +478,12 @@ let unstack_args_with_pos arg =
             let pos = top_pos+1 :: past_pos in
             let newlst,_ = unstack_args_with_pos_ arg pos in
             (List.append newlst alreadylst, pos)
-          ) ([], pos) arglst
+          ) ([], pos) arglst.loc_val
   in 
   let res , _pos = unstack_args_with_pos_ arg [] in res
 
 (*Simple utility fonction to get type of element in case of multi level list.*)
-let rec get_type_at_deep typ deep =
+let rec get_type_at_deep pos typ deep =
   match deep with
     | 0 -> typ 
     | i -> 
@@ -491,9 +492,10 @@ let rec get_type_at_deep typ deep =
             | MOList_type subtyp
             | MOSet_type subtyp
             | MOMap_type (_,subtyp) ->
-                get_type_at_deep subtyp (deep - 1)
-            |_ -> raise (TypeError (sprintf "Trying to access sub-element of list (or set or map) for type %s. \n "(type_to_string typ))) 
- 
+                get_type_at_deep pos subtyp (deep - 1)
+            |_ -> GufoParsedHelper.raise_typeError 
+                    (sprintf "Trying to access sub-element of list (or set or map) for type %s. \n "(type_to_string typ)) 
+                    pos
         )
 
 
@@ -561,7 +563,7 @@ let get_type_from_ref fulloptiprog optiprog typScope ref =
       | Some i -> i
   in
   let id_var, fields = ref.morv_varname in 
-  let base_type = IntMap.find id_var.loc_val (IntMap.find modi typScope) in
+  let base_type, pars_pos = IntMap.find id_var.loc_val (IntMap.find modi typScope) in
   (*we have to check the fields*)
   let typ_with_field = 
     match fields with
@@ -573,8 +575,11 @@ let get_type_from_ref fulloptiprog optiprog typScope ref =
   in
   (*we have to check the indexes*)
   match ref.morv_index with
-    | None -> typ_with_field
-    | Some lst -> get_type_at_deep typ_with_field (List.length lst)
+    | None -> {loc_val = typ_with_field; loc_pos = pars_pos}
+    | Some lst -> 
+        {loc_val = get_type_at_deep pars_pos typ_with_field (List.length lst);
+         loc_pos = pars_pos;
+        }
 
 
 

@@ -21,14 +21,6 @@
 
 open GenUtils
 
-exception SyntaxError of string
-exception TypeError of string
-exception ExecutionError of string
-exception VarError of string
-exception InternalError of string
-exception UncatchedError of string
-exception RuntimeError of string
-
 
 (*TYPES *)
 
@@ -43,6 +35,15 @@ and 'a located = {
     loc_val : 'a ;
     loc_pos : pars_position;
 }
+
+exception SyntaxError of string
+exception TypeError of string located
+exception ExecutionError of string
+exception VarError of string
+exception InternalError of string
+exception UncatchedError of string
+exception RuntimeError of string
+
 
 
 type mvar = {
@@ -118,7 +119,7 @@ and mbase_type_val =
   | MTypeCmdVal of mcmd_seq located
 
 and mtype_field = {
-  mtf_name : string;
+  mtf_name : string located;
   mtf_type: msimple_type;
   mtf_extend: string option;
 }
@@ -179,7 +180,7 @@ and msimple_type_val =
   | MSome_val of mtype_val located
   | MSet_val of  mtype_val located list located
   | MMap_val of (mtype_val located * mtype_val located) list located(*(key * value list ) Type info will come next. *)
-  | MFun_val of mfunarg list * mtype_val located (* args name * body_expr *)
+  | MFun_val of mfunarg list located * mtype_val located (* args name * body_expr *)
 
 and mfunarg = 
   | MBaseArg of string located

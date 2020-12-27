@@ -39,7 +39,7 @@ let debug_var_type var_types =
     (fun i vmap -> 
       debug_print (sprintf "Module %d \n" i); 
       IntMap.iter
-        (fun iv typ -> 
+        (fun iv (typ, _pars_pos) -> 
           debug_print (sprintf "var %d : %s \n" iv (type_to_string typ)); 
         )
         vmap
@@ -92,10 +92,13 @@ let dump_prog_representation optiprog =
 
 (*##################  ERROR MESSAGE ################## *)
 
-let raise_typeError msg pos = 
+let raise_varError msg pos = 
   let msg = Printf.sprintf "%s Position: %s" msg 
             (GufoParsedHelper.string_of_position pos) in
-  raise (TypeError msg )
+  raise (VarError msg )
+
+
+
 
 (*##################  END ERROR MESSAGE ################## *)
 
@@ -291,9 +294,10 @@ let rec add_in_scope ref_vname typ locScope =
   let id_ref,fds = ref_vname in 
   let id_ref, pos = id_ref.loc_val, id_ref.loc_pos in
   match fds, IntMap.find_opt id_ref locScope with
-    | [], None -> IntMap.add id_ref typ locScope
-    | [], Some atyp -> 
-        IntMap.add id_ref (determine_refine_type ~id_var:(Some id_ref) pos typ atyp) locScope
+    | [], None -> IntMap.add id_ref (typ, pos) locScope
+    | [], Some (atyp,_pos) -> 
+        IntMap.add id_ref 
+          (determine_refine_type ~id_var:(Some id_ref) pos typ atyp, pos) locScope
     | _,_ -> locScope
 
 and determine_type_cmdseq fulloptiprog optiprog locScope cmdseq = 
@@ -376,20 +380,6 @@ and determine_type_comp fulloptiprog optiprog locScope const op arga argb =
   )
   in
     (*next two line are for locScope precision*)
-(*
-  let const = 
-    match op with 
-      | Egal 
-      | NotEqual -> Some (MOAll_type (get_fresh_int())) ;
-      | LessThan  
-      | LessOrEq  
-      | GreaterThan 
-      | GreaterOrEq -> Some (MOOr_type([
-        MOBase_type(MTypeInt);
-        MOBase_type(MTypeFloat);
-          ], get_fresh_int()))
-  in 
-*)
     let typa, locScope = determine_type fulloptiprog optiprog locScope None arga in
     let typb, locScope = determine_type fulloptiprog optiprog locScope None argb in
     let epos = pos_merging arga.loc_pos argb.loc_pos in
@@ -475,30 +465,37 @@ and determine_type_binding fulloptiprog optiprog locScope const bd =
   let determine_in_known_tuple dbg_pos tupl_name tupl_typ locScope = 
     (*we have to check compatibilty between tupl_name and tupl_typ before putting link in locScope *)
           List.fold_left 
-          (fun locScope (id_el, position) -> 
-            let curel_typ = get_type_from_tuple_el dbg_pos tupl_typ position in
-            IntMap.add id_el curel_typ locScope
+          (fun locScope (id_el,pars_pos, position) -> 
+            let curel_typ = get_type_from_tuple_el pars_pos tupl_typ position in
+            IntMap.add id_el (curel_typ, pars_pos) locScope
           ) locScope tupl_name
   in
   let db_typ, locScope = determine_type fulloptiprog optiprog locScope None bd.mobd_value in
   let locScope = 
     match bd.mobd_name, db_typ with 
-      | [(single_id,[])], _ -> IntMap.add single_id db_typ locScope 
+      | [(single_id, _pars_pos,[])], _ -> 
+          IntMap.add single_id (db_typ, bd.mobd_value.loc_pos) locScope 
       | tupl_name, MOTuple_type tupl_typ ->
           determine_in_known_tuple bd.mobd_value.loc_pos tupl_name db_typ locScope
       | tupl_name, MORef_type (modul, iref, deep, args) ->
           List.fold_left 
-            (fun locScope (id, position) -> IntMap.add id (MOTupel_type(modul, iref, deep,args, position)) locScope) 
+            (fun locScope (id, pars_pos, position) -> 
+              IntMap.add id 
+                (MOTupel_type(modul, iref, deep,args, position), pars_pos) locScope) 
             locScope tupl_name
       | tupl_name, otherType -> raise (InternalError "Type checker error")
   in
   let body_type, locScope = determine_type fulloptiprog optiprog locScope const bd.mobd_body in
   let value_const =
     (match bd.mobd_name with 
-      | [(single_id,[])] -> IntMap.find single_id locScope 
+      | [(single_id,_,[])] -> 
+        let typ, _ = IntMap.find single_id locScope  in typ
       | tupl_name ->
           let lsttyp = 
-          List.map (fun (id, position) -> IntMap.find id locScope) tupl_name
+            List.map (fun (id, _, position) -> 
+                let typ, _  = IntMap.find id locScope in typ
+            )
+            tupl_name 
           in MOTuple_type (lsttyp)
     )
   in
@@ -611,7 +608,7 @@ and determine_type_ref fulloptiprog optiprog locScope ref =
          | None -> 
              (match IntMap.find_opt varname locScope with
                | None -> MORef_type (None, varname, 0, [])
-               | Some v -> v
+               | Some (v, _pars_pos) -> v
              )
           | Some i -> 
 (*                    MOAll_type (get_fresh_int()) *)
@@ -708,6 +705,9 @@ resolved to something else than a function or something accepting argument, but 
  *
  * const is an optional type contraint that must respect the value e.
  * e is the expression value we want to determine the type.
+ *
+ * It returns the found type and the updated locScope.
+ *
  * *)
 and determine_type fulloptiprog optiprog locScope const e =
   (*Check constraint between a constraint and a found type. pos is a position
@@ -721,6 +721,8 @@ and determine_type fulloptiprog optiprog locScope const e =
       | Some typ, deduced_type -> 
           determine_refine_type pos typ deduced_type 
   in
+  (*add_args to scope is used for argument of MOFun_val. It puts the argument
+    in the locScope.*)
   let rec add_args_to_scope argtyp_const args locScope = 
     match argtyp_const with 
       | None -> 
@@ -730,18 +732,18 @@ and determine_type fulloptiprog optiprog locScope const e =
             | MOBaseArg i -> 
                 let ntype = (MOAll_type (get_fresh_int ()))
                 in
-                (IntMap.add i ntype locScope, ntype::newlst)
+                (IntMap.add i.loc_val (ntype,i.loc_pos) locScope, ntype::newlst)
             | MOTupleArg args -> 
                 let nlocScope, nlst = add_args_to_scope None args locScope in
                   (nlocScope, (MOTuple_type nlst)::newlst)
         )
-        (locScope,[]) args
+        (locScope,[]) args.loc_val
       | Some lstargtyp_const ->
         List.fold_left2
         (fun (locScope,newlst) arg arg_const -> 
           match arg with
             | MOBaseArg i -> 
-                (IntMap.add i arg_const locScope, arg_const::newlst)
+                (IntMap.add i.loc_val (arg_const, i.loc_pos) locScope, arg_const::newlst)
             | MOTupleArg args -> 
                 (match arg_const with
                   | MOAll_type i ->
@@ -753,19 +755,19 @@ and determine_type fulloptiprog optiprog locScope const e =
                   | _ -> raise_typeError "Impossible to infer type of the function arguments." e.loc_pos
                 )
         )
-        (locScope,[]) args lstargtyp_const
+        (locScope,[]) args.loc_val lstargtyp_const
   in
   let rec refine_args_from_scope locScope args =  
     List.map
       (fun arg -> 
         (match arg with
-          | MOBaseArg i -> IntMap.find i locScope
+          | MOBaseArg i -> let v, pars_pos = IntMap.find i.loc_val locScope in v
           | MOTupleArg aargs -> 
               let nargs = refine_args_from_scope locScope aargs in
               MOTuple_type nargs
         )
       )
-      args
+      args.loc_val
   in
 
   let typ_res, locScope = 
@@ -902,15 +904,17 @@ and determine_type fulloptiprog optiprog locScope const e =
                     | Some (MOAll_type i) -> None, None
                     | Some (MOFun_type(arglstTyp, rettyp))->
                         Some arglstTyp, Some rettyp
-                    | _ ->  raise (TypeError "Type checker was expecting a type function.")
+                    | _ ->  raise_typeError 
+                              ("Type checker was expecting a type function.") 
+                              fv.loc_pos
                 in
-
-                let locScope, nargs = add_args_to_scope lstargtyp_const fv.mofv_args_id locScope in  
+                let locScope, nargs = add_args_to_scope lstargtyp_const 
+                                        fv.loc_val.mofv_args_id locScope in  
                 let body_type, locScope = 
                   determine_type fulloptiprog optiprog locScope rettyp_const 
-                                 fv.mofv_body 
+                                 fv.loc_val.mofv_body 
                 in
-                let nargs = refine_args_from_scope locScope fv.mofv_args_id in
+                let nargs = refine_args_from_scope locScope fv.loc_val.mofv_args_id in
                 MOFun_type (nargs, body_type), locScope 
             | MOEmpty_val ->
               MOUnit_type, locScope
@@ -971,8 +975,8 @@ and determine_type fulloptiprog optiprog locScope const e =
 
 let prog_get_types fulloptiprog optiprog = 
   let determine_type_tupel (idtup, position) var_types = 
-    let tup_typ = IntMap.find idtup.loc_val var_types in
-    get_type_from_tuple_el idtup.loc_pos tup_typ position
+    let tup_typ,_ = IntMap.find idtup.loc_val var_types in
+    get_type_from_tuple_el idtup.loc_pos tup_typ position, idtup.loc_pos
   in
   (*In the first folding, we don't manage the MOTupEl_val *)
   let var_types = 
@@ -983,17 +987,17 @@ let prog_get_types fulloptiprog optiprog =
           | Some al_typ-> 
               (determine_refine_type ~id_var:(Some i) expr.loc_pos typ al_typ.loc_val) 
       in 
-      (* maybe usefill *)
-(*       let typmap = constraint_type fulloptiprog optiprog typmap expr refined in *)
       IntMap.add i ({loc_val = refined; loc_pos= expr.loc_pos}) typmap
     in 
     IntMap.fold
       (fun id value typmap ->
         match value with 
           | MOTop_val e -> 
-              let typ, locScope = determine_type fulloptiprog optiprog IntMap.empty None e in
+              let typ, locScope = determine_type fulloptiprog optiprog 
+                                                 IntMap.empty None e 
+              in
               let typmap = IntMap.fold 
-                (fun i typ typmap -> 
+                (fun i (typ,pars_pos) typmap -> 
                   add_with_refine typmap i typ e
                 ) 
                 locScope typmap 
@@ -1005,7 +1009,7 @@ let prog_get_types fulloptiprog optiprog =
       optiprog.mopg_topvar IntMap.empty
   in
   (*we also run it for topcal *)
-  let var_types_noloc = IntMap.map (fun v -> v.loc_val) var_types in
+  let var_types_noloc = IntMap.map (fun v -> (v.loc_val,v.loc_pos)) var_types in
   let _typ, var_types = determine_type fulloptiprog optiprog var_types_noloc None optiprog.mopg_topcal in
   (*work over the MOTupEl_val *)
     IntMap.fold
@@ -1013,8 +1017,8 @@ let prog_get_types fulloptiprog optiprog =
         match value with 
           | MOTop_val _ -> typmap
           | MOTupEl_val (tup_id, position) ->
-              let typ = determine_type_tupel (tup_id, position) var_types in
-              IntMap.add id typ typmap 
+              let typ, pars_pos = determine_type_tupel (tup_id, position) var_types in
+              IntMap.add id (typ,pars_pos) typmap 
       )
       optiprog.mopg_topvar var_types
 
@@ -1045,7 +1049,7 @@ let top_level_types fulloptiprog =
 *)
 let top_level_types_no_ref var_types past_var_map =
 
-  let refine_bd_alltype req_typ real_typ bd_alltype = 
+  let refine_bd_alltype epos req_typ real_typ bd_alltype = 
       match req_typ with 
         | MOAll_type(i) ->
           let cur_typ = IntMap.find_opt i bd_alltype in
@@ -1053,26 +1057,26 @@ let top_level_types_no_ref var_types past_var_map =
               | None -> 
                   IntMap.add i real_typ bd_alltype, real_typ  
               | Some cur_typ ->
-                  let real_typ = (determine_refine_type dummy_position cur_typ real_typ) in
+                  let real_typ = (determine_refine_type epos cur_typ real_typ) in
                   IntMap.add i real_typ bd_alltype, real_typ
           )
         | _ -> bd_alltype, real_typ
   in
     
   (*The function refine the rettyp of ref_typ according to the types of its arguments.*)
-  let rec apply ref_typ args_typ bd_alltype = 
+  let rec apply epos ref_typ args_typ bd_alltype = 
     match args_typ with
       | [] -> 
-         let bd_alltype, ret_typ = refine_bd_alltype  ref_typ ref_typ bd_alltype in
+         let bd_alltype, ret_typ = refine_bd_alltype epos ref_typ ref_typ bd_alltype in
           bd_alltype, ret_typ 
       | typ :: args_typ -> 
           (match ref_typ with 
             | MOFun_type ([refarg], refret) ->
-                let bd_alltype, _ = refine_bd_alltype  typ refarg bd_alltype in
-                apply refret args_typ bd_alltype
+                let bd_alltype, _ = refine_bd_alltype  epos typ refarg bd_alltype in
+                apply epos refret args_typ bd_alltype
             | MOFun_type (refarg:: refargs , refret) ->
-                let bd_alltype, _  = refine_bd_alltype  refarg typ bd_alltype in
-                apply (MOFun_type (refargs, refret)) args_typ bd_alltype
+                let bd_alltype, _  = refine_bd_alltype  epos refarg typ bd_alltype in
+                apply epos (MOFun_type (refargs, refret)) args_typ bd_alltype
             | _ -> 
                 bd_alltype, MOAll_type (get_fresh_int () )
           )
@@ -1099,43 +1103,43 @@ let top_level_types_no_ref var_types past_var_map =
       | Some mi -> mi
   in
   (* For a reference to modi.i, provide its type *)
-  let rec find_and_get_type modi i deep bd_alltype = 
+  let rec find_and_get_type epos modi i deep bd_alltype = 
     let modtopvar_map = IntMap.find modi var_types in
-    let typ = IntMap.find i modtopvar_map in
-    let typ_with_deep = get_type_at_deep typ deep in 
+    let typ,pars_pos = IntMap.find i modtopvar_map in
+    let typ_with_deep = get_type_at_deep pars_pos typ deep in 
     match typ_with_deep, past_var_map with 
       | MORef_type (nmodi, ni, ndeep, args), Some past_map ->
           (match nmodi, modi, ni, i with 
             | Some inmodi, modi, ni, i when (inmodi = modi && ni = i ) ->
                 let past_i = IntMap.find i past_map in
                 let modi = get_module modi nmodi in
-                let bd_alltype, typ = find_and_get_type modi past_i ndeep bd_alltype in
-                apply typ args bd_alltype 
+                let bd_alltype, typ = find_and_get_type epos modi past_i ndeep bd_alltype in
+                apply epos typ args bd_alltype 
             | None, modi, ni, i when (0 = modi && ni = i ) ->  
                 let past_i = IntMap.find i past_map in
                 let modi = get_module modi nmodi in
-                let bd_alltype,typ  = find_and_get_type modi past_i ndeep bd_alltype in
-                apply typ args bd_alltype
+                let bd_alltype,typ  = find_and_get_type epos modi past_i ndeep bd_alltype in
+                apply epos typ args bd_alltype
             | _ -> 
                 let modi = get_module modi nmodi in
-                let bd_alltype, typ = find_and_get_type modi ni ndeep bd_alltype in
-                apply typ args bd_alltype
+                let bd_alltype, typ = find_and_get_type epos modi ni ndeep bd_alltype in
+                apply epos typ args bd_alltype
           )
       | MORef_type (nmodi, ni, ndeep, args), _  -> 
           let modi = get_module modi nmodi in
-          let bd_alltype, typ = find_and_get_type modi ni ndeep bd_alltype in
-          apply typ args bd_alltype
+          let bd_alltype, typ = find_and_get_type epos modi ni ndeep bd_alltype in
+          apply epos typ args bd_alltype
       | _,_ -> bd_alltype, typ_with_deep
   in
 
-  let rec _recRemoveRef bd_alltype modi typ = 
+  let rec _recRemoveRef epos bd_alltype modi typ = 
     match typ with 
       | MOComposed_type ctyp ->
         let bd_alltype, new_moct_fields = 
             IntMap.fold
               (fun i tfield (bd_alltype, newtypmap) -> 
                 let bd_alltype, motf_typ = 
-                  _recRemoveRef bd_alltype modi tfield.motf_type 
+                  _recRemoveRef epos bd_alltype modi tfield.motf_type 
                 in
                 bd_alltype, IntMap.add i {tfield with motf_type = motf_typ } newtypmap ) 
               ctyp.moct_fields (bd_alltype, IntMap.empty)
@@ -1147,35 +1151,35 @@ let top_level_types_no_ref var_types past_var_map =
         let bd_alltype, tup_typ = 
           List.fold_left
           (fun (bd_alltype, newlst) typ ->
-            let bd_alltype, el = _recRemoveRef bd_alltype modi typ in
+            let bd_alltype, el = _recRemoveRef epos bd_alltype modi typ in
             bd_alltype, el::newlst
            )
           (bd_alltype, []) ttyp 
         in bd_alltype, MOTuple_type (List.rev tup_typ)
       | MOList_type typ -> 
-        let bd_alltype, typ = _recRemoveRef bd_alltype modi typ in
+        let bd_alltype, typ = _recRemoveRef epos bd_alltype modi typ in
         bd_alltype, MOList_type typ
       | MOOption_type typ -> 
-        let bd_alltype, typ = _recRemoveRef bd_alltype modi typ in
+        let bd_alltype, typ = _recRemoveRef epos bd_alltype modi typ in
         bd_alltype, MOOption_type typ
       | MOSet_type typ -> 
-        let bd_alltype, typ = _recRemoveRef bd_alltype modi typ in
+        let bd_alltype, typ = _recRemoveRef epos bd_alltype modi typ in
         bd_alltype, MOSet_type typ
       | MOMap_type (typk, typv) -> 
-          let bd_alltype, typk = _recRemoveRef bd_alltype modi typk in
-          let bd_alltype, typv = _recRemoveRef bd_alltype modi typv in
+          let bd_alltype, typk = _recRemoveRef epos bd_alltype modi typk in
+          let bd_alltype, typv = _recRemoveRef epos bd_alltype modi typv in
           bd_alltype, MOMap_type (typk, typv)
       | MOFun_type (argst, rett) -> 
         let bd_alltype, new_lst_args = 
         List.fold_left
           (fun (bd_alltype, newlst) arg ->
-            let bd_alltype, newel = _recRemoveRef bd_alltype modi arg in
+            let bd_alltype, newel = _recRemoveRef epos bd_alltype modi arg in
             bd_alltype, newel::newlst
           )
           (bd_alltype, []) argst
         in
         
-        let bd_alltype, newrett = _recRemoveRef bd_alltype modi rett in
+        let bd_alltype, newrett = _recRemoveRef epos bd_alltype modi rett in
 
         (*we can need to refine args type using the ret type.
           As in the following exemple
@@ -1193,22 +1197,15 @@ let top_level_types_no_ref var_types past_var_map =
       
       | MORef_type (refmodi, i , deep, args) -> 
          let modi = get_module modi refmodi in
-         let bd_alltype, typ = find_and_get_type modi i deep bd_alltype in
-            let bd_alltype, typ = apply typ args bd_alltype in
+         let bd_alltype, typ = find_and_get_type epos modi i deep bd_alltype in
+            let bd_alltype, typ = apply epos typ args bd_alltype in
             bd_alltype, typ
       | MOTupel_type (refmodi , i , deep , args,  position) -> 
           let modi = get_module modi refmodi in
-          let bd_alltype, typ = find_and_get_type modi i deep bd_alltype in
-          let bd_alltype, typ = apply typ args bd_alltype in 
+          let bd_alltype, typ = find_and_get_type epos modi i deep bd_alltype in
+          let bd_alltype, typ = apply epos typ args bd_alltype in 
           bd_alltype, get_type_from_tuple_el dummy_position typ position
     in
-
-    (*IntMap.mapi
-      (fun modi topvar_map ->
-        IntMap.map (_recRemoveRef bd_alltype modi) topvar_map
-      )
-      var_types
-    *)
 
     let new_topvar_types = 
     IntMap.fold
@@ -1216,9 +1213,9 @@ let top_level_types_no_ref var_types past_var_map =
         (*For every module in topvar map*)
         let newMap = 
           IntMap.fold
-          (fun i typ  newMap -> 
-            let _, newtyp = _recRemoveRef IntMap.empty modi typ in
-            IntMap.add i newtyp newMap
+          (fun i (typ,pars_pos)  newMap -> 
+            let _, newtyp = _recRemoveRef pars_pos IntMap.empty modi typ in
+            IntMap.add i (newtyp,  pars_pos) newMap
           )
           topvar_map IntMap.empty
         in 
@@ -1237,13 +1234,13 @@ let get_type_from_topvar_types optiprog var_types (imod, idref, deep) args =
       | Some i -> IntMap.find i var_types 
     )
   in
-  let base_typ = IntMap.find idref modul in
+  let base_typ, pars_pos = IntMap.find idref modul in
   let typ = 
     match deep with 
       | 0 -> base_typ
-      | i -> get_type_at_deep base_typ deep
+      | i -> get_type_at_deep pars_pos base_typ deep
   in 
-  determine_refapplication_type typ dummy_position args IntMap.empty
+  determine_refapplication_type typ pars_pos args IntMap.empty
 
 
 (*Full type checking step *)
@@ -1286,8 +1283,10 @@ let type_check_has_type fulloptiprog optiprog var_types required_typ expr =
       | _, MORef_type(_,_,_,_) -> raise (InternalError "Gufo internal error (ref should not exist)")
       | MOTupel_type (_,_,_,_,_), _ -> raise (InternalError "unexpected tupel)")
       | _, MOTupel_type (_,_,_,_,_) ->  raise (InternalError "unexpected tupel)")
-      | _, _ -> raise (TypeError (sprintf "Incompatible type: %s found while type %s required" 
-                                  (type_to_string found) (type_to_string required)))
+      | _, _ -> raise_typeError 
+                  (sprintf "Incompatible type: %s found while type %s required" 
+                           (type_to_string found) (type_to_string required))
+                  expr.loc_pos
     in has_unique_type required found
   in
   let rec get_type_from_ref_ typ =
@@ -1517,7 +1516,7 @@ to feed the allTypeMap map.
   For exemple if your real type is int while the expected one is '1, '1 will be
 linked with te type int in the allTypeMap map.
 *)
-let type_check_has_type_with_allTypeConstraint 
+let type_check_has_type_with_allTypeConstraint epos
       fulloptiprog optiprog var_types required_typ real_typ allTypeMap
   =
   let rec has_type required found allTypeMap = 
@@ -1526,9 +1525,11 @@ let type_check_has_type_with_allTypeConstraint
       | MOComposed_type ctyp, MOComposed_type ctyp2 ->
           (match ctyp.moct_name = ctyp2.moct_name with
             | true -> MOComposed_type ctyp, allTypeMap
-            | false -> raise (TypeError 
-                (sprintf "Incompatible type: %s found while type %s required"
-                         (type_to_string found) (type_to_string required)))
+            | false -> 
+                raise_typeError 
+                  (sprintf "Incompatible type: %s found while type %s required"
+                         (type_to_string found) (type_to_string required))
+                  epos
           )
       | MOBase_type (MTypeString), MOBase_type (MTypeString) ->
           MOBase_type (MTypeString), allTypeMap
@@ -1588,8 +1589,10 @@ let type_check_has_type_with_allTypeConstraint
       | _, MORef_type(_,_,_,_) -> raise (InternalError "Gufo internal error (ref should not exist2)")
       | MOTupel_type (_,_,_,_,_), _ -> raise (InternalError "unexpected tupel)")
       | _, MOTupel_type (_,_,_,_,_) ->  raise (InternalError "unexpected tupel)")
-      | _, _ -> raise (TypeError (sprintf "Incompatible type: %s found while type %s required" 
-                                  (type_to_string found) (type_to_string required)))
+      | _, _ -> raise_typeError 
+                  (sprintf "Incompatible type: %s found while type %s required" 
+                    (type_to_string found) (type_to_string required))
+                  epos
     in has_unique_type required found
   in
     let real_typ, allTypeMap = has_type required_typ real_typ allTypeMap in
@@ -1621,8 +1624,8 @@ let expr_check_has_type_with_allTypeConstraint
   let typ_from_expr, _locScope = determine_type fulloptiprog optiprog 
                         (IntMap.find optiprog.mopg_name var_types) (Some required_typ) expr in
   let found_type = get_type_from_ref_ typ_from_expr in
-  type_check_has_type_with_allTypeConstraint 
-      fulloptiprog optiprog var_types required_typ found_type allTypeMap
+  type_check_has_type_with_allTypeConstraint expr.loc_pos
+      fulloptiprog optiprog var_types required_typ found_type allTypeMap 
 
 
 
@@ -1740,7 +1743,7 @@ and type_check_val fulloptiprog optiprog typScope v =
               with | Not_found -> true (*empty map is ok*)
               )
           | MOFun_val fv -> 
-              type_check_val fulloptiprog optiprog typScope fv.mofv_body 
+              type_check_val fulloptiprog optiprog typScope fv.loc_val.mofv_body 
           | MOEmpty_val -> true
         )
     | MOComposed_val ctypv ->
@@ -1787,7 +1790,7 @@ and type_check_val fulloptiprog optiprog typScope v =
             compatibles.
             *)
             let check_ref reft args = 
-              (match reft with
+              (match reft.loc_val with
                 | MORef_type (modul, id_ref,deep,nargs) ->
                     (*There should be no ref type at this level.*)
                     true
@@ -1818,7 +1821,7 @@ and type_check_val fulloptiprog optiprog typScope v =
                       in res
                     )
                 | _ -> 
-                    raise (TypeError "Invalid function call")
+                    raise_typeError ("Invalid function call") reft.loc_pos
               )
             in
             let ftyp = get_type_from_ref fulloptiprog optiprog typScope ref in 
@@ -1921,14 +1924,14 @@ let debug_to_level_type fulloptiprog var_types =
       fun modi toptypmap ->
         let mod_str = IntMap.find modi fulloptiprog.mofp_progmap_debug in
         IntMap.iter 
-          (fun var typ ->
+          (fun var (typ,pars_pos) ->
             let var_str = 
               match IntMap.find_opt modi fulloptiprog.mofp_progmodules with
                 | None -> find_debug_name fulloptiprog.mofp_mainprog var
                 | Some (MOUserMod mprog) -> find_debug_name mprog var
                 | Some (MOSystemMod sysmod) -> (IntMap.find var sysmod.mosm_topvar).mosmv_name
             in
-            debug_print (sprintf "from module %s: %d (%s) : %s\n" mod_str var var_str (type_to_string typ))
+            debug_print (sprintf "from module %s: %d (%s) : %s\n" mod_str var var_str (type_to_string (typ)))
           )
           toptypmap
     )
@@ -1999,7 +2002,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
       let parsedToOpt_field_in_prog prog fd = 
           let fdv = fd.loc_val in
           match StringMap.find_opt fdv.mtfv_name.loc_val prog.mopg_field2int with 
-            | None -> raise (TypeError ("field "^fdv.mtfv_name.loc_val ^" does not belong to a known type"))
+            | None -> raise_typeError ("field "^fdv.mtfv_name.loc_val ^" does not belong to a known type") fdv.mtfv_name.loc_pos
             | Some i -> IntMap.find i prog.mopg_field_to_type
       in
       match def_modul with 
@@ -2007,15 +2010,15 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
         | Some (MOUserMod userprog) -> parsedToOpt_field_in_prog userprog fd
         | Some (MOSystemMod sysmod) -> 
             (match StringMap.find_opt fd.loc_val.mtfv_name.loc_val sysmod.mosm_typstrfield2inttype with
-              | None -> raise (TypeError ("field "^fd.loc_val.mtfv_name.loc_val ^
-                        " does not belong to a known type"))
+              | None -> raise_typeError ("field "^fd.loc_val.mtfv_name.loc_val ^
+                        " does not belong to a known type") fd.loc_val.mtfv_name.loc_pos
               | Some i -> i)
     in
     let check_valid_fields def_modul ctype field =
       let check_valid_fields_in_prog prog = 
         (*check the field belong to the given ctype *)
           match StringMap.find_opt field.mtfv_name.loc_val prog.mopg_field2int with 
-            | None -> raise (TypeError ("field "^field.mtfv_name.loc_val ^" does not belong to a known type"))
+            | None -> raise_typeError ("field "^field.mtfv_name.loc_val ^" does not belong to a known type") field.mtfv_name.loc_pos
             | Some i -> ctype = IntMap.find i prog.mopg_field_to_type
       in
         match def_modul with
@@ -2023,7 +2026,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
           | Some (MOUserMod userprog) -> check_valid_fields_in_prog userprog
           | Some (MOSystemMod sysmod) -> 
             (match StringMap.find_opt field.mtfv_name.loc_val sysmod.mosm_typstrfield2inttype with 
-              | None ->raise  (TypeError ("field "^field.mtfv_name.loc_val^" does not belong to a known type")) 
+              | None ->raise_typeError ("field "^field.mtfv_name.loc_val^" does not belong to a known type") field.mtfv_name.loc_pos
               | Some i -> ctype = i
             )
     in
@@ -2057,7 +2060,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
         (fun fd -> 
           match check_valid_fields def_modul ctype fd.loc_val with
             | true -> ()
-            | false -> raise (TypeError (fd.loc_val.mtfv_name.loc_val^" does not belong to the correct struct."))
+            | false -> raise_typeError (fd.loc_val.mtfv_name.loc_val^" does not belong to the correct struct.") fd.loc_val.mtfv_name.loc_pos
         )
         (List.tl mct.mcv_fields)
     in
@@ -2170,7 +2173,9 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
    match funarg with  
     | MBaseArg s -> 
         let i = get_fresh_int () in
-        StringMap.add s.loc_val i nameMap, MOBaseArg i, StringMap.add s.loc_val i locScope
+        StringMap.add s.loc_val i nameMap, 
+        MOBaseArg {loc_val = i; loc_pos = s.loc_pos}, 
+        StringMap.add s.loc_val (i, s.loc_pos) locScope
     | MTupleArg arglst ->
         let onames, locScope, newlst = 
           List.fold_left
@@ -2182,7 +2187,9 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
             )
             (StringMap.empty,locScope,[]) arglst.loc_val
         in
-        onames, MOTupleArg newlst, locScope
+        onames, 
+        MOTupleArg {loc_val=newlst; loc_pos=arglst.loc_pos}, 
+        locScope
     
   
   and parsedToOpt_simple_val ?topvar:(topvar = None) optiprog locScope ms =
@@ -2222,18 +2229,25 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
             let nonames, oarg, locScope = parsedToOpt_funarg onames locScope arg in
             nonames,locScope, oarg::newlst
           ) 
-          (StringMap.empty,locScope,[]) args 
+          (StringMap.empty,locScope,[]) args.loc_val
       in 
       let obody = parsedToOpt_expr ~topvar optiprog locScope body in
       MOFun_val 
-        {mofv_args_name = onames; mofv_args_id = ofunargs; mofv_body = obody}
+        {loc_val = 
+          {mofv_args_name = onames; 
+           mofv_args_id = {loc_val = ofunargs; loc_pos = args.loc_pos}; 
+           mofv_body = obody};
+         loc_pos = pos_merging args.loc_pos  obody.loc_pos;
+        }
   
   
   and parsedToOpt_ref ?topvar:(topvar = None) optiprog locScope ref  = 
 
     let resolve_fd prog fdname = 
       match StringMap.find_opt fdname prog.mopg_field2int with
-        | None -> raise (TypeError (sprintf "field %s does not belong to a known field." fdname ))
+        | None -> raise_typeError 
+                    (sprintf "field %s does not belong to a known field." fdname )
+                    ref.mrv_varname.loc_pos
         | Some i -> i
     in
     let resolve_fd_modul modul fdname = 
@@ -2253,7 +2267,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
         match modul  with
           | None ->
             (match search_in_scope locScope vname with 
-              | Some vint -> vint
+              | Some (vint, _pars_pos) -> vint
               | None -> 
                   (match search_in_topvar optiprog vname with
                     | Some vint -> vint
@@ -2308,7 +2322,9 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
     let resolve_index ref = 
       (match ref.mrv_index with
                 | None -> None
-                | Some vlst -> Some (List.map (parsedToOpt_expr ~topvar optiprog locScope) vlst)
+                | Some vlst -> 
+                    Some (List.map (parsedToOpt_expr ~topvar optiprog locScope) 
+                    vlst)
       ) 
     in
     match ref.mrv_module with
@@ -2343,14 +2359,14 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
           }
   and parsedToOpt_binding ?topvar:(topvar = None) optiprog locScope bd = 
     let add_in_bindlist bindScope bindList debugnames elname position = 
-      match StringMap.find_opt elname bindScope with
+      match StringMap.find_opt elname.loc_val bindScope with
         | None -> 
             let id = get_fresh_int () in 
-            (StringMap.add elname id bindScope), 
-            (id, position)::bindList,
-            IntMap.add id elname debugnames,
+            (StringMap.add elname.loc_val (id,elname.loc_pos) bindScope), 
+            (id, elname.loc_pos,  position)::bindList,
+            IntMap.add id elname.loc_val debugnames,
             position
-        | Some _ -> raise (VarError ("Cannot bind same variable name in same tuple: variable $"^elname^" ." ))
+        | Some _ -> (raise_varError ("Cannot bind same variable name in same tuple: variable $"^elname.loc_val^" ." ) elname.loc_pos)
     in
     let rec register_tuple_vars decl bindScope bindList debugnames position = 
       match decl with
@@ -2361,7 +2377,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
               | lst -> 
                    (List.hd lst + 1)::(List.tl lst) 
             )
-              in add_in_bindlist bindScope bindList debugnames str.loc_val nposition
+              in add_in_bindlist bindScope bindList debugnames str nposition
         | MTupDecl decllst -> 
           let nposition = -1::position in
           List.fold_left 
@@ -2471,7 +2487,9 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
                 one).
                 *)
                 | MSimple_val (MFun_val (_, _)) ->
-                  (parsedToOpt_expr  ~topvar:(None) optiprog (StringMap.add aname.loc_val iname StringMap.empty) mvar.mva_value)
+                  (parsedToOpt_expr  ~topvar:(None) optiprog 
+                    (StringMap.add aname.loc_val (iname, aname.loc_pos) StringMap.empty) 
+                    mvar.mva_value)
                 | _  ->
                     (match past_var_map with 
                       | None -> parsedToOpt_expr ~topvar:(None) optiprog StringMap.empty mvar.mva_value
@@ -2710,9 +2728,12 @@ let parsedToOpt_type fulloptiprog oldprog optiprog =
             )
           in
           MORef_type (modul, inttyp, 0, [])
-      | None, [typename] -> raise (TypeError ("Type not found: "^ typename))
-      | _,  lst -> raise (TypeError 
-                            ("unvalide type declaration"^(List.fold_left (fun str el -> str^" "^el)"" lst)))
+      | None, [typename] -> raise_typeError ("Type not found: "^ typename) 
+                                            ref.mrv_varname.loc_pos
+      | _,  lst -> raise_typeError 
+                            ("unvalide type declaration"^
+                            (List.fold_left (fun str el -> str^" "^el)"" lst)) 
+                          ref.mrv_varname.loc_pos
       )
   in
 
@@ -2752,9 +2773,9 @@ let parsedToOpt_type fulloptiprog oldprog optiprog =
   let transform_composed_type_field fd = 
     let intname = get_fresh_int () in
     {
-      motf_name  = intname;
+      motf_name  = {fd.mtf_name with loc_val = intname};
       motf_type = parsedToOpt_type_simpletype fd.mtf_type;
-      motf_debugname = fd.mtf_name;
+      motf_debugname = fd.mtf_name.loc_val;
     }
   in
 
@@ -2763,14 +2784,14 @@ let parsedToOpt_type fulloptiprog oldprog optiprog =
        (fun (optiprog,map_res) fd -> 
          let ofd = transform_composed_type_field fd in
          (*we need to check there is no other field with the same name*)
-         match StringMap.mem fd.mtf_name optiprog.mopg_field2int with
+         match StringMap.mem fd.mtf_name.loc_val optiprog.mopg_field2int with
           | true ->
-            raise (TypeError ("the field "^fd.mtf_name^" is used several times (possibly in different structs)"))
+            raise_typeError ("the field "^fd.mtf_name.loc_val^" is used several times (possibly in different structs)") fd.mtf_name.loc_pos
           | false  -> 
               (*we add it*)
-            let optiprog = {optiprog with mopg_field2int = StringMap.add fd.mtf_name ofd.motf_name optiprog.mopg_field2int} in
-            let optiprog = {optiprog with mopg_field_to_type = IntMap.add ofd.motf_name mc_intname optiprog.mopg_field_to_type} in
-            (optiprog, (IntMap.add ofd.motf_name ofd map_res ))
+            let optiprog = {optiprog with mopg_field2int = StringMap.add fd.mtf_name.loc_val ofd.motf_name.loc_val optiprog.mopg_field2int} in
+            let optiprog = {optiprog with mopg_field_to_type = IntMap.add ofd.motf_name.loc_val mc_intname optiprog.mopg_field_to_type} in
+            (optiprog, (IntMap.add ofd.motf_name.loc_val ofd map_res ))
        )
        (optiprog,IntMap.empty) mc.mct_fields
   in
@@ -2815,7 +2836,7 @@ type_check_val_to_top returns a new var_types and a current resulting type.
 *)
 
 
-let rec type_check_val_to_top fulloptiprog optiprog modi varval var_types = 
+let rec type_check_val_to_top_ fulloptiprog optiprog modi varval var_types = 
   (*var_types contains strictly more accurate information than a locScope (as
 used in the determine_type* functions.). So to call some determine_type*
 function we used it to not lost informations. *)
@@ -2824,9 +2845,9 @@ function we used it to not lost informations. *)
     match IntMap.find_opt idmodul var_types with
       | None -> raise (InternalError "type checker error.")(*We hope this cannot happen.*)
       | Some modulmap -> 
-          (match IntMap.find_opt id modulmap with
+          (match IntMap.find_opt id.loc_val modulmap with
             | None -> raise (InternalError "type checker error.")(*We hope this cannot happen.*)
-            | Some typ -> typ
+            | Some typ_and_pos -> typ_and_pos
           )
   in 
 
@@ -2834,10 +2855,16 @@ function we used it to not lost informations. *)
     List.map
     (fun funarg -> 
       match funarg with
-        | MOBaseArg i -> get_type_from_var_types var_types modi i
+        | MOBaseArg i -> 
+            let v, pos = get_type_from_var_types var_types modi i in
+            {loc_val = v; loc_pos = pos}
         | MOTupleArg lstfunarg -> 
-            (MOTuple_type (type_check_val_to_top_funargs lstfunarg var_types) )
-    ) args
+            {loc_val = (MOTuple_type (
+              List.map (fun typ_pos -> typ_pos.loc_val )
+                (type_check_val_to_top_funargs lstfunarg var_types)) );
+             loc_pos = lstfunarg.loc_pos;
+            }
+    ) args.loc_val
   in
 
   (*Specific for commands *)
@@ -2894,11 +2921,11 @@ function we used it to not lost informations. *)
     let allTypeMap = IntMap.empty in
     (*Check if a real arguments is compatible with the expected one and return the resulting type.*)
     let check_arg required real allTypeMap = 
-      type_check_has_type_with_allTypeConstraint fulloptiprog optiprog var_types required real allTypeMap
+      type_check_has_type_with_allTypeConstraint real.loc_pos fulloptiprog optiprog var_types required real.loc_val allTypeMap
     in
 
     (*For now this function just return an updated allTypeMap without worrying about var_types. TODO: it should update var_types. *)
-    let rec do_analyse_funcall_ var_types ftyp args_types allTypeMap = 
+    let rec do_analyse_funcall_ epos var_types ftyp args_types allTypeMap = 
       match ftyp with
         | MOFun_type(args_required_type, ret) ->
           (match (Stdlib.compare (List.length args_types) (List.length args_required_type) )
@@ -2926,7 +2953,7 @@ function we used it to not lost informations. *)
                   in
                   let ret = allType_getRealType ret allTypeMap in
                   let ret, allTypeMap = 
-                    do_analyse_funcall_ var_types ret ret_fun_args_types allTypeMap
+                    do_analyse_funcall_ epos var_types ret ret_fun_args_types allTypeMap
                   in
                   ret, allTypeMap
                 | _ -> 
@@ -2962,14 +2989,14 @@ function we used it to not lost informations. *)
                     ret, allTypeMap
           )
           | _ -> 
-              raise (TypeError "Invalid function call")
+              raise_typeError "Invalid function call" epos
     in
     (*first we check the arguments *)
 (*
     let var_types, args_types = 
       List.fold_left (fun (var_types, args_types) v -> 
         let var_types, next_type =
-        type_check_val_to_top fulloptiprog optiprog v var_types
+        type_check_val_to_top_ fulloptiprog optiprog v var_types
         in
         var_types, next_type::args_types
       ) (var_types, [] ) args
@@ -2983,10 +3010,10 @@ function we used it to not lost informations. *)
             (*need to get the current module id*)
         | Some modulId -> modulId
     in 
-    let funtype =  
+    let funtype, fun_pos =  
       match (List.rev field) with 
-        | [] -> get_type_from_var_types var_types modulId (funname.loc_val)
-        | fd::lst -> (get_type_field_from_field fulloptiprog optiprog fd).motf_type
+        | [] -> get_type_from_var_types var_types modulId funname
+        | fd::lst -> (get_type_field_from_field fulloptiprog optiprog fd).motf_type, funname.loc_pos
     in
     
       debug_print(sprintf "function %d ret type before analysis: %s \n"  
@@ -2996,7 +3023,9 @@ function we used it to not lost informations. *)
       | [] -> 
         (*no args, we return funtype*) (funtype, var_types)
       | lst -> 
-          let funtyp, allTypeMap = do_analyse_funcall_ var_types funtype args_typ allTypeMap
+          let funtyp, allTypeMap = do_analyse_funcall_ 
+                                     funname.loc_pos var_types 
+                                     funtype args_typ allTypeMap
           in  funtyp, var_types
   in
 
@@ -3017,7 +3046,7 @@ function we used it to not lost informations. *)
           (fun (var_types, lstTyp ) aval -> 
             let var_types, res = 
               type_check_val_to_top fulloptiprog optiprog modi aval var_types in
-            var_types, res::lstTyp
+            var_types, res.loc_val::lstTyp
           ) 
           (var_types, [] ) vallist.loc_val
       in var_types, MOTuple_type (List.rev(rev_lstType))
@@ -3027,7 +3056,7 @@ function we used it to not lost informations. *)
           let var_types, res = 
             type_check_val_to_top fulloptiprog optiprog modi aval var_types 
           in
-            var_types, determine_refine_type varval.loc_pos res_typ res
+            var_types, determine_refine_type varval.loc_pos res_typ res.loc_val
         )
         (var_types, (MOAll_type (get_fresh_int ()))) vallist.loc_val
       in
@@ -3037,7 +3066,7 @@ function we used it to not lost informations. *)
     | MOSimple_val (MOSome_val v) -> 
       let var_types, res = type_check_val_to_top fulloptiprog optiprog modi v var_types 
       in
-        var_types, MOOption_type (res)
+        var_types, MOOption_type (res.loc_val)
     | MOSimple_val (MOSet_val setval) -> 
       let var_types, res = 
         MSet.fold
@@ -3045,7 +3074,7 @@ function we used it to not lost informations. *)
            let var_types, res = 
             type_check_val_to_top fulloptiprog optiprog modi (simple_to_core_val aval) var_types 
            in
-             var_types, determine_refine_type varval.loc_pos res_typ res
+             var_types, determine_refine_type varval.loc_pos res_typ res.loc_val
          )
          setval.loc_val (var_types, (MOAll_type (get_fresh_int ())))
       in var_types, MOSet_type res
@@ -3059,20 +3088,23 @@ function we used it to not lost informations. *)
           let var_types, res = 
             type_check_val_to_top fulloptiprog optiprog modi aval var_types 
           in
-            var_types, determine_refine_type varval.loc_pos key_res_typ  key_res ,
-            determine_refine_type varval.loc_pos res_typ res
+            var_types, determine_refine_type varval.loc_pos key_res_typ  key_res.loc_val ,
+            determine_refine_type varval.loc_pos res_typ res.loc_val
         )
         mapval.loc_val 
         (var_types, (MOAll_type (get_fresh_int ())), (MOAll_type (get_fresh_int ())))
       in
       var_types, MOMap_type (key_res, res)
     | MOSimple_val (MOFun_val fval) ->
+      let fval = fval.loc_val in
       let lst_args = type_check_val_to_top_funargs fval.mofv_args_id var_types
       in
       let var_types, res = 
         type_check_val_to_top fulloptiprog optiprog modi fval.mofv_body var_types 
       in
-        var_types, MOFun_type (lst_args, res)
+        var_types, MOFun_type 
+                    (List.map (fun typ_pos -> typ_pos.loc_val) lst_args, 
+                    res.loc_val)
     | MOSimple_val (MOEmpty_val) -> var_types, MOUnit_type
     | MOComposed_val comptype ->
         var_types, MOComposed_type (determine_type_composed fulloptiprog optiprog comptype)
@@ -3083,7 +3115,7 @@ function we used it to not lost informations. *)
             let var_types, typ = 
               type_check_val_to_top fulloptiprog optiprog modi arg var_types
             in 
-      debug_print(sprintf "function  has type args: %s \n"  (type_to_string typ));
+      debug_print(sprintf "function  has type args: %s \n"  (type_to_string typ.loc_val));
             var_types, typ::args_types
           )
           (var_types, []) args
@@ -3100,37 +3132,45 @@ function we used it to not lost informations. *)
           type_check_val_to_top fulloptiprog optiprog modi arga var_types in
         let var_types, typArgb = 
           type_check_val_to_top fulloptiprog optiprog modi argb var_types in
-        var_types, determine_refine_type varval.loc_pos typArga typArgb 
+        var_types, determine_refine_type varval.loc_pos typArga.loc_val typArgb .loc_val
     | MOBind_val bd -> 
       let var_types, bdval_typ = type_check_val_to_top fulloptiprog optiprog modi bd.mobd_value var_types in
       let var_types, bdbody_typ = type_check_val_to_top fulloptiprog optiprog modi bd.mobd_body var_types 
        in
       (*Enough?*)
-      var_types, bdbody_typ
+      var_types, bdbody_typ.loc_val
     | MOIf_val (cond, v1, v2) -> 
         let var_types, cond_typ = 
           type_check_val_to_top fulloptiprog optiprog modi cond var_types in 
         (*TODO: ok? *)
-        let _typ = determine_refine_type varval.loc_pos cond_typ 
+        let _typ = determine_refine_type varval.loc_pos cond_typ.loc_val
                     (MOBase_type (MTypeBool)) in
         let var_types, v1_typ = 
           type_check_val_to_top fulloptiprog optiprog modi v1 var_types in
         let var_types, v2_typ = 
           type_check_val_to_top fulloptiprog optiprog modi v2 var_types in
-        var_types, determine_refine_type varval.loc_pos v1_typ v2_typ
+        var_types, determine_refine_type varval.loc_pos v1_typ.loc_val v2_typ.loc_val
     | MOComp_val (op, v1, v2) -> 
         let var_types, v1_typ = 
           type_check_val_to_top fulloptiprog optiprog modi v1 var_types in
         let var_types, v2_typ = 
           type_check_val_to_top fulloptiprog optiprog modi v2 var_types in
-        let _typ = determine_refine_type varval.loc_pos v1_typ v2_typ in
+        let _typ = determine_refine_type varval.loc_pos v1_typ.loc_val v2_typ.loc_val in
         var_types, MOBase_type MTypeBool
     | MOBody_val (lst) -> 
-        List.fold_left 
-        (fun (var_types, _) elval -> 
-          type_check_val_to_top fulloptiprog optiprog modi elval  var_types
-        )
-        (var_types, MOUnit_type) lst
+        let var_types, typ = 
+          List.fold_left 
+          (fun (var_types, _) elval -> 
+            type_check_val_to_top fulloptiprog optiprog modi elval  var_types
+          )
+          (var_types, (box_loc MOUnit_type)) lst
+        in
+        var_types, typ.loc_val
+
+and type_check_val_to_top fulloptiprog optiprog modi varval var_types = 
+   let var_types, typ = 
+     type_check_val_to_top_ fulloptiprog optiprog modi varval var_types in
+   var_types, {loc_val = typ; loc_pos = varval.loc_pos}
 
 
 let type_check_prog_to_top fulloptiprog optiprog modi var_types = 
@@ -3151,6 +3191,7 @@ let type_check_prog_to_top fulloptiprog optiprog modi var_types =
   let var_types, _  = 
     type_check_val_to_top fulloptiprog optiprog modi optiprog.mopg_topcal var_types
   in var_types
+
 
 let type_check_bottom_to_top fulloptiprog var_types = 
   (*For every modules*)
@@ -3555,12 +3596,12 @@ let add_prog_to_optprog fulloptiprog fullprog =
   (*PART 3 *)
   debug_print "dump var_types before top_level_types_no_ref\n";
   IntMap.iter
-    (fun ivar typ -> debug_print (sprintf "\t\t %d : %s\n" ivar (type_to_string typ)))
+    (fun ivar (typ, _pars_pos) -> debug_print (sprintf "\t\t %d : %s\n" ivar (type_to_string typ)))
     (IntMap.find 0 var_types);
   let var_types = top_level_types_no_ref var_types past_var_map in
   debug_print "dump var_types after top_level_types_no_ref\n";
   IntMap.iter
-    (fun ivar typ -> debug_print (sprintf "\t\t %d : %s\n" ivar (type_to_string typ)))
+    (fun ivar (typ, _pars_pos) -> debug_print (sprintf "\t\t %d : %s\n" ivar (type_to_string typ)))
     (IntMap.find 0 var_types);
 
 

@@ -21,14 +21,6 @@ open GenUtils
 
 
 open Format
-exception SyntaxError of string
-exception TypeError of string
-exception VarError of string
-exception ExecutionError of string
-exception InternalError of string
-exception UncatchedError of string
-exception RuntimeError of string
-
 type lexing_position = Stdlib.Lexing.position = {
   pos_fname : string ;
   pos_lnum  : int ;
@@ -46,6 +38,15 @@ and 'a located = {
     loc_val : 'a ;
     loc_pos : pars_position;
 }
+
+exception SyntaxError of string
+exception TypeError of string located
+exception VarError of string
+exception ExecutionError of string
+exception InternalError of string
+exception UncatchedError of string
+exception RuntimeError of string
+
 
 type mvar = {
   mva_name: var_decl located; 
@@ -119,7 +120,7 @@ and mbase_type_val =
   | MTypeCmdVal of mcmd_seq located
 
 and mtype_field = {
-  mtf_name : string;
+  mtf_name : string located;
   mtf_type: msimple_type;
   mtf_extend: string option;
 }
@@ -173,7 +174,7 @@ and msimple_type_val =
   | MSome_val of mtype_val located
   | MSet_val of  mtype_val located list located
   | MMap_val of (mtype_val located * mtype_val located) list located (*(key * value list ) Type info will come next. *)
-  | MFun_val of mfunarg list * mtype_val located (* args name * body_expr *)
+  | MFun_val of mfunarg list located * mtype_val located (* args name * body_expr *)
 
 and mfunarg = 
   | MBaseArg of string located
@@ -324,7 +325,7 @@ let rec dump_mtype_short mytype =
 
 let dump_mtype_field mytypefield =
     open_hovbox 2;
-    print_string mytypefield.mtf_name;
+    print_string mytypefield.mtf_name.loc_val;
     print_string ": ";
     dump_mtype_short mytypefield.mtf_type;
     (match mytypefield.mtf_extend with 
@@ -496,7 +497,7 @@ and dump_mtype_val varval =
 
          | MFun_val (fargs, fexpr) ->
            print_string "fun ";
-           List.iter dump_arg fargs;
+           List.iter dump_arg fargs.loc_val;
            print_string "= ";
            dump_mtype_val fexpr.loc_val
         )

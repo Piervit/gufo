@@ -25,7 +25,9 @@ val search_modules : GufoParsed.mprogram -> int GenUtils.StringMap.t
 
 (*From a low level fullprog to a highlevel fillprog with a map of the type. *)
 val parsedToOpt : GufoParsed.fullprog -> 
-                  Gufo.MCore.fullprogopt * Gufo.MCore.motype GenUtils.IntMap.t GenUtils.IntMap.t
+                  Gufo.MCore.fullprogopt *  
+                    (Gufo.MCore.motype * GufoParsed.pars_position) 
+                      GenUtils.IntMap.t GenUtils.IntMap.t
 
 (*
  * add_prog_to_optprog fulloptiprog fullprog 
@@ -39,9 +41,11 @@ val parsedToOpt : GufoParsed.fullprog ->
    * *)
 val add_prog_to_optprog: Gufo.MCore.fullprogopt -> 
                          GufoParsed.fullprog -> 
-                         Gufo.MCore.fullprogopt * Gufo.MCore.motype GenUtils.IntMap.t GenUtils.IntMap.t
+                          Gufo.MCore.fullprogopt * 
+                          (Gufo.MCore.motype * GufoParsed.pars_position) 
+                            GenUtils.IntMap.t GenUtils.IntMap.t
 
-val add_module_to_optprog : string -> Gufo.MCore.fullprogopt -> GufoParsed.mprogram -> Gufo.MCore.fullprogopt * Gufo.MCore.motype GenUtils.IntMap.t GenUtils.IntMap.t
+val add_module_to_optprog : string -> Gufo.MCore.fullprogopt -> GufoParsed.mprogram -> Gufo.MCore.fullprogopt * (Gufo.MCore.motype * GufoParsed.pars_position) GenUtils.IntMap.t GenUtils.IntMap.t
 
 (*This function should not be used if you are not sure about what you are doing.
   This is only needed from GufoEngine in a case when we have to trick partial

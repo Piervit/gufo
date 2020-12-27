@@ -204,10 +204,10 @@ shell:
     {   
       Some {mpg_types = GenUtils.StringMap.empty; mpg_topvar = []; mpg_topcal = main_expr} 
     }
-    | LET ; varnames = located(var_tuple_decl); argnames = funargs_top ; AFFECTATION; funbody = located(topvarassign); EOF
+    | LET ; varnames = located(var_tuple_decl); argnames = located(funargs_top) ; AFFECTATION; funbody = located(topvarassign); EOF
 	{
           let open GenUtils in 
-          (match argnames, varnames.loc_val with
+          (match argnames.loc_val, varnames.loc_val with
             | [], _ -> 
               let mvar = {mva_name = varnames; mva_value = funbody} in
               Some ({mpg_types = GenUtils.StringMap.empty; mpg_topvar = [mvar];  
@@ -216,11 +216,17 @@ shell:
                            loc_val = MSimple_val(MEmpty_val);
                          }
                    })
-            | argnames, MBaseDecl varname ->
+            | args, MBaseDecl varname ->
                 let mvar = 
                   {
                     mva_name = varnames; 
-                    mva_value = {funbody with loc_val = MSimple_val (MFun_val (List.rev argnames, funbody))}
+                    mva_value = 
+                    {
+                      funbody with 
+                      loc_val = MSimple_val (
+                                  MFun_val ({argnames with loc_val = List.rev args},
+                                             funbody))
+                    }
                   } 
                 in
                 Some ({mpg_types = GenUtils.StringMap.empty; mpg_topvar = [mvar];  
@@ -317,7 +323,10 @@ rev_mtypes_or_topvals:
           let name = rm_first_char name in
           match StringMap.mem name types with
             | true -> 
-                raise (TypeError ("The type "^name^" is already declared."))
+                raise (TypeError {loc_val = ("The type "^name^" is already declared."); 
+                                  loc_pos = GufoParsedHelper.dummy_position;  
+                                }
+                      )
             | false ->
                 ( GenUtils.StringMap.add name
                   (MComposed_type 
@@ -329,20 +338,23 @@ rev_mtypes_or_topvals:
 
   (*variables and function assignation*)
 
-  | topels= rev_mtypes_or_topvals; LET ; varnames = located(var_tuple_decl); argnames = funargs_top ; AFFECTATION; funbody = located(topvarassign);
+  | topels= rev_mtypes_or_topvals; LET ; varnames = located(var_tuple_decl); argnames = located(funargs_top) ; AFFECTATION; funbody = located(topvarassign);
 	{
            
           let open GenUtils in 
       	  let (types, topvals) = topels in
-          (match argnames, varnames.loc_val with
+          (match argnames.loc_val, varnames.loc_val with
             | [], _ -> 
               let mvar = {mva_name = varnames; mva_value = funbody} in
       	      (  types ,  mvar :: topvals )
-            | argnames, MBaseDecl varname ->
+            | args, MBaseDecl varname ->
                 let mvar = 
                   {
                     mva_name = varnames; 
-                    mva_value = {funbody with loc_val = MSimple_val (MFun_val (List.rev argnames, funbody))}
+                    mva_value = {funbody with 
+                                  loc_val = MSimple_val (
+                                              MFun_val ({argnames with loc_val = List.rev args}, 
+                                                         funbody))}
                   } in
       	      (  types ,  mvar :: topvals )
             | argnames, MTupDecl _ -> 
@@ -362,26 +374,27 @@ fields_decl:
 
 rev_fields_decl:
   | { [],[] }
-  | vars = rev_fields_decl; varname = WORD ; COLON; typename = toptypedecl ; COMMA
+  | vars = rev_fields_decl; varname = located(WORD) ; COLON; typename = toptypedecl ; COMMA
     { 
       let lst_field, lst_val = vars in
       {mtf_name = varname; mtf_type = typename; mtf_extend = None} :: lst_field, lst_val }
-  | vars = rev_fields_decl; EXTENDS; fieldname= modulVar; COMMA
+  | vars = rev_fields_decl; EXTENDS; fieldname= located(modulVar); COMMA
     { 
       let lst_field, lst_val = vars in
-      let fieldnameStr = ref_to_string fieldname in 
-      { mtf_name = String.concat "_" ["ext"; fieldnameStr]; 
-        mtf_type = (MRef_type fieldname);
+      let fieldnameStr = ref_to_string fieldname.loc_val in 
+      { mtf_name = {loc_val = (String.concat "_" ["ext"; fieldnameStr]); 
+                    loc_pos = fieldname.loc_pos};
+        mtf_type = (MRef_type fieldname.loc_val);
         mtf_extend = Some fieldnameStr;
       } :: lst_field, 
       lst_val 
     }
-  | vars = rev_fields_decl; EXTENDS; fieldname= modulVar; WITH; anofun = anonymousfun; COMMA
+  | vars = rev_fields_decl; EXTENDS; fieldname= located(modulVar); WITH; anofun = anonymousfun; COMMA
     { 
       let lst_field, lst_val = vars in
-      let fieldnameStr = ref_to_string fieldname in 
-      {mtf_name = String.concat "_" ["ext"; fieldnameStr]; 
-       mtf_type = (MRef_type fieldname);
+      let fieldnameStr = ref_to_string fieldname.loc_val in 
+      {mtf_name = {fieldname with loc_val = String.concat "_" ["ext"; fieldnameStr];} ;
+       mtf_type = (MRef_type fieldname.loc_val);
        mtf_extend = Some fieldnameStr
       } :: lst_field , 
      (String.concat "_" ["extfun"; fieldnameStr], anofun) ::lst_val }
@@ -510,16 +523,20 @@ leaf_expr:
 basic_expr:
   | res = leaf_expr 
     { res }
-  | LET ; binding_name = var_tuple_decl ; argnames = funargs_top ; AFFECTATION ; binding_value = located(topvarassign); IN ; OPEN_BRACKET; body = located(topvarassign); CLOSE_BRACKET;
+  | LET ; binding_name = var_tuple_decl ; argnames = located(funargs_top) ; AFFECTATION ; binding_value = located(topvarassign); IN ; OPEN_BRACKET; body = located(topvarassign); CLOSE_BRACKET;
     { 
      let open GenUtils in
       MBind_val {mbd_name = binding_name; 
                  mbd_value = 
-                    (match argnames with 
+                    (match argnames.loc_val with 
                       | [] -> binding_value
                       | lstargs -> 
                           { binding_value with 
-                            loc_val = MSimple_val (MFun_val (List.rev lstargs, binding_value))}); 
+                            loc_val = MSimple_val 
+                                      (MFun_val (
+                                        { argnames with loc_val = List.rev lstargs}, 
+                                          binding_value))
+                          }); 
                   mbd_body =  body;
                   }
     }
@@ -618,9 +635,10 @@ comp_expr :
     {MComp_val ({loc_val=LessOrEq;loc_pos=eq.loc_pos}, expr1, expr2) }
 
 anonymousfun: 
-  | OPEN_BRACKET; FUN; args = funargs_top; ARROW;   body = located(topvarassign); CLOSE_BRACKET; 
+  | OPEN_BRACKET; FUN; args = located(funargs_top); ARROW;   body = located(topvarassign); CLOSE_BRACKET; 
     { 
-    MSimple_val (MFun_val (List.rev args, body))
+    MSimple_val (MFun_val ({loc_val = List.rev args.loc_val; loc_pos = args.loc_pos}, 
+                            body))
     }
 
 

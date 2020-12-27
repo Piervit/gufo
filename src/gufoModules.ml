@@ -23,6 +23,7 @@ open GenUtils
 open Gufo.MCore
 open GufoParsed
 open Format
+open GufoParsedHelper
 
 
 exception GufoInvalidModule of string
@@ -84,7 +85,7 @@ let sysmodctype_to_ctype sysmodtyp =
                 (fun map sysmodfd -> 
                   IntMap.add sysmodfd.mosmf_intname
                   {
-                    motf_name = sysmodfd.mosmf_intname;
+                    motf_name = {loc_val = sysmodfd.mosmf_intname; loc_pos = dummy_position};
                     motf_type = sysmodfd.mosmf_type;
                     motf_debugname = sysmodfd.mosmf_name;
                   }
@@ -98,7 +99,7 @@ let sysmodctype_to_ctype sysmodtyp =
 let get_types_map modu = 
   IntMap.fold
     (fun k el map_toptypes  ->
-      IntMap.add el.mosmv_intname el.mosmv_type map_toptypes
+      IntMap.add el.mosmv_intname (el.mosmv_type, dummy_position) map_toptypes
     ) 
   modu.mosm_topvar
   IntMap.empty

@@ -26,7 +26,7 @@ open Sys
 open Array
 open Printf
 open GufoLocHelper
-
+open GufoParsedHelper
 
 let print_debug_arg2valMap arg2valMap = 
   debug_print "DUMPING arg2ValMap";
@@ -46,13 +46,13 @@ let rec unstack_args arg =
         (fun alreadylst arg -> 
           let newlst = unstack_args arg in
           List.append newlst alreadylst
-        ) [] arglst
+        ) [] arglst.loc_val
 
 (*for a funarg type, return the type unfolded list of arguments. *)
 let unstack_args_with_pos arg = 
   let rec unstack_args_with_pos_ arg pos  = 
     match arg with 
-      | MOBaseArg i -> [i, List.rev pos] , pos
+      | MOBaseArg i -> [i.loc_val, i.loc_pos, List.rev pos] , pos
       | MOTupleArg arglst ->
           let pos = 0::pos in
          List.fold_left 
@@ -61,7 +61,7 @@ let unstack_args_with_pos arg =
             let pos = top_pos+1 :: past_pos in
             let newlst,_ = unstack_args_with_pos_ arg pos in
             (List.append newlst alreadylst, pos)
-          ) ([], pos) arglst
+          ) ([], pos) arglst.loc_val
   in 
   let res , _pos = unstack_args_with_pos_ arg [] in res
 
@@ -415,11 +415,12 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
           MMap.compare val_compare a.loc_val b.loc_val
       
       | MOFun_val aaa, MOFun_val bbb -> 
+          let aaa, bbb = aaa.loc_val, bbb.loc_val in
           fun_compare (aaa.mofv_args_id, aaa.mofv_body) (bbb.mofv_args_id, bbb.mofv_body)
       | MOEmpty_val, MOEmpty_val -> 0
       | MOEmpty_val, _ -> 1 
       | _, MOEmpty_val -> -1
-      | _ , _ -> raise (TypeError "Bad type comparison")
+      | _ , _ -> raise_typeError "Bad type comparison" dummy_position
   
   and val_compare a b =
       match a.loc_val, b.loc_val with 
@@ -431,7 +432,7 @@ let play_cd cmd red_args shenv input_fd output_fd outerr_fd =
           mref_compare refa refb 
       | MOEnvRef_val (vara), MOEnvRef_val (varb) ->
           String.compare vara varb
-      | _ , _ -> raise (TypeError "Bad type comparison")
+      | _ , _ -> raise_typeError "Bad type comparison" b.loc_pos
   
   let compare a b = simple_val_compare a b
 
@@ -692,16 +693,16 @@ and systemvar_partial_interpretation ref sysmodulevar argslst =
   let anofun_args_id = List.init (sysfun_nb_args - (List.length argslst)) 
     (fun i -> box_loc (GufoParsedToOpt.get_fresh_int ()))
   in
-  let anofun_args = List.map (fun i -> MOBaseArg i.loc_val ) anofun_args_id
+  let anofun_args = box_loc(List.map (fun i -> MOBaseArg i) anofun_args_id)
   in
   let body_binding =
     let bd_name = 
       List.init (List.length argslst) 
-        (fun i -> GufoParsedToOpt.get_fresh_int ( ), [i])
+        (fun i -> GufoParsedToOpt.get_fresh_int ( ), dummy_position, [i])
     in
     let bd_value = box_loc(MOSimple_val (MOTuple_val (box_loc (argslst)))) in
     let bd_body = 
-      let args_from_binding = List.map (fun (i,_) -> box_loc i ) bd_name in
+      let args_from_binding = List.map (fun (i,_,_) -> box_loc i ) bd_name in
       let ref_args = 
         List.map 
           (fun i -> box_loc (MORef_val ({
@@ -729,7 +730,7 @@ and systemvar_partial_interpretation ref sysmodulevar argslst =
     mofv_args_id = anofun_args;
     mofv_body = anofun_body;
   } 
-  in box_loc (MOSimple_val (MOFun_val anofun))
+  in box_loc (MOSimple_val (MOFun_val (box_loc anofun)))
 
 
 (*apply a core module function *)
@@ -864,9 +865,9 @@ and apply_fun toplevel arg2valMap funval arglst =
       (fun (acc,pos) argval -> 
         let mofunarg = List.nth mofunarglst pos in
         match mofunarg, argval.loc_val with
-          | MOBaseArg i, _ -> (IntMap.add i (MOTop_val argval) acc, pos + 1)
+          | MOBaseArg i, _ -> (IntMap.add i.loc_val (MOTop_val argval) acc, pos + 1)
           | MOTupleArg mofunarglst, MOSimple_val (MOTuple_val tuplst) -> 
-              create_pointer acc mofunarglst tuplst.loc_val
+              create_pointer acc mofunarglst.loc_val tuplst.loc_val
           | MOTupleArg mofunarglst, _ -> assert false
       ) 
       (acc, 0) arglst
@@ -877,39 +878,41 @@ and apply_fun toplevel arg2valMap funval arglst =
       | cur_partial_arg ::partial_args -> 
         (match full_fun with
           | MOSimple_val(MOFun_val fv) ->
+            let fvv = fv.loc_val in
             let curfunarg, mofunarglst = 
-              List.hd fv.mofv_args_id, List.tl fv.mofv_args_id 
+              List.hd fvv.mofv_args_id.loc_val, List.tl fvv.mofv_args_id.loc_val
             in
             let body_binding = 
               {
                 mobd_name = unstack_args_with_pos curfunarg;
                 mobd_debugnames = IntMap.empty ; (*at this level, we don't care about debug*)
                 mobd_value= cur_partial_arg;
-                mobd_body= fv.mofv_body;
+                mobd_body= fvv.mofv_body;
               }
             in
-            let new_fv = {mofv_args_name = fv.mofv_args_name; 
-                          mofv_args_id = mofunarglst; 
+            let new_fv = {mofv_args_name = fvv.mofv_args_name; 
+                          mofv_args_id = box_loc(mofunarglst); 
                           mofv_body = box_loc (MOBind_val body_binding)} 
             in 
-              apply_partial_fun (MOSimple_val (MOFun_val new_fv)) partial_args
+              apply_partial_fun (MOSimple_val (MOFun_val {fv with loc_val = new_fv})) partial_args
           | _ -> assert false
         )
   in 
   match funval with 
     | MOSimple_val(MOFun_val fv) -> 
+      let fv = fv.loc_val in
       (*apply the code using arg2valMap when needed.*)
       (*we check if it is a partial application *)
-      (match (Stdlib.compare (List.length arglst) (List.length fv.mofv_args_id)) with
+      (match (Stdlib.compare (List.length arglst) (List.length fv.mofv_args_id.loc_val)) with
         | i when i < 0 -> 
             box_loc (apply_partial_fun funval arglst)
         | 0 -> 
-            let arg2valMap,_ = create_pointer arg2valMap fv.mofv_args_id arglst in
+            let arg2valMap,_ = create_pointer arg2valMap fv.mofv_args_id.loc_val arglst in
             apply_motype_val toplevel arg2valMap fv.mofv_body
         | _ ->  (*more argument than take the function*)
-              let pos = (List.length arglst) - (List.length fv.mofv_args_id) in
+              let pos = (List.length arglst) - (List.length fv.mofv_args_id.loc_val) in
                let arglst, nargs = list_split_at_idx arglst pos in
-               let narg2valMap,_ = create_pointer arg2valMap fv.mofv_args_id arglst in
+               let narg2valMap,_ = create_pointer arg2valMap fv.mofv_args_id.loc_val arglst in
                let funval = (apply_motype_val toplevel narg2valMap fv.mofv_body) in 
                apply_fun toplevel arg2valMap funval.loc_val nargs
       )
@@ -1325,7 +1328,7 @@ and apply_binding toplevel arg2valMap mbind =
   (*associate the resulting value tuple to the binding tuple*)
   let arg2valMap = 
   List.fold_left
-    (fun arg2valMap (id_bd, position) -> 
+    (fun arg2valMap (id_bd,pars_position, position) -> 
       IntMap.add id_bd (get_value_from_position position res_value) arg2valMap
     )
     arg2valMap mbind.mobd_name 

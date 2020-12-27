@@ -34,7 +34,7 @@ module MCore :
 sig
 
   type motype_field = {
-    motf_name : int;
+    motf_name : int located;
     motf_type: motype;
     motf_debugname : string;
   }
@@ -282,7 +282,7 @@ sig
  
   and mofun_val = {
     mofv_args_name : int StringMap.t; (*args name map (for debug + color)*) 
-    mofv_args_id : mofunarg list; 
+    mofv_args_id : mofunarg list located; 
     mofv_body : motype_val located;
     (*TODO: Should this have a type information?*)
   } 
@@ -295,12 +295,12 @@ sig
     | MOSome_val of motype_val located
     | MOSet_val of MSet.t located
     | MOMap_val of motype_val located MMap.t located
-    | MOFun_val of mofun_val
+    | MOFun_val of mofun_val located
     | MOEmpty_val
   
   and mofunarg = 
-    | MOBaseArg of int
-    | MOTupleArg of mofunarg list
+    | MOBaseArg of int located
+    | MOTupleArg of mofunarg list located
   
   (*
     This is the values of gufo optimized representation.
@@ -319,7 +319,7 @@ sig
   and mocomp_op = GufoParsed.mcomp_op
 
   and mobinding = {
-    mobd_name : (int * int list) list; (*for each element of the tuple,
+    mobd_name : (int * pars_position * int list) list; (*for each element of the tuple,
     give its unique id and code its position in the tuple with int list. 
     for exemple, if we just have "let $a = 4 in $a", mbd_name will be [x, []]
     with x its associated integer id.

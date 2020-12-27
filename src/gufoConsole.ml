@@ -305,6 +305,7 @@ let print_color_expr term expr optprog types =
     [ S word ; B_fg c_unknown]
   in
   let print_type typ word = 
+    let (typ,_pars_pos) = typ in
     (match typ with 
       | MOComposed_type _  -> 
           [ S word ; B_fg c_comp]
@@ -348,8 +349,8 @@ let print_color_expr term expr optprog types =
                   | None -> 
                       None
                   | Some id_var -> 
-                      let typ = IntMap.find id_var (IntMap.find 0 types) in
-                      Some typ
+                      let typ = IntMap.find id_var (IntMap.find 0 types) 
+                      in Some typ
                 )
           in
           let search_bind_var () = 
@@ -507,7 +508,11 @@ let analyse_and_print term cur_expr =
             in
             print_color_expr term cur_expr opt_prog types
           )
-          with | TypeError msg 
+          with | TypeError msg as e ->
+                  print_expr term cur_expr >>=
+                  (fun () -> print_err term cur_expr (Printexc.to_string e)) >>=
+                  (fun () -> print_err term cur_expr (Printexc.get_backtrace ()))
+
                | InternalError msg 
                | Sys_error msg  
                | VarError msg 
@@ -528,7 +533,7 @@ let analyse_and_print term cur_expr =
     with 
       | TypeError (reason) -> 
          print_expr term cur_expr >>=
-            (fun () -> print_err term cur_expr reason)
+            (fun () -> print_err term cur_expr reason.loc_val)
       | ParseError(fname, line_start, line_end, col_start, col_end , tok, reason) -> 
        print_expr term cur_expr >>=
          let err_msg = string_of_ParseError (fname, 
@@ -688,7 +693,8 @@ let first_line term shell_env (hist, hist_id) cur_expr =
         return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
     | None ->
         return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
-  ) with | TypeError _msg 
+  ) with | TypeError _msg ->
+             return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
        | InternalError _msg 
        | Sys_error _msg 
        | VarError _msg 
@@ -739,7 +745,10 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
         let expr = insert_newline cur_expr in
         print_expr term expr >>=
         (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
-  ) with | TypeError msg 
+  ) with | TypeError msg ->
+              print_err term cur_expr (sprintf "error found :%s\n" msg.loc_val )
+              >>=
+              (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
        | InternalError msg 
        | Sys_error msg 
        | VarError msg 
