@@ -1,6 +1,10 @@
 This file track potential bugs and issues of Gufo.
 Information here might be transfered to github issues.
 
+
+#### BUG 1 ####
+let $endTime = let $cmd = date "+%s" in ($Int.fromString ($cmd.Cmd.print)) in ( echo $endTime )
+
 #### BUG 8 ####
 
 This is not sure it is really a bug, but a strong interogation
@@ -33,9 +37,4 @@ let $f $a $b = $a + $b
 
 ($f 5) 6
 
-#### BUG 18 ####
-(priorité d'opérateur)
-
-1 + 1 ;; 3
-4
 
