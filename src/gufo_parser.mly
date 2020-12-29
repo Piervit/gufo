@@ -651,42 +651,42 @@ topvarassign :
 operation : 
   | OPEN_BRACKET; CLOSE_BRACKET;
     { MSimple_val (MEmpty_val) }
-  | i1 = located(top_expr); PLUS_STR; i2 = located(top_expr)
-    {MBasicFunBody_val (MConcatenation, [i1; i2])}
-  | i1 = located(top_expr); PLUS; i2 = located(top_expr)
-    {MBasicFunBody_val (MAddition, [i1; i2])}
-  | i1 = located(top_expr); PLUS_DOT; i2 = located(top_expr) 
-    {MBasicFunBody_val (MAdditionFloat, [i1; i2])}
-  | i1 = located(top_expr) ; MINUS ; i2 = located(top_expr)
-    {MBasicFunBody_val (MSoustraction, [i1; i2])}
-  | i1 = located(top_expr) ; MINUS_DOT ; i2 = located(top_expr)
-    {MBasicFunBody_val (MSoustractionFloat, [i1; i2])}
-  | i1 = located(top_expr) ; STAR ; i2 = located(top_expr)
-    {MBasicFunBody_val (MMultiplication, [i1; i2])}
-  | i1 = located(top_expr) ; STAR_DOT ; i2 = located(top_expr)
-    {MBasicFunBody_val (MMultiplicationFLoat, [i1; i2])}
-  | i1 = located(top_expr) ; DIVISION ; i2 = located(top_expr)
-    {MBasicFunBody_val (MDivision , [i1; i2])}
-  | i1 = located(top_expr) ; DIVISION_DOT ; i2 = located(top_expr)
-    {MBasicFunBody_val (MDivisionFloat , [i1; i2])}
-  | i1 = located(top_expr); MODULO ; i2 = located(top_expr)
-    {MBasicFunBody_val (MModulo, [i1; i2])}
-  | i1 = located(top_expr); MODULO_DOT ; i2 = located(top_expr)
-    {MBasicFunBody_val (MModuloFloat, [i1; i2])}
-  | i1 = located(top_expr); WITH ; i2 = located(top_expr)
-    {MBasicFunBody_val (MWithList, [i1; i2])}
-  | i1 = located(top_expr); WITH_SET ; i2 = located(top_expr)
-    {MBasicFunBody_val (MWithSet, [i1; i2])}
-  | i1 = located(top_expr); WITH_MAP ; i2 = located(top_expr)
-    {MBasicFunBody_val (MWithMap, [i1; i2])}
-  | i1 = located(top_expr); WITHOUT_SET ; i2 = located(top_expr)
-    {MBasicFunBody_val (MWithoutSet, [i1; i2])}
-  | i1 = located(top_expr); WITHOUT_MAP ; i2 = located(top_expr)
-    {MBasicFunBody_val (MWithoutMap, [i1; i2])}
-  | i1 = located(top_expr); SHAS ; i2 = located(top_expr)
-    {MBasicFunBody_val (MHasSet, [i1; i2])}
-  | i1 = located(top_expr); MHAS ; i2 = located(top_expr)
-    {MBasicFunBody_val (MHasMap, [i1; i2])}
+  | i1 = located(top_expr); op=located(PLUS_STR); i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MConcatenation; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr); op=located(PLUS); i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MAddition; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr); op=located(PLUS_DOT); i2 = located(top_expr) 
+    {MBasicFunBody_val ({loc_val= MAdditionFloat; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr) ; op=located(MINUS) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MSoustraction; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr) ; op=located(MINUS_DOT) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MSoustractionFloat; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr) ; op=located(STAR) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MMultiplication; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr) ; op=located(STAR_DOT) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MMultiplicationFLoat; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr) ; op=located(DIVISION) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MDivision ; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr) ; op=located(DIVISION_DOT) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MDivisionFloat ; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr); op=located(MODULO) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MModulo; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr); op=located(MODULO_DOT) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MModuloFloat; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr); op=located(WITH) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MWithList; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr); op=located(WITH_SET) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MWithSet; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr); op=located(WITH_MAP) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MWithMap; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr); op=located(WITHOUT_SET) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MWithoutSet; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr); op=located(WITHOUT_MAP) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MWithoutMap; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr); op=located(SHAS) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MHasSet; loc_pos=op.loc_pos}, [i1; i2])}
+  | i1 = located(top_expr); op=located(MHAS) ; i2 = located(top_expr)
+    {MBasicFunBody_val ({loc_val= MHasMap; loc_pos=op.loc_pos}, [i1; i2])}
   | assign1 = located(top_expr); DOUBLE_SEMICOLON ;assign2 = exprseqeassign; 
     { MBody_val (assign1 ::assign2)}
 
@@ -994,6 +994,6 @@ modulVarOrExpr:
 *)
 
 %inline located(X): x=X {
-  GufoParsedHelper.with_poss $startpos $endpos x
+  GufoParsedHelper.with_lexing_pos $startpos $endpos x
 }
 

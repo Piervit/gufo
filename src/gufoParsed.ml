@@ -39,7 +39,7 @@ and 'a located = {
     loc_pos : pars_position;
 }
 
-exception SyntaxError of string
+exception SyntaxError of string located
 exception TypeError of string located
 exception VarError of string
 exception ExecutionError of string
@@ -189,7 +189,7 @@ and mtype_val =
   | MSimple_val of msimple_type_val
   | MRef_val of mref_val located * mtype_val located list (*module, varname args*)
   | MEnvRef_val of string located (*environment variable*)
-  | MBasicFunBody_val of m_expr_operation * mtype_val located list
+  | MBasicFunBody_val of m_expr_operation located * mtype_val located list
   | MBind_val of mbinding
   | MIf_val of mtype_val located * mtype_val located * mtype_val located
   | MComp_val of mcomp_op located * mtype_val located * mtype_val located (* comp_op * left_expr * right_expr *)
@@ -531,7 +531,7 @@ and dump_mtype_val varval =
          print_string " in ";
          dump_mtype_val bd.mbd_body.loc_val
      | MBasicFunBody_val (fop, args) ->
-         (match fop with
+         (match fop.loc_val with
             | MConcatenation -> 
                 print_call "^" args
             | MAddition -> 

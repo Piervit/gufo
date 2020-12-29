@@ -119,11 +119,6 @@ let rewrite_arg shenv arg =
         let completions_files = 
         Array.fold_left
           (fun completions_files file -> 
-(*
-            match (GenUtils.compare_first_chars file_part file &&
-                   GenUtils.compare_last_chars after_file_part file
-                  )
-*)
             match (check_star_pattern file (file_part ^"*" ^ after_file_part)) 
             with
               | true -> 
@@ -1215,7 +1210,7 @@ and apply_basic_fun toplevel arg2valMap op arga argb =
   
   (*TODO: improve perf *)
   (*TODO: replace assert false by runtime exception*)
-  match op, reduced_arga.loc_val, reduced_argb.loc_val with 
+  match op.loc_val, reduced_arga.loc_val, reduced_argb.loc_val with 
             (** Concatenation **)
   | MConcatenation , MOSimple_val (MOBase_val (MOTypeStringVal a)),
     MOSimple_val (MOBase_val (MOTypeStringVal b)) -> 

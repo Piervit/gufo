@@ -406,7 +406,7 @@ and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb =
 
   in
   let typ,locScope = 
-    match op with 
+    match op.loc_val with 
     | MConcatenation ->
         let expectedType = Some (MOBase_type MTypeString) in
         for_basic_op expectedType arga argb
@@ -1830,11 +1830,6 @@ and type_check_val fulloptiprog optiprog typScope v =
     | MOEnvRef_val (_) -> 
       true
     | MOBasicFunBody_val (op, a, b) -> 
-(*
-        let typ =  determine_type_basic_fun fulloptiprog optiprog progScope None op a b in
-        let _typa,_ = determine_type fulloptiprog optiprog progScope None a in
-        let _typb,_ = determine_type fulloptiprog optiprog progScope None b in
-*)
         (type_check_val fulloptiprog optiprog typScope a) && (type_check_val fulloptiprog optiprog typScope b)
     | MOBind_val bd ->
         type_check_val fulloptiprog optiprog typScope bd.mobd_value && type_check_val fulloptiprog optiprog typScope bd.mobd_body
@@ -2452,7 +2447,7 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
             |  [a;b] -> 
                 MOBasicFunBody_val (op, parsedToOpt_expr ~topvar optiprog locScope a, 
                                         parsedToOpt_expr ~topvar optiprog locScope b)
-            |  _ -> raise (SyntaxError "basic operators (+,-,/,mod...) are binary.")
+            |  _ -> raise_syntaxError "basic operators (+,-,/,mod...) are binary." op.loc_pos
             )
         | MBind_val bd -> 
             MOBind_val (parsedToOpt_binding ~topvar optiprog locScope bd)
@@ -3132,7 +3127,7 @@ function we used it to not lost informations. *)
           type_check_val_to_top fulloptiprog optiprog modi arga var_types in
         let var_types, typArgb = 
           type_check_val_to_top fulloptiprog optiprog modi argb var_types in
-        var_types, determine_refine_type varval.loc_pos typArga.loc_val typArgb .loc_val
+        var_types, determine_refine_type arga.loc_pos typArga.loc_val typArgb.loc_val
     | MOBind_val bd -> 
       let var_types, bdval_typ = type_check_val_to_top fulloptiprog optiprog modi bd.mobd_value var_types in
       let var_types, bdbody_typ = type_check_val_to_top fulloptiprog optiprog modi bd.mobd_body var_types 

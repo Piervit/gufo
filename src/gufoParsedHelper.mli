@@ -27,7 +27,7 @@ open GufoParsed
 val on_located : ('a -> 'b) -> 'a located -> 'b
 
 val with_pos : pars_position -> 'a -> 'a located
-val with_poss : Lexing.position -> Lexing.position -> 'a -> 'a located
+val with_lexing_pos : Lexing.position -> Lexing.position -> 'a -> 'a located
 
 val dummy_lexing_position : Lexing.position
 val dummy_position : pars_position
@@ -48,6 +48,7 @@ val string_of_position : pars_position -> string
 
 (*raise a type error exception*)
 val raise_typeError : string -> GufoParsed.pars_position -> 'a
+val raise_syntaxError : string -> GufoParsed.pars_position -> 'a
 
 val compare_positions : pars_position -> pars_position -> int
 

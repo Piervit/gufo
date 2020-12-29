@@ -44,7 +44,7 @@ let dummy_position = {
     ppos_end = dummy_lexing_position;
   }
 
-let with_poss p1 p2 v =
+let with_lexing_pos p1 p2 v =
   with_pos { ppos_start = p1; ppos_end = p2 } v
 
 let start_of_position p = p.ppos_start
@@ -105,6 +105,12 @@ let raise_typeError msg pos =
   let msg = Printf.sprintf "%s Position: %s" msg 
             (string_of_position pos) in
   raise (TypeError {loc_val = msg ; loc_pos = pos})
+
+let raise_syntaxError msg pos = 
+  let msg = Printf.sprintf "%s Position: %s" msg 
+            (string_of_position pos) in
+  raise (SyntaxError {loc_val = msg ; loc_pos = pos})
+
 
 
 

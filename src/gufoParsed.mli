@@ -36,7 +36,7 @@ and 'a located = {
     loc_pos : pars_position;
 }
 
-exception SyntaxError of string
+exception SyntaxError of string located
 exception TypeError of string located
 exception ExecutionError of string
 exception VarError of string
@@ -195,7 +195,7 @@ and mtype_val =
   | MSimple_val of msimple_type_val
   | MRef_val of mref_val located * mtype_val located list (*module, varname args*)
   | MEnvRef_val of string located (*environment variable*)
-  | MBasicFunBody_val of m_expr_operation * mtype_val located list
+  | MBasicFunBody_val of m_expr_operation located * mtype_val located list
   | MBind_val of mbinding
   | MIf_val of mtype_val located * mtype_val located * mtype_val located
   | MComp_val of mcomp_op located * mtype_val located * mtype_val located (* comp_op * left_expr * right_expr *)

@@ -161,8 +161,8 @@ struct
         | MIComposed_val of micomposed_type_val
         | MIRef_val of miref_val * mitype_val located list 
         | MIEnvRef_val of string
-        | MIBasicFunBody_val of mi_expr_operation * mitype_val located 
-                                                  * mitype_val located
+        | MIBasicFunBody_val of mi_expr_operation located * mitype_val located 
+                                                          * mitype_val located
         | MIBind_val of mibinding
         | MIIf_val of mitype_val located * mitype_val located * mitype_val located
         | MIComp_val of micomp_op located * mitype_val located * mitype_val located
@@ -391,7 +391,7 @@ struct
                 )
         in
 
-        match opa, opb with 
+        match opa.loc_val, opb.loc_val with 
           | MConcatenation, MConcatenation
           | MAddition, MAddition 
           | MAdditionFloat, MAdditionFloat
@@ -750,7 +750,7 @@ struct
     | MOComposed_val of mocomposed_type_val
     | MORef_val of moref_val * motype_val located list 
     | MOEnvRef_val of string
-    | MOBasicFunBody_val of mo_expr_operation * motype_val located * motype_val located
+    | MOBasicFunBody_val of mo_expr_operation located * motype_val located * motype_val located
     | MOBind_val of mobinding
     | MOIf_val of motype_val located * motype_val located * motype_val located
     | MOComp_val of mocomp_op located * motype_val located * motype_val located
@@ -1550,7 +1550,7 @@ struct
         | MOBasicFunBody_val (op, arga, argb) -> 
             let symbol = 
             (
-              match op with
+              match op.loc_val with
                 | MConcatenation -> "^"
                 | MAddition -> "+"
                 | MAdditionFloat -> ".+"

@@ -297,6 +297,24 @@ let print_expr term expr =
   (fun () -> LTerm.fprints term (eval [B_fg c_unknown; R (Zed_edit.text (Zed_edit.edit expr))]))  >>=
   (fun () -> place_cursor_after_print term expr) 
 
+(*The basic printing: no color, except for error position. *)
+let print_expr_with_err term expr error_pos = 
+  (*We divide expr in 3 part:
+    - the first "valid part"
+    - the "error higlighted" part
+    - the last "valid part".
+  *)
+  let error_start = error_pos.ppos_start.pos_cnum in
+  let error_end = error_pos.ppos_end.pos_cnum in
+  let full_expr = (Zed_edit.text (Zed_edit.edit expr)) in 
+  let expr_before = Zed_rope.sub full_expr 0 error_start in
+  let expr_err= Zed_rope.sub full_expr error_start (error_end - error_start)  in
+  let expr_after= Zed_rope.sub full_expr error_end ((Zed_rope.length full_expr) - error_end) in
+  print_prefix term  >>=
+  (fun () -> LTerm.fprints term (eval [B_fg c_unknown; R expr_before;B_fg c_error; R expr_err; B_fg c_unknown; R expr_after]))  >>=
+  (fun () -> place_cursor_after_print term expr) 
+
+
 
 
 (*The advanced color printing *)
@@ -508,15 +526,15 @@ let analyse_and_print term cur_expr =
             in
             print_color_expr term cur_expr opt_prog types
           )
-          with | TypeError msg as e ->
-                  print_expr term cur_expr >>=
-                  (fun () -> print_err term cur_expr (Printexc.to_string e)) >>=
+          with | TypeError msg
+               | SyntaxError msg ->
+                  print_expr_with_err term cur_expr msg.loc_pos >>=
+                  (fun () -> print_err term cur_expr msg.loc_val) >>=
                   (fun () -> print_err term cur_expr (Printexc.get_backtrace ()))
 
                | InternalError msg 
                | Sys_error msg  
-               | VarError msg 
-               | SyntaxError msg as e ->
+               | VarError msg as e ->
                   print_expr term cur_expr >>=
                   (fun () -> print_err term cur_expr (Printexc.to_string e)) >>=
                   (fun () -> print_err term cur_expr (Printexc.get_backtrace ()))
@@ -531,8 +549,9 @@ let analyse_and_print term cur_expr =
           print_expr term cur_expr
     )
     with 
-      | TypeError (reason) -> 
-         print_expr term cur_expr >>=
+      | TypeError (reason) 
+      | SyntaxError (reason) -> 
+         print_expr_with_err term cur_expr reason.loc_pos >>=
             (fun () -> print_err term cur_expr reason.loc_val)
       | ParseError(fname, line_start, line_end, col_start, col_end , tok, reason) -> 
        print_expr term cur_expr >>=
@@ -693,12 +712,13 @@ let first_line term shell_env (hist, hist_id) cur_expr =
         return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
     | None ->
         return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
-  ) with | TypeError _msg ->
+  ) with 
+       | TypeError _msg 
+       | SyntaxError _msg ->
              return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
        | InternalError _msg 
        | Sys_error _msg 
-       | VarError _msg 
-       | SyntaxError _msg ->
+       | VarError _msg ->
               return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
        | ParseError (_fname, _line_start, _line_end, _col_start, _col_end, _tok, _reason) ->
               return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
@@ -745,14 +765,15 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
         let expr = insert_newline cur_expr in
         print_expr term expr >>=
         (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
-  ) with | TypeError msg ->
+  ) with 
+       | TypeError msg 
+       | SyntaxError msg ->
               print_err term cur_expr (sprintf "error found :%s\n" msg.loc_val )
               >>=
               (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
        | InternalError msg 
        | Sys_error msg 
-       | VarError msg 
-       | SyntaxError msg ->
+       | VarError msg ->
               print_err term cur_expr (sprintf "error found :%s\n" msg )
               >>=
               (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
@@ -905,15 +926,16 @@ let completion term shell_env hist cur_expr =
 let handle_key_event term shell_env hist cur_expr akey = 
   try
     (match akey.LTerm_key.code with
-     | Char uchar when ((UChar.uint_code uchar) = 0x0068  && akey.LTerm_key.control)
-    (*It looks some conventions allows CTRL-H to del char, and some GUI Terms
+     | Char uchar when ((UChar.uint_code uchar) = 0x0068  && akey.LTerm_key.control) 
+    (* CTRL + H
+     * It looks some conventions allows CTRL-H to del char, and some GUI Terms
      * remap backspace to CTRL-H...
      * https://github.com/diml/lambda-term/issues/57
      * *)
         -> delete term shell_env hist cur_expr 
     | Char uchar when ((UChar.uint_code uchar) = 0x0020) && 
           (akey.LTerm_key.control)
-          ->
+          -> (*CTRL + SPACE : enable multiline mode.*)
         (multiline_expr term shell_env hist cur_expr)
     | Char uchar when ((UChar.uint_code uchar) = 0x0072) &&  (*CTRL-R*)
           (akey.LTerm_key.control)

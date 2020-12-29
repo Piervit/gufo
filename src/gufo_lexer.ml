@@ -139,13 +139,7 @@ let rec read_ lexbuf =
    | '}'                 -> Gufo_parser.CLOSE_BRACE  
    | ','                 -> Gufo_parser.COMMA  
    | '"'                 ->
-                           (try 
                            read_string (Buffer.create 17) lexbuf 
-                           with 
-                            | SyntaxError msg ->
-                            raise_ParseErrorWithMsg lexbuf msg
-                            | _ -> raise_ParseError lexbuf
-                           )
    | varname             -> Gufo_parser.VARNAME (Sedlexing.Utf8.lexeme lexbuf)
    | envvar              -> Gufo_parser.ENVVAR (Sedlexing.Utf8.lexeme lexbuf)
 
@@ -174,8 +168,14 @@ and read_string inBuf genBuf =
   | Sub (any,('"' | '\\') ) ->
     Buffer.add_string inBuf (Sedlexing.Utf8.lexeme genBuf);
     read_string inBuf genBuf
-  | eof ->  raise (SyntaxError "String is not terminated")
-  | _ -> raise (SyntaxError ("Illegal string character: " ^ Sedlexing.Utf8.lexeme genBuf))
+  | eof ->  
+      let lex_pos_start, lex_pos_end = (Sedlexing.lexing_positions genBuf) in
+      raise (SyntaxError (GufoParsedHelper.with_lexing_pos  lex_pos_start lex_pos_end 
+              "String is not terminated" ) )
+  | _ -> 
+      let lex_pos_start, lex_pos_end = (Sedlexing.lexing_positions genBuf) in
+      raise (SyntaxError (GufoParsedHelper.with_lexing_pos lex_pos_start lex_pos_end 
+              ("Illegal string character: " ^ Sedlexing.Utf8.lexeme genBuf)))
 
 
 let read lexbuf =
