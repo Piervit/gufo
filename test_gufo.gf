@@ -46,43 +46,22 @@ let $run_valid_tests_ $cur_test $file =
       )
     )
 
-#let $run_error_tests_ $cur_test $file = 
-#  #function validing (or invaliding the result of a test)
-#  #we want to check that gufo raised an error but also that this error occured
-#  #before the gufoEngine part.
-#  let $error_test $cmd = 
-#      if ($cmd.Cmd.res == (Some 0))
-#      then (echo ($cmd.Cmd.print) ; echo "FAILED(should have been invalid)"; exit)
-#      else (
-#        $cmd.Cmd.print_err
-#        (echo $cmd.Cmd.print; echo "SUCCESS(invalid as expected)\n" ) 
-#        )
-#  in (
-#    if ($cur_test  == 1 )
-#    then (
-#      #termination case: last file
-#      let $cmd = $run_test 1 $file in
-#      ($error_test $cmd)
-#     )
-#    else(
-#      #recursive case: still file to valid
-#      let $prevcmd = $run_test $cur_test $file in (
-#      ($error_test $prevcmd) ;; ($run_valid_tests_ ($cur_test - 1) $file ))
-#      )
-#    )
-
-
-
-
-  
 let $run_valid_tests $file =
   $run_valid_tests_ ($nb_exemples $file) $file 
 
 **START**
 
+let $starttime = 
+  let $cmd = (date "+%s") in (
+    $Int.fromString $cmd.Cmd.print ) 
+in (
 
 #$run_test 2
 ($run_valid_tests "tests/basic_affectations.gf") ;;
 ($run_valid_tests "tests/valid_exprs.gf") ;;
 ($run_valid_tests "tests/valid_commands.gf") ;;
-($run_valid_tests "tests/basic_operation.gf")
+($run_valid_tests "tests/basic_operation.gf") ;;
+
+(let $endtime = let $cmd = (date "+%s") in ($Int.fromString $cmd.Cmd.print) in (
+echo "duration" ($Int.toString (($Opt.force $endtime) - ($Opt.force $starttime)))
+)))
