@@ -294,11 +294,11 @@ let rec add_in_scope ref_vname typ locScope =
   let id_ref,fds = ref_vname in 
   let id_ref, pos = id_ref.loc_val, id_ref.loc_pos in
   match fds, IntMap.find_opt id_ref locScope with
-    | [], None -> IntMap.add id_ref (typ, pos) locScope
+    | [], None -> typ, IntMap.add id_ref (typ, pos) locScope
     | [], Some (atyp,_pos) -> 
-        IntMap.add id_ref 
-          (determine_refine_type ~id_var:(Some id_ref) pos typ atyp, pos) locScope
-    | _,_ -> locScope
+        let rtype, pars_pos = (determine_refine_type ~id_var:(Some id_ref) pos typ atyp, pos) in
+        rtype, IntMap.add id_ref (rtype, pars_pos) locScope
+    | _,_ -> typ, locScope 
 
 and determine_type_cmdseq fulloptiprog optiprog locScope cmdseq = 
   let determine_type_stringOrRef locScope sor =
@@ -547,7 +547,7 @@ and determine_type_ref_function_call fulloptiprog optiprog const locScope
   
   debug_print (sprintf "determine_type_ref_function_call ending with type : '%s' \n"  (type_to_string expr_typ));
 
-  let locScope = add_in_scope ref.morv_varname typ_ref locScope in
+  let expr_typ, locScope = add_in_scope ref.morv_varname expr_typ locScope in
   expr_typ, locScope
   )
 
@@ -611,23 +611,15 @@ and determine_type_ref fulloptiprog optiprog locScope ref =
                | Some (v, _pars_pos) -> v
              )
           | Some i -> 
-(*                    MOAll_type (get_fresh_int()) *)
                    (match ref.morv_index with
                      | None -> MORef_type (Some i, varname, 0, [] )
-                     | Some idx -> MORef_type (Some i, varname, List.length idx, [] )
+                     | Some idx -> 
+                        MORef_type (Some i, varname, List.length idx, [] )
                    )
         )
       | lst_fields -> 
           determine_with_fields lst_fields ref.morv_index
   in 
-(*
-  let varname_typ = 
-    match fields with 
-      | [] -> typ 
-      | firstfd::lst_fields -> 
-          get_ownertype_from_field fulloptiprog optiprog firstfd
-  in
-   typ, add_in_scope varname varname_typ locScope  *)
    typ, locScope 
 
 and precise_with_args ref_typ args_typ =
@@ -932,12 +924,16 @@ and determine_type fulloptiprog optiprog locScope const e =
             | [] -> 
                 (match const with
                   | None -> 
-                      determine_ref_with_index ref typ_ref, 
-                      add_in_scope ref.morv_varname typ_ref locScope
+                      let typ_ref = determine_ref_with_index ref typ_ref in
+                      let typ_ref, locScope = add_in_scope ref.morv_varname typ_ref locScope in
+                      (typ_ref, locScope)
+                    
                   | Some const ->
                       let refined_typ = determine_refine_type ref_pos const typ_ref in
-                      determine_ref_with_index ref refined_typ, 
-                      add_in_scope ref.morv_varname refined_typ locScope
+                      let refined_typ = determine_ref_with_index ref refined_typ  in
+                      let refined_typ, locScope = add_in_scope ref.morv_varname refined_typ locScope in
+                      refined_typ, locScope
+                    
                 )
             | args -> 
                 determine_type_ref_function_call fulloptiprog optiprog const locScope 
@@ -1073,7 +1069,7 @@ let top_level_types_no_ref var_types past_var_map =
           (match ref_typ with 
             | MOFun_type ([refarg], refret) ->
                 let bd_alltype, _ = refine_bd_alltype  epos typ refarg bd_alltype in
-                apply epos refret args_typ bd_alltype
+                apply epos refret [] bd_alltype
             | MOFun_type (refarg:: refargs , refret) ->
                 let bd_alltype, _  = refine_bd_alltype  epos refarg typ bd_alltype in
                 apply epos (MOFun_type (refargs, refret)) args_typ bd_alltype
@@ -1832,6 +1828,12 @@ and type_check_val fulloptiprog optiprog typScope v =
     | MOBasicFunBody_val (op, a, b) -> 
         (type_check_val fulloptiprog optiprog typScope a) && (type_check_val fulloptiprog optiprog typScope b)
     | MOBind_val bd ->
+        (match bd.mobd_name with
+          | [(id,pars_pos,pos)] ->
+              let const, _ = (IntMap.find id progScope) in
+              let typ,_ = determine_type fulloptiprog optiprog progScope (Some const) bd.mobd_value  in typ
+          | _ -> assert false (*TODO*) 
+        );
         type_check_val fulloptiprog optiprog typScope bd.mobd_value && type_check_val fulloptiprog optiprog typScope bd.mobd_body
     | MOIf_val (cond, thn, els) ->
         let _typ = type_check_has_type fulloptiprog optiprog typScope (MOBase_type MTypeBool) cond in

@@ -73,27 +73,33 @@ let main () =
      ("--help", Arg.Set help, " Print help and exit. ");
     ]
   in
-  let usage_msg = "usage: gufo [option] ... [file]\nIf called without file, will be set to run in interactive mode, else will execute the file.\nList of options:" in 
-  Arg.parse speclist (fun afile-> prog := Some afile; print_endline "" ) usage_msg;
-  (match !full_verbose with
-    | true -> init_backtrace (); GufoConfig.set_debug GufoConfig.DBG_FULL
-    | false -> match !verbose with
-                | true -> GufoConfig.set_debug GufoConfig.DBG_INFO
-                | _ -> GufoConfig.set_debug GufoConfig.DBG_NO_DEBUG
-  );
-  match !help with
-    | true -> 
-      Printf.printf "%s" (Arg.usage_string speclist usage_msg)
-    | false -> 
-        (match !prog with
-          | Some prog -> 
-            let parsedProg = parse_program prog in
-            let opt_prog,_ = GufoParsedToOpt.parsedToOpt parsedProg in
-            let shell_env = Gufo.MCore.get_env (Sys.getcwd ()) in
-            let red_prog, shell_env = (GufoEngine.exec opt_prog shell_env) in
-            printf "%s\n" (Gufo.MCore.moval_to_string red_prog.mofp_mainprog.mopg_topcal.loc_val)
-          | None -> 
-            GufoConsole.run ()
-        );;
+  try
+    let usage_msg = "usage: gufo [option] ... [file]\nIf called without file, will be set to run in interactive mode, else will execute the file.\nList of options:" in 
+    Arg.parse speclist (fun afile-> prog := Some afile; print_endline "" ) usage_msg;
+    (match !full_verbose with
+      | true -> init_backtrace (); GufoConfig.set_debug GufoConfig.DBG_FULL
+      | false -> match !verbose with
+                  | true -> GufoConfig.set_debug GufoConfig.DBG_INFO
+                  | _ -> GufoConfig.set_debug GufoConfig.DBG_NO_DEBUG
+    );
+    match !help with
+      | true -> 
+        Printf.printf "%s" (Arg.usage_string speclist usage_msg)
+      | false -> 
+          (match !prog with
+            | Some prog -> 
+              let parsedProg = parse_program prog in
+              let opt_prog,_ = GufoParsedToOpt.parsedToOpt parsedProg in
+              let shell_env = Gufo.MCore.get_env (Sys.getcwd ()) in
+              let red_prog, shell_env = (GufoEngine.exec opt_prog shell_env) in
+              printf "%s\n" (Gufo.MCore.moval_to_string red_prog.mofp_mainprog.mopg_topcal.loc_val)
+            | None -> 
+              GufoConsole.run ()
+          )
+  with 
+(*     | TypeError e  *)
+    | SyntaxError e ->
+        printf "%s\n" e.loc_val
+  ;;
 
 main ()
