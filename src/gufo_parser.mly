@@ -197,7 +197,7 @@ shell:
             mpg_topcal = {
                            loc_pos = GufoParsedHelper.dummy_position ; 
                            loc_val = MSimple_val(MEmpty_val);
-                         }
+                         };
            }
     }
     |  main_expr = located(topvarassign); EOF
@@ -374,7 +374,7 @@ fields_decl:
 
 rev_fields_decl:
   | { [],[] }
-  | vars = rev_fields_decl; varname = located(WORD) ; COLON; typename = toptypedecl ; COMMA
+  | vars = rev_fields_decl; varname = located(WORD) ; COLON; typename = located(toptypedecl) ; COMMA
     { 
       let lst_field, lst_val = vars in
       {mtf_name = varname; mtf_type = typename; mtf_extend = None} :: lst_field, lst_val }
@@ -384,7 +384,7 @@ rev_fields_decl:
       let fieldnameStr = ref_to_string fieldname.loc_val in 
       { mtf_name = {loc_val = (String.concat "_" ["ext"; fieldnameStr]); 
                     loc_pos = fieldname.loc_pos};
-        mtf_type = (MRef_type fieldname.loc_val);
+        mtf_type = {fieldname with loc_val = (MRef_type fieldname.loc_val)};
         mtf_extend = Some fieldnameStr;
       } :: lst_field, 
       lst_val 
@@ -394,11 +394,12 @@ rev_fields_decl:
       let lst_field, lst_val = vars in
       let fieldnameStr = ref_to_string fieldname.loc_val in 
       {mtf_name = {fieldname with loc_val = String.concat "_" ["ext"; fieldnameStr];} ;
-       mtf_type = (MRef_type fieldname.loc_val);
+       mtf_type = {fieldname with loc_val = (MRef_type fieldname.loc_val)};
        mtf_extend = Some fieldnameStr
       } :: lst_field , 
      (String.concat "_" ["extfun"; fieldnameStr], anofun) ::lst_val }
   ;
+
 
 toptypedecl:
   | ft = FREETYPE;
@@ -423,8 +424,8 @@ toptypedecl:
       MFun_type (args, ret_type) }
   | name = modulVar
     { MRef_type name }
-  | first_tupel = typedecl ; DOUBLE_MINUS; tupel_suite= typetupelseq;
-    { MTuple_type (first_tupel:: tupel_suite)}
+  | first_el = typedecl; DOUBLE_MINUS; tupel_suite= typetupelseq;
+    { (MTuple_type (first_el :: tupel_suite))} 
   | tdec = typedecl; OPTIONTYPE; 
     {MOption_type tdec}
   | tdec = typedecl ;SETTYPE
@@ -432,25 +433,31 @@ toptypedecl:
   | OPEN_BRACKET; tdec = typedecl; COMMA; tdec2 = typedecl; CLOSE_BRACKET ;MAPTYPE
     { MMap_type (tdec, tdec2)}
 
+typetupelseq :
+  | el = typedecl;
+    { [el] }
+  | el = typedecl; DOUBLE_MINUS; seq = typetupelseq
+    { el:: seq }
+
 
 typedecl:
-  | ft = FREETYPE;
-    {MAll_type ft }
-  | STRINGTYPE
-    { MBase_type MTypeString }
-  | INTTYPE
-    { MBase_type MTypeInt }
-  | FLOATTYPE
-    { MBase_type MTypeFloat }
-  | BOOLTYPE
-    { MBase_type MTypeBool }
-  | CMDTYPE
-    { MBase_type MTypeCmd }
-  | internal_type = typedecl; LISTTYPE
-    { MList_type internal_type }
-  | name = modulVar
-    {MRef_type name}
-  | OPEN_BRACKET; typ = toptypedecl ; CLOSE_BRACKET;
+  | ft = located(FREETYPE);
+    { {ft with loc_val = MAll_type ft.loc_val; } }
+  | td = located (STRINGTYPE);
+    { {td with loc_val= MBase_type MTypeString }}
+  | td = located(INTTYPE)
+    { {td with loc_val= MBase_type MTypeInt}}
+  | td = located(FLOATTYPE)
+    { {td with loc_val= MBase_type MTypeFloat}}
+  | td = located(BOOLTYPE)
+    { {td with loc_val= MBase_type MTypeBool}}
+  | td = located(CMDTYPE)
+    { {td with loc_val= MBase_type MTypeCmd}}
+  | internal_type = typedecl; td = located(LISTTYPE)
+    { {td with loc_val = (MList_type internal_type)} }
+  | name = located(modulVar)
+    { {name with loc_val = MRef_type name.loc_val ;} }
+  | OPEN_BRACKET; typ = located(toptypedecl) ; CLOSE_BRACKET;
     { typ }
   ;
 
@@ -460,17 +467,11 @@ funargdecl:
   ; 
 
 rev_funarinnergdecl:
-  | arg_type = typedecl ; 
+  | arg_type = typedecl; 
     {[ arg_type ] }
   | arg_type = typedecl ; ARROW ; args= rev_funarinnergdecl;
     {arg_type :: args }
   ;
-
-typetupelseq :
-  | el = typedecl;
-    { [el] }
-  | el = typedecl; DOUBLE_MINUS; seq = typetupelseq
-    { el:: seq }
 
 
 leaf_expr: 

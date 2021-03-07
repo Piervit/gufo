@@ -124,11 +124,13 @@ let topvars =
       mosmv_description = "Split each line of the given string into a list.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOFun_type
-        ([
-         MOBase_type (MTypeString); ], 
-         MOList_type (MOBase_type (MTypeString)))
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([
+           MOCBase_type (MTypeString); ], 
+           MOCList_type (MOCBase_type (MTypeString)))
+          )
+          "String.split"
         ;
       mosmv_action= split;
     };
@@ -138,13 +140,15 @@ let topvars =
       mosmv_description = "contains str substr: Return true if substr is contained within str. Else return false.";
       mosmv_intname = 2;
       mosmv_type = 
-        MOFun_type
-        ([
-         MOBase_type (MTypeString); 
-         MOBase_type (MTypeString); 
-         ], 
-         MOBase_type (MTypeBool))
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([
+           MOCBase_type (MTypeString); 
+           MOCBase_type (MTypeString); 
+           ], 
+           MOCBase_type (MTypeBool))
+          )
+          "String.contains"
         ;
       mosmv_action= contains;
     };

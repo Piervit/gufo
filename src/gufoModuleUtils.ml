@@ -93,7 +93,7 @@ let getModuleNameFromPath path =
   filename_to_module last_file
 
 let getNbArgsFromCoreFunction sysmodVar =
-  match sysmodVar.mosmv_type with
+  match sysmodVar.mosmv_type.loc_val with
     | MOFun_type (args, ret) ->
         List.length args
     | _ -> 0

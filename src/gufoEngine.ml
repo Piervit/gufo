@@ -731,7 +731,7 @@ and systemvar_partial_interpretation ref sysmodulevar argslst =
 (*apply a core module function *)
 and apply_core_fun ref msymodule fname arg2valMap msysmodvar argslst = 
   let expected_args = 
-    match msysmodvar.mosmv_type with
+    match msysmodvar.mosmv_type.loc_val with
       | MOFun_type(argstyp, retyp) -> argstyp
       | _ -> assert false
   in
@@ -1403,7 +1403,8 @@ and apply_motype_val toplevel arg2valMap aval =
     | MOComposed_val mct -> apply_composed_type toplevel arg2valMap mct 
     | MORef_val (ref, argslst) ->
       (match ref.morv_module with 
-        | None -> 
+        | None  
+        | Some 0 -> 
             let funvar = 
               (match ref.morv_index with
                 | None -> 

@@ -106,6 +106,7 @@ let raise_varError msg pos =
 (** transformation from gufoParsed to gufo.core **)
 
 let fresh_int = ref 1
+(*get_fresh_int is used to identify uniquely variable.*)
 let get_fresh_int () = 
   fresh_int:= (!fresh_int + 1); !fresh_int
 
@@ -151,20 +152,30 @@ let search_modules mprogram =
   let module2int = fold_over_mref_val add_module_from_mref module2int mprogram.mpg_topcal.loc_val
   in module2int
 
-  (* PART 3: FULL TYPE CHECKING *)
-  (* We will have 3 parts in the type checking part:
-    * - determine_type_* : is the main folding in the whole code, it try to
-    *    dive in the code to give type to the result of topval. From the value
-    *    it determines a type.
-    * - constraint_type: is called by determine_type after the dive occured, it
-    *   worries about the operation in the other direction: from a type, we
-    *   precise the element of the expression. 
-    * - refine_type_* is about precising type from 2 expression which should
-    * match the same type.
-    *
-    * *)
+  (* PART 3: TYPE DETERMINATION *)
+
+(*Add a constraint to the constraint set.*)
+let rec add_constraints id typs constraint_map = 
+  let typsAsSet = (TypeSet.of_list typs) in
+  match (IntMap.find_opt id constraint_map) with
+    | None -> IntMap.add id typsAsSet constraint_map
+    | Some constSet -> IntMap.add id (TypeSet.union typsAsSet constSet) constraint_map
 
 
+(*See the comment of the box_val function. 
+  At some stage, we box values within variables to be sure to register every
+  constraints we need.
+  This extract_boxed_value function, return the variable id the boxed value.
+*)
+and extract_boxed_value boxed_val =
+  match boxed_val.loc_val with
+    | MOBind_val bd_val ->
+        (*Boxed value should not contains tuple, so we can just take the first
+        element.*)
+        let id,_loc_pos,_  = List.hd (bd_val.mobd_name) in 
+        let aval = bd_val.mobd_value in
+        id,aval
+    | _ -> raise (InternalError (sprintf "Gufo type checker internal erreur."))
 
 (*fonction retrieving the type of the element of a tuple according to its position.
  * tupl_typ is the general type of the tuple while position is the position of the element.*)
@@ -172,422 +183,229 @@ let rec get_type_from_tuple_el dbg_pos tupl_typ position =
   match position with 
     | [] -> raise (InternalError "Gufo internal error.")
     | [last_pos] -> 
-        (match tupl_typ with
+        (match tupl_typ.loc_val with
           | MOTuple_type subtyplst -> 
               (try List.nth subtyplst last_pos
                 with _ -> raise_typeError "The tuple value cannot be assigned to the assigned variable tuples." dbg_pos
               )
           | MORef_type (modul, iref, idx, args) -> 
-              (MOTupel_type (modul, iref, idx, args, position) )
+              ({tupl_typ with 
+                 loc_val = MOTupel_type (modul, iref, idx, args, position)})
           | _ -> raise_typeError "Tuple is not correctly matched. \n"  dbg_pos
         )
     | i::lst -> 
-        (match tupl_typ with
+        (match tupl_typ.loc_val with
           | MOTuple_type subtuple -> 
-              get_type_from_tuple_el dbg_pos (List.nth subtuple i) lst
+              get_type_from_tuple_el dbg_pos 
+                                     (List.nth subtuple i)
+                                     lst
           | MORef_type (modul, iref, idx, args)-> 
-              (MOTupel_type (modul, iref, idx, args, position))
+              ({tupl_typ with loc_val = MOTupel_type (modul, iref, idx, args, position)})
           | _ -> raise (InternalError "type checker error.")
         )
 
-let determine_refine_type_composed epos i j = 
-  match i.moct_name - j.moct_name with
-    | 0 -> i
-    | _ -> raise_typeError (sprintf "Cannot merge type %d and %d together (TODO: give source name) (heritage not implemented))" i.moct_name j.moct_name) epos
 
-let determine_refine_base_type epos i j = 
-  match i, j with 
-    | MTypeString, MTypeString -> MTypeString
-    | MTypeBool, MTypeBool -> MTypeBool
-    | MTypeInt, MTypeInt -> MTypeInt
-    | MTypeFloat, MTypeFloat -> MTypeFloat
-    | MTypeCmd, MTypeCmd -> MTypeCmd
-    | _, _ -> raise_typeError (sprintf "Cannot merge together type %s and type %s ." (basetype_to_str i) (basetype_to_str j)) epos
-
-(*
-* alltypeMap give for a given 'alltype' id a list of constraints to which it is
-linked.  * for exemple '63 can be constrained to be an integer, or can be
-constrained * to another  'alltype'.
-*)
-(* let alltypeMap = ref IntMap.empty *)
-
-(*Try to refines the expr into a reduced set of compatible types. 
-  There is a complex issue when both e1 and e2 are MOAll_type with i and i'.
-  if you have a function f : set('70) -> '70 -> bool, this is not the same
-  typing as a function g : set('80') -> '81 -> bool.
-
-  That is why when using this function, we should consider e1 as the most
-  constrained type: if both are MOAll_type, the MOAll_type val of e1 will be
-  taken.
-  epos is a position to report in case an error is emmited.
-*)
-let rec determine_refine_type ?id_var:(id_var = None) epos t1 t2 = 
-  match t1, t2 with
-    | MOUnit_type, MOUnit_type -> 
-        MOUnit_type
-    | MOUnit_type, _ -> 
-        raise_typeError  "cannot refine unit with other type" epos
-    | t1, MOAll_type i 
-    | MOAll_type i , t1 -> 
-(*
-        (let currentIConstraints = 
-          match (IntMap.find_opt i (!alltypeMap)) with
-            | None -> []
-            | Some lst -> lst
-         in
-         alltypeMap:= IntMap.add i (t1::currentIConstraints) (!alltypeMap)
-        );
-*)
-        t1
-    | MOComposed_type i , MOComposed_type j -> 
-        MOComposed_type (determine_refine_type_composed epos i j )
-    | MOBase_type i , MOBase_type j  -> 
-        MOBase_type (determine_refine_base_type epos i j )
-    | MOTuple_type ilst , MOTuple_type jlst  ->
-        (match (List.length ilst - List.length jlst ) with 
-          | 0 -> MOTuple_type (List.map2 (determine_refine_type epos ~id_var:None) ilst jlst)
-          | _ -> raise_typeError 
-                  "Cannot merge together tuple types of different lengths."
-                  epos
-        )
-    | MOList_type i , MOList_type j  -> 
-        MOList_type (determine_refine_type epos i j )
-    | MOOption_type i, MOOption_type j -> 
-        MOOption_type (determine_refine_type epos i j)
-    | MOSet_type i, MOSet_type j ->
-        MOSet_type (determine_refine_type  epos i j )
-    | MOMap_type (k,v), MOMap_type(kp,vp) ->
-        MOMap_type (determine_refine_type epos k kp , determine_refine_type epos v vp )
-    (*TODO: for now we consider no ref type here, it should be handled elsewhere.*)
-    | MOComposed_type _ , _ -> 
-        raise_typeError "Cannot refine composed type to other type" epos
-    | MORef_type (imod, i, deep,args ), MORef_type(imod2, i2, deep2, args2) -> 
-        (*we do the match to avoid a typ beiing a ref to itself. 
-         *
-         * Sometimes, while we have just usage without any definition, we have
-         * a ref on ourself but at the moment we get the definition, we improve
-         * and in particular, if the definition is on another ref, we want to
-         * replace the type by this another ref.
-         * *)
-        (match id_var with
-          | Some (ni) when ni = i -> MORef_type(imod2, i2, deep2, args2)
-          | _ -> MORef_type (imod, i, deep, args)
-        )
-      (*TODO: eventually this might
-    be improvable to keep link that both ref should have same type.*)
-    | MORef_type _, typB -> typB
-    | typA, MORef_type _ -> typA
-    | MOFun_type(aargs, aret), MOFun_type(bargs, bret) -> 
-        let lst_args = List.map2 (determine_refine_type epos) aargs bargs in
-        let ret = determine_refine_type epos aret bret in
-        MOFun_type (lst_args, ret)
-    | _,_ ->
-        let msg = (sprintf "Cannot infer correct type between %s and %s " 
-                    (type_to_string t1) (type_to_string t2)) in
-        raise_typeError msg epos        
-(*Determining the type of every top level function *)
-    (*Caution, we try here to deduce toplevel type, not to check low level
-     * coherency. We don't check here validity of element of MTypeCmdVal*)
-
-let rec add_in_scope ref_vname typ locScope = 
-  (*fds is the eventual field, if there are fields, we don't add to locScope*)
-  let id_ref,fds = ref_vname in 
-  let id_ref, pos = id_ref.loc_val, id_ref.loc_pos in
-  match fds, IntMap.find_opt id_ref locScope with
-    | [], None -> typ, IntMap.add id_ref (typ, pos) locScope
-    | [], Some (atyp,_pos) -> 
-        let rtype, pars_pos = (determine_refine_type ~id_var:(Some id_ref) pos typ atyp, pos) in
-        rtype, IntMap.add id_ref (rtype, pars_pos) locScope
-    | _,_ -> typ, locScope 
-
-and determine_type_cmdseq fulloptiprog optiprog locScope cmdseq = 
-  let determine_type_stringOrRef locScope sor =
-    match sor with
-      | MOSORString _-> locScope
-      | MOSORExpr e -> 
-          let const =  Some (MOBase_type MTypeString) in
-          let _typ, locScope = determine_type fulloptiprog optiprog locScope const e in
-          locScope
-  in
-
-  let determine_type_cmd locScope cmd =
+let rec determine_constraint_cmdseq fulloptiprog optiprog constraint_map cmdseq = 
+    let determine_constraint_stringOrRef constraint_map sor =
+      match sor with
+        | MOSORString sloc -> constraint_map
+        | MOSORExpr e -> 
+              let id, e = extract_boxed_value e in
+              let _, constraint_map = 
+                determine_constraint fulloptiprog optiprog constraint_map e 
+              in
+                add_constraints id 
+                                [({e with loc_val = MOBase_type MTypeString})]
+                                constraint_map
+    in
+  
+  let determine_constraint_cmd constraint_map cmd =
     (*we have to check the arguments and the input/output*)
-    let locScope = List.fold_left (fun locScope arg -> determine_type_stringOrRef locScope arg ) locScope cmd.loc_val.mocm_args in
-    let locScope = 
+    let constraint_map = 
+      List.fold_left 
+        (fun constraint_map arg -> 
+              determine_constraint_stringOrRef constraint_map arg
+        ) constraint_map cmd.loc_val.mocm_args 
+    in
+    let constraint_map = 
       match cmd.loc_val.mocm_output with
         | MOCMDOStdOut
-        | MOCMDOStdErr -> locScope
+        | MOCMDOStdErr -> constraint_map
         | MOCMDOFile sor 
-        | MOCMDOFileAppend sor -> determine_type_stringOrRef locScope sor
+        | MOCMDOFileAppend sor -> determine_constraint_stringOrRef constraint_map sor
     in
-    let locScope = 
+    let constraint_map = 
       match cmd.loc_val.mocm_outputerr with
         | MOCMDEStdOut
-        | MOCMDEStdErr -> locScope
+        | MOCMDEStdErr -> constraint_map
         | MOCMDEFile sor 
-        | MOCMDEFileAppend sor -> determine_type_stringOrRef locScope sor
+        | MOCMDEFileAppend sor -> determine_constraint_stringOrRef constraint_map sor
     in
-    let locScope = 
+    let constraint_map = 
       match cmd.loc_val.mocm_input_src with
-        | MOCMDIStdIn -> locScope
-        | MOCMDIFile sor -> determine_type_stringOrRef locScope sor
+        | MOCMDIStdIn -> constraint_map
+        | MOCMDIFile sor -> determine_constraint_stringOrRef constraint_map sor
     in
-    MTypeCmd, locScope
+    MTypeCmd, constraint_map
   in
   match cmdseq.loc_val with 
-    | MOSimpleCmd cmd -> determine_type_cmd locScope cmd
-    | MOForkedCmd cmdseq -> determine_type_cmdseq fulloptiprog optiprog locScope cmdseq
+    | MOSimpleCmd cmd -> determine_constraint_cmd constraint_map cmd
+    | MOForkedCmd cmdseq -> 
+        determine_constraint_cmdseq fulloptiprog optiprog constraint_map cmdseq
     | MOAndCmd (cmdseqa, cmdseqb) 
     | MOOrCmd (cmdseqa, cmdseqb) 
     | MOSequenceCmd (cmdseqa, cmdseqb) 
     | MOPipedCmd (cmdseqa, cmdseqb) ->
-        let _typ, locScope = 
-          determine_type_cmdseq fulloptiprog optiprog locScope cmdseqa
+        let _typ, _locScope = 
+          determine_constraint_cmdseq fulloptiprog optiprog constraint_map cmdseqa
         in
-        determine_type_cmdseq fulloptiprog optiprog locScope cmdseqb
+        determine_constraint_cmdseq fulloptiprog optiprog constraint_map cmdseqb
 
-and determine_type_base_val fulloptiprog optiprog locScope bv = 
+and determine_constraint_base_val fulloptiprog optiprog constraint_map bv = 
   let typ, locScope = 
     match bv with
-      | MOTypeStringVal s -> MTypeString, locScope
-      | MOTypeBoolVal b -> MTypeBool, locScope
-      | MOTypeIntVal i -> MTypeInt, locScope 
-      | MOTypeFloatVal f-> MTypeFloat, locScope
-      | MOTypeCmdVal cseq -> determine_type_cmdseq fulloptiprog optiprog locScope cseq
+      | MOTypeStringVal s -> MTypeString, constraint_map
+      | MOTypeBoolVal b -> MTypeBool, constraint_map
+      | MOTypeIntVal i -> MTypeInt, constraint_map 
+      | MOTypeFloatVal f-> MTypeFloat, constraint_map
+      | MOTypeCmdVal cseq -> 
+          determine_constraint_cmdseq fulloptiprog optiprog constraint_map cseq
   in 
-  MOBase_type typ, locScope
+    MOBase_type typ, constraint_map
 
-
-
-
-and determine_type_composed fulloptiprog optiprog mct = 
+and determine_constraint_composed fulloptiprog optiprog constraint_map mct = 
   let modul, id = mct.mocv_resolved_type in 
   match modul with
-    | None -> IntMap.find id optiprog.mopg_types
+    | None -> MOComposed_type (IntMap.find id optiprog.mopg_types)
     | Some i -> 
         match IntMap.find i fulloptiprog.mofp_progmodules with
-          | MOUserMod prog -> IntMap.find id prog.mopg_types
-          | MOSystemMod sysmod ->  GufoModules.sysmodctype_to_ctype 
-                                    (IntMap.find i sysmod.mosm_types)
+          | MOUserMod prog -> MOComposed_type (IntMap.find id prog.mopg_types)
+          | MOSystemMod sysmod ->  
+              MOComposed_type (GufoModules.sysmodctype_to_ctype 
+              (IntMap.find i sysmod.mosm_types))
 
-and determine_type_comp fulloptiprog optiprog locScope const op arga argb =   
-  let () = 
-  (match const with 
-     | None 
-     | Some (MOAll_type _) 
-     | Some  (MOBase_type (MTypeBool)) -> ()
-     | Some const ->  raise_typeError (sprintf "Comparison return a boolean type while a type %s is expected. \n" (type_to_string const) ) op.loc_pos
-  )
-  in
+
+and determine_constraint_comp fulloptiprog optiprog constraint_map op arga argb =
     (*next two line are for locScope precision*)
-    let typa, locScope = determine_type fulloptiprog optiprog locScope None arga in
-    let typb, locScope = determine_type fulloptiprog optiprog locScope None argb in
-    let epos = pos_merging arga.loc_pos argb.loc_pos in
-    let _typ = determine_refine_type epos typa typb in
-      MOBase_type (MTypeBool), locScope
-    
-and determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb = 
-  let for_basic_op expectedType arga argb =
-    let typa, locScope = 
-      determine_type fulloptiprog optiprog locScope expectedType arga in
-    let typb, locScope = 
-      determine_type fulloptiprog optiprog locScope expectedType argb in
-    let epos = pos_merging arga.loc_pos argb.loc_pos in
-        determine_refine_type epos typa typb, locScope
-  in
-  let for_dict_op expectedType arga argb = 
-    let typ_a, locScope = determine_type fulloptiprog optiprog locScope const arga in 
-    let typ_b, locScope = determine_type fulloptiprog optiprog locScope const argb in
-    let epos = pos_merging arga.loc_pos argb.loc_pos in
-    (determine_refine_type epos
-                           (determine_refine_type arga.loc_pos expectedType typ_a) 
-                           (determine_refine_type argb.loc_pos expectedType typ_b)) 
-    , locScope
+    let id_a, vala = extract_boxed_value arga in
+    let id_b, valb = extract_boxed_value argb in
+    let typa, constraint_map = determine_constraint_
+                           fulloptiprog optiprog constraint_map vala in
+    let typb, constraint_map = determine_constraint_
+                           fulloptiprog optiprog constraint_map valb in
+    let constraint_map = add_constraints id_a 
+                                         [{vala with loc_val = typa};
+                                          {valb with loc_val = typb};
+                                         ] 
+                                         constraint_map in
+    let constraint_map = add_constraints id_b 
+                                         [{vala with loc_val = typa};
+                                          {valb with loc_val = typb}] 
+                                         constraint_map in
+      MOBase_type (MTypeBool), constraint_map
+ 
 
+and determine_constraint_basic_fun fulloptiprog optiprog constraint_map op arga argb = 
+  let for_op expectedType arga argb constraint_map =
+    let ida, arga_unbox = extract_boxed_value arga in
+    let idb, argb_unbox = extract_boxed_value argb in
+    let typa, constraint_map = 
+      determine_constraint_ fulloptiprog optiprog constraint_map arga_unbox in
+    let typb, constraint_map = 
+      determine_constraint_ fulloptiprog optiprog constraint_map argb_unbox in
+    let typaloc = {arga_unbox with loc_val = typa} in
+    let typbloc = {argb_unbox with loc_val = typb} in
+    let constraint_map = add_constraints ida [typaloc;typbloc] constraint_map in
+    let constraint_map = add_constraints idb [typaloc;typbloc] constraint_map in
+    typa, constraint_map
   in
-  let typ,locScope = 
+
+  let typ,constraint_map= 
     match op.loc_val with 
     | MConcatenation ->
         let expectedType = Some (MOBase_type MTypeString) in
-        for_basic_op expectedType arga argb
+        for_op expectedType arga argb constraint_map
     | MAddition 
     | MMultiplication 
     | MModulo 
     | MDivision 
     | MSoustraction -> 
         let expectedType = Some (MOBase_type MTypeInt) in
-        for_basic_op expectedType arga argb
+        for_op expectedType arga argb constraint_map
     | MAdditionFloat 
     | MMultiplicationFLoat
     | MModuloFloat
     | MDivisionFloat
     | MSoustractionFloat -> 
         let expectedType = Some (MOBase_type MTypeFloat) in
-        for_basic_op expectedType arga argb
+        for_op expectedType arga argb constraint_map
     | MWithList -> 
-        let full_or_type = MOList_type (MOAll_type (get_fresh_int ())) in
-        for_dict_op full_or_type arga argb
+        let full_or_type = 
+          MOList_type ({loc_val = MOAll_type (get_fresh_int ()) ;
+           loc_pos = pos_merging arga.loc_pos argb.loc_pos;
+          })
+        in
+        for_op full_or_type arga argb constraint_map
     | MWithSet -> 
-        let full_or_type = MOSet_type (MOAll_type (get_fresh_int ())) in
-        for_dict_op full_or_type arga argb
+        let full_or_type = MOSet_type ({op with loc_val =(MOAll_type (get_fresh_int ()))}) in
+        for_op full_or_type arga argb constraint_map
     | MWithMap -> 
-        let full_or_type = MOMap_type (MOAll_type (get_fresh_int ()), MOAll_type (get_fresh_int ())) in
-        for_dict_op full_or_type arga argb
+        let full_or_type = MOMap_type ({op with loc_val = (MOAll_type (get_fresh_int ()))}, {op with loc_val = MOAll_type (get_fresh_int ())}) in
+        for_op full_or_type arga argb constraint_map
     | MWithoutSet -> 
-        let full_or_type = MOSet_type (MOAll_type (get_fresh_int ())) in
-        for_dict_op full_or_type arga argb
+        let full_or_type = MOSet_type ({op with loc_val = MOAll_type (get_fresh_int ())}) in
+        for_op full_or_type arga argb constraint_map
     | MWithoutMap -> 
-        let full_or_type = MOMap_type (MOAll_type (get_fresh_int ()), MOAll_type (get_fresh_int ())) in
-        for_dict_op full_or_type arga argb
-    | MHasSet -> 
-        let full_or_type = MOSet_type (MOAll_type (get_fresh_int ())) in
-        let typ_a, locScope = determine_type fulloptiprog optiprog locScope (Some full_or_type) arga in 
-        (match typ_a with 
-          | MOSet_type keytype ->
-            let typ_b, locScope = determine_type fulloptiprog optiprog locScope (Some keytype) argb in
-            MOBase_type(MTypeBool), locScope
-          | _ -> raise (InternalError "Gufo internal error.") (*Cannot append *)
-        )
-    | MHasMap -> 
-        let full_or_type = MOMap_type (MOAll_type (get_fresh_int ()), MOAll_type (get_fresh_int ())) in
-        let typ_a, locScope = determine_type fulloptiprog optiprog locScope (Some full_or_type) arga in 
-        (match typ_a with 
-          | MOMap_type (keytype, _vtype) ->
-            let typ_b, locScope = determine_type fulloptiprog optiprog locScope (Some keytype) argb in
-            MOBase_type(MTypeBool), locScope
-          | _ -> raise (InternalError "Gufo internal error.") (*Cannot append *)
-        )
+        let full_or_type = MOMap_type ({op with loc_val = (MOAll_type (get_fresh_int ()))}, {op with loc_val = MOAll_type (get_fresh_int ())}) in
+        for_op full_or_type arga argb constraint_map
+    | MHasSet -> raise (InternalError "MHas is deprecated.") 
+    | MHasMap -> raise (InternalError "SHas is deprecated.") 
   in 
-  typ, locScope
+  typ, constraint_map
 
-
-and determine_type_binding fulloptiprog optiprog locScope const bd = 
-  let determine_in_known_tuple dbg_pos tupl_name tupl_typ locScope = 
-    (*we have to check compatibilty between tupl_name and tupl_typ before putting link in locScope *)
-          List.fold_left 
-          (fun locScope (id_el,pars_pos, position) -> 
-            let curel_typ = get_type_from_tuple_el pars_pos tupl_typ position in
-            IntMap.add id_el (curel_typ, pars_pos) locScope
-          ) locScope tupl_name
+and determine_constraint_binding fulloptiprog optiprog constraint_map bd = 
+  let determine_in_known_tuple dbg_pos tupl_name tupl_typ constraint_map  = 
+    (*we have to check compatibilty between tupl_name and tupl_typ before putting link in constraint_map*)
+    List.fold_left 
+    (fun constraint_map (id_el,pars_pos, position) -> 
+      let curel_typ = get_type_from_tuple_el pars_pos tupl_typ position in
+      add_constraints id_el [curel_typ] 
+                      constraint_map
+    ) constraint_map tupl_name
   in
-  let db_typ, locScope = determine_type fulloptiprog optiprog locScope None bd.mobd_value in
-  let locScope = 
+
+  let db_typ, constraint_map = determine_constraint_ fulloptiprog optiprog constraint_map bd.mobd_value in
+
+  let constraint_map = 
     match bd.mobd_name, db_typ with 
       | [(single_id, _pars_pos,[])], _ -> 
-          IntMap.add single_id (db_typ, bd.mobd_value.loc_pos) locScope 
-      | tupl_name, MOTuple_type tupl_typ ->
-          determine_in_known_tuple bd.mobd_value.loc_pos tupl_name db_typ locScope
+          add_constraints single_id [{bd.mobd_value with loc_val = db_typ}] 
+            constraint_map 
+      | tupl_name, MOTuple_type _tupl_typ ->
+          determine_in_known_tuple bd.mobd_value.loc_pos tupl_name 
+            {bd.mobd_value with loc_val = db_typ} 
+            constraint_map
       | tupl_name, MORef_type (modul, iref, deep, args) ->
           List.fold_left 
-            (fun locScope (id, pars_pos, position) -> 
-              IntMap.add id 
-                (MOTupel_type(modul, iref, deep,args, position), pars_pos) locScope) 
-            locScope tupl_name
+            (fun constraint_map (id, pars_pos, position) -> 
+              add_constraints id 
+                              [{loc_val = MOTupel_type(modul, iref, deep,args, position);
+                                loc_pos = pars_pos;
+                               }] 
+                              constraint_map
+            )
+            constraint_map tupl_name
       | tupl_name, otherType -> raise (InternalError "Type checker error")
   in
-  let body_type, locScope = determine_type fulloptiprog optiprog locScope const bd.mobd_body in
-  let value_const =
-    (match bd.mobd_name with 
-      | [(single_id,_,[])] -> 
-        let typ, _ = IntMap.find single_id locScope  in typ
-      | tupl_name ->
-          let lsttyp = 
-            List.map (fun (id, _, position) -> 
-                let typ, _  = IntMap.find id locScope in typ
-            )
-            tupl_name 
-          in MOTuple_type (lsttyp)
-    )
+  let body_type, constraint_map = 
+    determine_constraint_ fulloptiprog optiprog constraint_map bd.mobd_body 
   in
-  let _db_val, locScope = determine_type fulloptiprog optiprog locScope (Some value_const) bd.mobd_value in
-  body_type, locScope
+  body_type, constraint_map
 
-(**Determine typ of a reference acting as a function call (with arguments). 
-*)
-and determine_type_ref_function_call fulloptiprog optiprog const locScope 
-                                     ref args typ_ref =
-  (*args_const is the list of the constrained argument.
-    ret_const is the constrained return type.*)
-  (let args_const, ret_const = 
-    (match const with 
-      | None 
-      | Some (MOAll_type _) -> 
-          List.map (fun _ -> None ) args , None
-      | Some (MOFun_type (typargs, argret)) ->
-          List.map (fun typ -> Some typ) typargs, Some argret
-      | _ -> List.map (fun _ -> None) args, None (*TODO:maybe to easy*)
-    )
-  in
 
-  (*lst_typ_args is the refination of the args with the constrained args.*)
-  let lst_typ_args, locScope, bd_alltype = 
-    List.fold_left2 
-    (fun (lst_typ_args,locScope, bd_alltype) arg const -> 
-      let typ, locScope = 
-        determine_type fulloptiprog optiprog locScope const arg 
-      in
-
-      let typ, bd_alltype = 
-        match const with 
-        | Some (MOAll_type i ) ->
-          refine_bd_alltype i typ arg.loc_pos bd_alltype 
-        | _ -> typ, bd_alltype
-      in
-      typ::lst_typ_args, locScope, bd_alltype
-    ) ([], locScope, IntMap.empty) args args_const
-  in
-  let lst_typ_args = List.rev lst_typ_args in
-  let typ_ref = precise_with_args typ_ref lst_typ_args in
-
-  let expr_typ = determine_ref_with_index ref typ_ref in 
-  let pos,_ = ref.morv_varname in
-  let pos = pos.loc_pos in
-  (*update the type of typ_ref using the information from the argument*)
-  let expr_typ = determine_refapplication_type expr_typ pos lst_typ_args bd_alltype in
-  
-  debug_print (sprintf "determine_type_ref_function_call ending with type : '%s' \n"  (type_to_string expr_typ));
-
-  let expr_typ, locScope = add_in_scope ref.morv_varname expr_typ locScope in
-  expr_typ, locScope
-  )
-
-(*we don't do intermodule type checking for now, so we only check ref
- * defined in this module.*)
-and determine_ref_with_index ref ref_vtyp  = 
-  (match ref.morv_index with
-    | None -> ref_vtyp
-    | Some idx -> 
-        let idx_deep = List.length idx in 
-        let ref_name = ref.morv_debugname in
-        let rec determine_ref_with_index_ idx_deep ref_vtyp = 
-          match idx_deep with
-            | 0 -> raise (VarError (sprintf "You are trying to access to the index of a variable (%s) which is not a map or a list." ref_name))
-            | 1 -> 
-              (match ref_vtyp with 
-                | MOList_type subtyp -> subtyp
-                | MOSet_type( subtyp) ->  subtyp 
-                | MOMap_type (_, subtyp) -> subtyp
-                | MOAll_type i -> MOAll_type (get_fresh_int ())
-                | _ -> raise (InternalError 
-                        "Gufo internal error: no deep for the given type.") 
-                        (*we don't have deep for other types.*)
-              )
-            | i -> 
-              (match ref_vtyp with 
-                | MOList_type subtyp -> determine_ref_with_index_ (i-1) subtyp 
-                | MOSet_type( subtyp) -> determine_ref_with_index_ (i-1) subtyp 
-                | MOMap_type (_, subtyp) -> determine_ref_with_index_ (i-1) subtyp 
-                | MOAll_type i -> MOAll_type (get_fresh_int ())
-                | _ -> raise (InternalError 
-                        "Gufo internal error: no deep for the given type.") 
-                        (*we don't have deep for other types.*)
-              )
-        in
-        determine_ref_with_index_ idx_deep ref_vtyp
-    )
 
 (*we only check the ref here, without worying about possible args.*)
-and determine_type_ref fulloptiprog optiprog locScope ref = 
+and determine_constraint_ref fulloptiprog optiprog constraint_map ref = 
 
   let rec determine_with_fields fields index = 
     match fields with 
@@ -599,427 +417,350 @@ and determine_type_ref fulloptiprog optiprog locScope ref =
           determine_with_fields lstfield index
   in
   let (varname, fields ) = ref.morv_varname in 
-  let varname = varname.loc_val in 
+
   (*we should check if there are field vars*)
   let typ = 
     match fields with 
       | [] -> 
         (match ref.morv_module with
          | None -> 
-             (match IntMap.find_opt varname locScope with
-               | None -> MORef_type (None, varname, 0, [])
-               | Some (v, _pars_pos) -> v
-             )
+                {varname with loc_val = MORef_type (None, varname.loc_val, 0, [])}
           | Some i -> 
                    (match ref.morv_index with
-                     | None -> MORef_type (Some i, varname, 0, [] )
+                     | None -> 
+                        {varname with loc_val = 
+                          MORef_type (Some i, varname.loc_val, 0, [] )}
                      | Some idx -> 
-                        MORef_type (Some i, varname, List.length idx, [] )
+                        {varname with loc_val = 
+                          MORef_type (Some i, varname.loc_val, List.length idx, [] )}
                    )
         )
       | lst_fields -> 
           determine_with_fields lst_fields ref.morv_index
   in 
-   typ, locScope 
+   typ, constraint_map
 
-and precise_with_args ref_typ args_typ =
-  match args_typ with
-    | [] -> ref_typ
-    | typ :: oargs_typ -> 
-        (match ref_typ with 
-          | MORef_type (_,_,_,_) -> 
-              ref_typ
-              (*TODO: there might be a better solution to find.*)
-          | MOAll_type i ->
-              (MOFun_type (typ::oargs_typ, MOAll_type i)) 
-          | _ -> 
-              ref_typ
-        )
- 
-(*bd all type is a map containing the reduction of an 'alltype' into a more
-precise type.*)
-and refine_bd_alltype i typ epos bd_alltype = 
-  let cur_typ = IntMap.find_opt i bd_alltype in
-  match cur_typ with
-    | None -> 
-        typ , IntMap.add i typ bd_alltype
-    | Some cur_typ ->
-        let typ = (determine_refine_type epos cur_typ typ) in
-        typ , IntMap.add i typ bd_alltype
+(*we don't do intermodule type checking for now, so we only check ref
+ * defined in this module.*)
+and determine_ref_with_index ref ref_vtyp  = 
+  (match ref.morv_index with
+    | None -> ref_vtyp
+    | Some idx -> 
+        let idx_deep = List.length idx in 
+        let ref_name = ref.morv_debugname in
+        let pos = let v,_ = ref.morv_varname in v.loc_pos in
+        let rec determine_ref_with_index_ idx_deep ref_vtyp = 
+          match idx_deep with
+            | 0 -> raise (VarError (sprintf "You are trying to access to the index of a variable (%s) which is not a map or a list." ref_name))
+            | 1 -> 
+              (match ref_vtyp.loc_val with 
+                | MOList_type subtyp -> subtyp
+                | MOSet_type( subtyp) ->  subtyp 
+                | MOMap_type (_, subtyp) -> subtyp
+                | MOAll_type i -> 
+                    {loc_val = MOAll_type (get_fresh_int ()); loc_pos = pos}
+                | _ -> raise (InternalError 
+                        "Gufo internal error: no deep for the given type.") 
+                        (*we don't have deep for other types.*)
+              )
+            | i -> 
+              (match ref_vtyp.loc_val with 
+                | MOList_type subtyp -> determine_ref_with_index_ (i-1) subtyp 
+                | MOSet_type( subtyp) -> determine_ref_with_index_ (i-1) subtyp 
+                | MOMap_type (_, subtyp) -> determine_ref_with_index_ (i-1) subtyp 
+                | MOAll_type i -> 
+                    {loc_val = MOAll_type (get_fresh_int ()); loc_pos = pos}
+                | _ -> raise (InternalError 
+                        "Gufo internal error: no deep for the given type.") 
+                        (*we don't have deep for other types.*)
+              )
+        in
+        determine_ref_with_index_ idx_deep ref_vtyp
+    )
 
-(*
- * 
+(**Determine typ of a reference acting as a function call (with arguments). 
 *)
-and determine_refapplication_type ref_typ pos args_typ bd_alltype = 
-  let rec apply ref_typ args_typ = 
-    match args_typ with
-      | [] -> ref_typ
-      | typ :: args_typ -> 
-          (match ref_typ with 
-            | MOFun_type ([_refarg], refret) ->
-                apply refret args_typ
-              | MOFun_type (refarg:: refargs , refret) ->
-                  apply (MOFun_type (refargs, refret)) args_typ
-            | MORef_type (modi,i,deep,args) -> 
-                apply (MORef_type (modi,i,deep,(List.rev (typ::(List.rev args))))) args_typ
-                (*TODO: there might be a better solution to find.*)
-            | MOAll_type i ->
-                let typ, _ = refine_bd_alltype i ref_typ pos bd_alltype in typ 
-(*                 let typ, _ = refine_bd_alltype i ref_typ bd_alltype in typ  *)
-            | MOList_type st -> 
-               MOList_type st 
-            | _ -> 
-                (*If we are reaching this part, it means that _ref_typ has been
-resolved to something else than a function or something accepting argument, but still there are new arguments provided ..*)
-                raise_typeError "Too many arguments given." pos
-          )
-  in
-  match args_typ with
-    | [] -> ref_typ
-    | args_typ -> apply ref_typ  args_typ
-        
+and determine_constraint_ref_function_call fulloptiprog optiprog constraint_map
+                                     ref args typ_ref =
 
+  let precise_with_args constraint_map id ref_typ args_typ =
+    match args_typ with
+      | [] -> 
+        add_constraints id.loc_val [ref_typ] constraint_map
+      | typ :: oargs_typ -> 
+        
+        add_constraints id.loc_val
+          [{loc_val = (MOFun_type (typ::oargs_typ, 
+                        {id with loc_val = MOAll_type (get_fresh_int ())}));
+            loc_pos = id.loc_pos}] 
+          constraint_map
+  in
+  (*Determine type of arguments.*)
+  let lst_typ_args, constraint_map = 
+    List.fold_left 
+    (fun (lst_typ_args, constraint_map ) arg -> 
+      let typ, constraint_map = 
+        determine_constraint fulloptiprog optiprog constraint_map arg 
+      in
+      typ::lst_typ_args, constraint_map  
+    ) ([], constraint_map ) args 
+  in
+  let lst_typ_args = List.rev lst_typ_args in
+  let idloc,_ = ref.morv_varname in
+
+  let constraint_map = 
+    precise_with_args constraint_map idloc typ_ref lst_typ_args 
+  in
+  let expr_typ = determine_ref_with_index ref typ_ref in 
+  expr_typ, constraint_map
 
 (* 
  *
- * This function is the central type checking fonction.
- * It tries te determine a type for a expr e.
- *
- * This function will be run several time for the same expression depending on
- * the state of the analyse: it will be first used to retrieve a simple type
- * and later will be used against with an eventual constraint allowing to
- * refine the analyse.
+ * This function is the central constraint creator of the type checking part.
+ * It should determine every constraints of an expr e.
  *
  * fulloptiprog is the representation of the full programs in optimised representation
  * optiprog is the current module in optimised representation
- * locScope is the type local scope (for a variable, give its type)
- * to what concrete type it is currently linked.
+ * 
+ * constraint_map is the current map of constraint.
  *
- * const is an optional type contraint that must respect the value e.
  * e is the expression value we want to determine the type.
  *
  * It returns the found type and the updated locScope.
  *
  * *)
-and determine_type fulloptiprog optiprog locScope const e =
-  (*Check constraint between a constraint and a found type. pos is a position
-    to report in case an error is emmited.*)
-  let check_respect_constraint const deduced_type pos = 
-    match const, deduced_type with
-      | None, _ -> 
-          deduced_type
-      | Some (MOAll_type i), MOAll_type a -> 
-          MOAll_type i
-      | Some typ, deduced_type -> 
-          determine_refine_type pos typ deduced_type 
-  in
-  (*add_args to scope is used for argument of MOFun_val. It puts the argument
-    in the locScope.*)
-  let rec add_args_to_scope argtyp_const args locScope = 
-    match argtyp_const with 
-      | None -> 
-        List.fold_left
-        (fun (locScope,newlst) arg -> 
-          match arg with
-            | MOBaseArg i -> 
-                let ntype = (MOAll_type (get_fresh_int ()))
-                in
-                (IntMap.add i.loc_val (ntype,i.loc_pos) locScope, ntype::newlst)
-            | MOTupleArg args -> 
-                let nlocScope, nlst = add_args_to_scope None args locScope in
-                  (nlocScope, (MOTuple_type nlst)::newlst)
-        )
-        (locScope,[]) args.loc_val
-      | Some lstargtyp_const ->
-        List.fold_left2
-        (fun (locScope,newlst) arg arg_const -> 
-          match arg with
-            | MOBaseArg i -> 
-                (IntMap.add i.loc_val (arg_const, i.loc_pos) locScope, arg_const::newlst)
-            | MOTupleArg args -> 
-                (match arg_const with
-                  | MOAll_type i ->
-                      let nlocScope, nlst = add_args_to_scope None args locScope in
-                      (nlocScope, (MOTuple_type nlst)::newlst)
-                  | MOTuple_type lsttyp_const -> 
-                      let nlocScope, nlst = add_args_to_scope (Some lsttyp_const) args locScope in
-                      (nlocScope, (MOTuple_type nlst)::newlst)
-                  | _ -> raise_typeError "Impossible to infer type of the function arguments." e.loc_pos
-                )
-        )
-        (locScope,[]) args.loc_val lstargtyp_const
-  in
-  let rec refine_args_from_scope locScope args =  
-    List.map
-      (fun arg -> 
-        (match arg with
-          | MOBaseArg i -> let v, pars_pos = IntMap.find i.loc_val locScope in v
-          | MOTupleArg aargs -> 
-              let nargs = refine_args_from_scope locScope aargs in
-              MOTuple_type nargs
-        )
-      )
-      args.loc_val
-  in
+and determine_constraint fulloptiprog optiprog constraint_map e =
+  let typ, constraint_map = determine_constraint_ 
+                              fulloptiprog optiprog constraint_map e in
+  {e with loc_val = typ}, constraint_map
 
-  let typ_res, locScope = 
+and determine_constraint_ fulloptiprog optiprog constraint_map e =
+  let typ_res, constraint_map = 
     (match e.loc_val with
       | MOComposed_val mct -> 
-          MOComposed_type (determine_type_composed fulloptiprog optiprog mct),
-          locScope
+          determine_constraint_composed fulloptiprog optiprog constraint_map mct,
+          constraint_map
       | MOSimple_val st -> 
           (match st with 
             | MOBase_val bv -> 
-                determine_type_base_val fulloptiprog optiprog locScope bv
+                determine_constraint_base_val fulloptiprog optiprog constraint_map bv
             | MOTuple_val tv -> 
-                let new_const = 
-                  match const with
-                    | None -> None
-                    | Some (MOAll_type i) -> None
-                    | Some (MOTuple_type lst) -> Some lst
-                    | _ ->  raise_typeError ("Type checker was expecting a type tuple.") tv.loc_pos
-                in
-                let  nlst, locScope = 
-                  (match new_const with
-                    | None -> 
-                              (List.fold_left 
-                                    (fun (ntv, locScope) tvel -> 
-                                      let (nel, locScope) =
-                                        determine_type fulloptiprog optiprog locScope None tvel in
-                                      ( nel::ntv, locScope)
-                                      ) 
-                                    ([], locScope) tv.loc_val
-                              )
-                    | Some lst -> 
-                              (List.fold_left2
-                                    (fun (ntv, locScope) tvel const -> 
-                                      let (nel, locScope) =
-                                        determine_type fulloptiprog optiprog locScope (Some const) tvel in
-                                      ( nel::ntv, locScope)
-                                      ) 
-                                    ([], locScope) tv.loc_val lst
-                              )
-                   )
-                   in
-                    MOTuple_type (List.rev nlst), locScope
-            | MOList_val lv ->
-                let new_const = 
-                  match const with
-                    | None -> None
-                    | Some (MOAll_type i) -> None
-                    | Some (MOList_type typ) -> Some typ
-                    | _ ->  raise_typeError ("Type checker was expecting a type list.") lv.loc_pos
-                in
-
-                (match lv.loc_val with
-                  | [] ->  MOAll_type (get_fresh_int ()), locScope
-                  | lv -> 
-                    let typ, locScope = 
-                      determine_type fulloptiprog optiprog locScope new_const (List.hd lv) 
-                    in
-                    let typ, locScope = 
-                      List.fold_left 
-                        (fun (typ, locScope) lval -> 
-                          let ntyp, locScope = determine_type fulloptiprog optiprog locScope new_const lval in 
-                          determine_refine_type lval.loc_pos typ ntyp, locScope
-                        )
-                        (typ, locScope) (List.tl lv) 
-                    in
-                      MOList_type typ, locScope
+                let  nlst, constraint_map = 
+                (List.fold_left 
+                      (fun (ntv, constraint_map) tvel -> 
+                        let (nel, constraint_map) =
+                          determine_constraint_ fulloptiprog optiprog constraint_map tvel in
+                        ( {tvel with loc_val = nel}::ntv, constraint_map)
+                      )
+                      ([], constraint_map) tv.loc_val
                 )
+                in MOTuple_type (List.rev nlst), 
+                    constraint_map
+            | MOList_val lv ->
+                let lst_el_constraints, constraint_map = 
+                  List.fold_left 
+                    (fun (constraints,constraint_map) lval -> 
+                      let _id, expr = extract_boxed_value lval in
+                      let typ, constraint_map = determine_constraint_
+                        fulloptiprog optiprog constraint_map expr
+                      in 
+                      {expr with loc_val = typ}::constraints, constraint_map
+                    )
+                  ([],constraint_map) lv.loc_val
+                in 
+                let constraint_map = 
+                  List.fold_left 
+                    (fun (constraint_map) lval -> 
+                      let id, _expr = extract_boxed_value lval in
+                      add_constraints id lst_el_constraints constraint_map
+                    )
+                    constraint_map lv.loc_val
+                in
+                  MOList_type ((List.hd lst_el_constraints)), constraint_map
             | MONone_val -> 
-                MOOption_type (MOAll_type (get_fresh_int ())), locScope
+                MOOption_type 
+                  ({e with loc_val = MOAll_type (get_fresh_int ())}), constraint_map
             | MOSome_val el -> 
-                let new_const = 
-                  match const with
-                    | None -> None
-                    | Some (MOAll_type i) -> None
-                    | Some (MOOption_type typ)-> Some typ
-                    | _ ->  raise_typeError "Type checker was expecting a type option." el.loc_pos
+                let opt_typ, constraint_map = 
+                  determine_constraint fulloptiprog optiprog constraint_map el 
                 in
-                let opt_typ, locScope = 
-                  determine_type fulloptiprog optiprog locScope new_const el 
-                in
-                MOOption_type (opt_typ), locScope
+                MOOption_type (opt_typ), constraint_map
             | MOSet_val sett -> 
-                let new_const = 
-                  match const with
-                    | None -> None
-                    | Some (MOAll_type i) -> None
-                    | Some (MOSet_type typ)-> Some typ
-                    | _ ->  raise_typeError "Type checker was expecting a type set." sett.loc_pos
+                let lst_el_constraints, constraint_map = 
+                  MSet.fold
+                    (fun lval (constraints,constraint_map) -> 
+                      let _id, expr = extract_boxed_value (simple_to_core_val lval) 
+                      in
+                      let typ, constraint_map = determine_constraint_ 
+                        fulloptiprog optiprog constraint_map expr
+                      in 
+                      {expr with loc_val = typ}::constraints, constraint_map
+                    )
+                  sett.loc_val ([],constraint_map) 
+                in 
+                let constraint_map = 
+                  MSet.fold
+                    (fun lval (constraint_map) -> 
+                      let id, _expr = extract_boxed_value (simple_to_core_val lval) 
+                      in
+                      add_constraints id lst_el_constraints constraint_map
+                    )
+                    sett.loc_val (constraint_map) 
                 in
-                let typ, locScope = 
-                MSet.fold
-                  (fun el (curtyp, locScope) -> 
-                    let nel_type, locScope = 
-                      determine_type fulloptiprog optiprog locScope
-                        new_const (simple_to_core_val el)
-                    in
-                    determine_refine_type el.loc_pos curtyp nel_type, locScope
-                  )
-                  sett.loc_val
-                  (MOAll_type (get_fresh_int ()), locScope)
-                in
-                MOSet_type typ, locScope
+                  MOSet_type (List.hd lst_el_constraints), constraint_map
             | MOMap_val map -> 
-                let new_const_key, new_const_val = 
-                  match const with
-                    | None -> None, None
-                    | Some (MOAll_type i) -> None, None
-                    | Some (MOMap_type (typkey, typval))-> Some typkey, Some typval
-                    | _ ->  raise_typeError ("Type checker was expecting a type map.") map.loc_pos
+                let constraints_key, constraints_el, constraint_map = 
+                  MMap.fold
+                    (fun key el
+                          (constraints_key, constraints_el ,constraint_map)
+                       -> 
+                      let _id, exprk = 
+                        extract_boxed_value (simple_to_core_val key) 
+                      in
+                      let _id, exprel = extract_boxed_value el in
+                      let typk, constraint_map = determine_constraint_
+                        fulloptiprog optiprog constraint_map exprk
+                      in 
+                      let typv, constraint_map = determine_constraint_
+                        fulloptiprog optiprog constraint_map exprel
+                      in 
+                      ({exprk with loc_val = typk}::constraints_key),
+                      ({exprel with loc_val = typv}::constraints_el), 
+                      constraint_map)
+                  map.loc_val ([], [] ,constraint_map) 
+                in 
+                let constraint_map = 
+                  MMap.fold
+                    (fun key el (constraint_map) -> 
+                      let idk, _exprk = extract_boxed_value (simple_to_core_val key) in
+                      let idel, _exprel = extract_boxed_value el in
+                      let constraint_map = 
+                        add_constraints idk  constraints_key constraint_map
+                      in
+                        add_constraints idel constraints_el constraint_map
+                    )
+                    map.loc_val (constraint_map) 
                 in
-
-                let keyt, elt,locScope = 
-                MMap.fold
-                  (fun key el (curkeyt, curelt, locScope) -> 
-                    let keytyp, locScope = 
-                      determine_type fulloptiprog optiprog locScope new_const_key
-                        (simple_to_core_val key)
-                    in 
-                    let eltype, locScope = 
-                      (determine_type fulloptiprog optiprog locScope new_const_val el)
-                    in
-                    (determine_refine_type key.loc_pos curkeyt keytyp),
-                    (determine_refine_type el.loc_pos curelt eltype),
-                    locScope
-                  )
-                  map.loc_val (MOAll_type (get_fresh_int ()),
-                       MOAll_type (get_fresh_int ()),locScope)
-                in
-                MOMap_type(keyt, elt), locScope
+                  MOMap_type((List.hd constraints_key), 
+                              (List.hd constraints_el)), 
+                  constraint_map
             | MOFun_val fv ->
-                let lstargtyp_const, rettyp_const = 
-                  match const with
-                    | None -> None, None
-                    | Some (MOAll_type i) -> None, None
-                    | Some (MOFun_type(arglstTyp, rettyp))->
-                        Some arglstTyp, Some rettyp
-                    | _ ->  raise_typeError 
-                              ("Type checker was expecting a type function.") 
-                              fv.loc_pos
-                in
-                let locScope, nargs = add_args_to_scope lstargtyp_const 
-                                        fv.loc_val.mofv_args_id locScope in  
-                let body_type, locScope = 
-                  determine_type fulloptiprog optiprog locScope rettyp_const 
+                let body_type, constraint_map = 
+                  determine_constraint fulloptiprog optiprog constraint_map
                                  fv.loc_val.mofv_body 
                 in
-                let nargs = refine_args_from_scope locScope fv.loc_val.mofv_args_id in
-                MOFun_type (nargs, body_type), locScope 
+                let args_type = 
+                  List.map 
+                    (fun funarg -> 
+                      (match funarg with 
+                        | MOBaseArg bt -> 
+                            {bt with loc_val = MOAll_type(get_fresh_int())}
+                        | MOTupleArg bt ->
+                            {bt with loc_val = MOAll_type(get_fresh_int())}
+                      )
+                    )
+                    fv.loc_val.mofv_args_id.loc_val
+                in
+                MOFun_type (args_type, body_type), constraint_map
             | MOEmpty_val ->
-              MOUnit_type, locScope
+              MOUnit_type, constraint_map
           )
       | MORef_val (ref, args) -> 
           (*we use locScope and only put to MOAll_type if not found in scope.*)
           (*we don't do intermodule type checking for now, so we only check ref
            * defined in this module.*)
-          let typ_ref, locScope = 
-            (*provide the raw type of ref (from the locScope) *)
-          determine_type_ref fulloptiprog optiprog locScope ref 
+          let typ_ref, constraint_map = 
+            determine_constraint_ref fulloptiprog optiprog constraint_map ref 
           in
-          let ref_pos = let tmp,_ = ref.morv_varname in tmp.loc_pos in
+          let ref_id = let tmp,_ = ref.morv_varname in tmp in
           (match args with 
             | [] -> 
-                (match const with
-                  | None -> 
-                      let typ_ref = determine_ref_with_index ref typ_ref in
-                      let typ_ref, locScope = add_in_scope ref.morv_varname typ_ref locScope in
-                      (typ_ref, locScope)
-                    
-                  | Some const ->
-                      let refined_typ = determine_refine_type ref_pos const typ_ref in
-                      let refined_typ = determine_ref_with_index ref refined_typ  in
-                      let refined_typ, locScope = add_in_scope ref.morv_varname refined_typ locScope in
-                      refined_typ, locScope
-                    
-                )
+              let typ_ref = determine_ref_with_index ref typ_ref in
+(*
+              let constraint_map = 
+                add_constraints ref_id.loc_val 
+                                [typ_ref] 
+                                constraint_map 
+              in
+*)
+              (typ_ref.loc_val, constraint_map)
             | args -> 
-                determine_type_ref_function_call fulloptiprog optiprog const locScope 
-                                            ref args typ_ref
+                let expr_typ, constraint_map = 
+                  determine_constraint_ref_function_call 
+                    fulloptiprog optiprog constraint_map ref args typ_ref in
+                expr_typ.loc_val, constraint_map
           )
       | MOEnvRef_val _ -> 
-        MOBase_type (MTypeString), locScope
+        MOBase_type (MTypeString), constraint_map
       | MOBasicFunBody_val (op, arga, argb)
         ->
-          determine_type_basic_fun fulloptiprog optiprog locScope const op arga argb
+          determine_constraint_basic_fun 
+            fulloptiprog optiprog constraint_map op arga argb
       | MOBind_val bd ->
-          determine_type_binding fulloptiprog optiprog locScope const bd
+          determine_constraint_binding fulloptiprog optiprog constraint_map bd
       | MOIf_val (cond, thn, els) ->
           (*for now we do not worry about cond as it does not give info about
            * return type.*)
-          let cond_typ, locScope = determine_type fulloptiprog optiprog locScope 
-            (Some (MOBase_type MTypeBool)) cond in
-          let thn_typ, locScope = determine_type fulloptiprog optiprog locScope const thn in
-          let els_typ, locScope = (determine_type fulloptiprog optiprog locScope const els) in
-          determine_refine_type (pos_merging thn.loc_pos els.loc_pos)
-                                thn_typ els_typ, locScope
+          let idcond, econd = extract_boxed_value cond in
+          let idthn, ethn = extract_boxed_value thn in
+          let idels, eels = extract_boxed_value els in
+          let cond_typ, constraint_map = 
+            determine_constraint_ fulloptiprog optiprog constraint_map econd 
+          in
+          let cond_typ =  {econd with loc_val = cond_typ} 
+          in
+          let booltype = {econd with loc_val = (MOBase_type MTypeBool)} in
+          let constraint_map = 
+            add_constraints idcond [booltype;cond_typ] constraint_map
+          in
+                            
+          let thn_typ, constraint_map = determine_constraint_
+                                    fulloptiprog optiprog constraint_map ethn 
+          in
+          let els_typ, constraint_map = (determine_constraint_
+                                    fulloptiprog optiprog constraint_map eels) 
+          in
+          let thn_typ =  {ethn with loc_val = thn_typ}  in
+          let els_typ =  {eels with loc_val = els_typ}  in
+          let constraint_map = 
+            add_constraints idthn [thn_typ; els_typ] constraint_map
+          in
+           let constraint_map = 
+            add_constraints idels [thn_typ; els_typ] constraint_map
+          in
+            thn_typ.loc_val, constraint_map
       | MOComp_val (op, a, b ) ->
           (*a comparison can only return a boolean *)
-          determine_type_comp fulloptiprog optiprog locScope const op a b
+          determine_constraint_comp fulloptiprog optiprog constraint_map op a b
       | MOBody_val bdlst ->
           (*return the type of the last body*)
           let lastbd = List.nth bdlst ((List.length bdlst) -1) in
-          determine_type fulloptiprog optiprog locScope const lastbd
+          determine_constraint_ fulloptiprog optiprog constraint_map lastbd
+
+
     )
-  in 
-  let typ_res = check_respect_constraint const typ_res e.loc_pos in
-  typ_res, locScope
+  in typ_res, constraint_map 
 
-
-
-let prog_get_types fulloptiprog optiprog = 
-  let determine_type_tupel (idtup, position) var_types = 
-    let tup_typ,_ = IntMap.find idtup.loc_val var_types in
-    get_type_from_tuple_el idtup.loc_pos tup_typ position, idtup.loc_pos
-  in
-  (*In the first folding, we don't manage the MOTupEl_val *)
-  let var_types = 
-    let add_with_refine typmap i typ expr = 
-      let refined = 
-        match IntMap.find_opt i typmap with
-          | None -> typ 
-          | Some al_typ-> 
-              (determine_refine_type ~id_var:(Some i) expr.loc_pos typ al_typ.loc_val) 
-      in 
-      IntMap.add i ({loc_val = refined; loc_pos= expr.loc_pos}) typmap
-    in 
+(*Just iter on topval to feed constraint.*)
+let module_extract_constraints fulloptiprog optiprog = 
+  let constraint_map = 
     IntMap.fold
-      (fun id value typmap ->
+      (fun id value constraint_map ->
         match value with 
           | MOTop_val e -> 
-              let typ, locScope = determine_type fulloptiprog optiprog 
-                                                 IntMap.empty None e 
+              let typ, constraint_map = determine_constraint fulloptiprog 
+                                          optiprog constraint_map e 
               in
-              let typmap = IntMap.fold 
-                (fun i (typ,pars_pos) typmap -> 
-                  add_with_refine typmap i typ e
-                ) 
-                locScope typmap 
-              in 
-              add_with_refine typmap id typ e
-          | MOTupEl_val _ -> typmap 
-          (*for the moment, we don't add them as typed. They will get their type later.*)
+                add_constraints id [typ] constraint_map
+          | MOTupEl_val _ -> constraint_map 
+          (*TODO: we to do this, maybe later. *)
       )
       optiprog.mopg_topvar IntMap.empty
   in
-  (*we also run it for topcal *)
-  let var_types_noloc = IntMap.map (fun v -> (v.loc_val,v.loc_pos)) var_types in
-  let _typ, var_types = determine_type fulloptiprog optiprog var_types_noloc None optiprog.mopg_topcal in
-  (*work over the MOTupEl_val *)
-    IntMap.fold
-      (fun id value typmap ->
-        match value with 
-          | MOTop_val _ -> typmap
-          | MOTupEl_val (tup_id, position) ->
-              let typ, pars_pos = determine_type_tupel (tup_id, position) var_types in
-              IntMap.add id (typ,pars_pos) typmap 
-      )
-      optiprog.mopg_topvar var_types
+  let _typ, constraint_map = determine_constraint fulloptiprog optiprog constraint_map optiprog.mopg_topcal in
+    constraint_map
 
-
-let top_level_types fulloptiprog = 
+let extract_constraints fulloptiprog = 
   let toptypes_modules = IntMap.empty in 
   let toptypes_modules = 
     IntMap.fold 
@@ -1028,914 +769,21 @@ let top_level_types fulloptiprog =
           | MOSystemMod s -> 
               IntMap.add modi (GufoModules.get_types_map s) toptypes_modules 
           | MOUserMod optiprog -> (*TODO: if depend on nothing, gen type?*)
-              IntMap.add modi (prog_get_types fulloptiprog optiprog) toptypes_modules
+              IntMap.add modi (module_extract_constraints 
+                                fulloptiprog optiprog) toptypes_modules
       )
     fulloptiprog.mofp_progmodules
     toptypes_modules
   in
   (*for main prog *)
-  let toptypes_modules = IntMap.add 0 (prog_get_types fulloptiprog fulloptiprog.mofp_mainprog) toptypes_modules in
-
+  let toptypes_modules = IntMap.add 0 
+                           (module_extract_constraints fulloptiprog 
+                              fulloptiprog.mofp_mainprog) toptypes_modules in
   toptypes_modules
-(*
-   * past_var_map is set to None when we are not in the console interactive. In
-   * console interactive mode it contains a map which contains as key a new int
-   * id for topvar and as value, the previous id value for the "same string"
-   * var.
-*)
-let top_level_types_no_ref var_types past_var_map =
-
-  let refine_bd_alltype epos req_typ real_typ bd_alltype = 
-      match req_typ with 
-        | MOAll_type(i) ->
-          let cur_typ = IntMap.find_opt i bd_alltype in
-          (match cur_typ with
-              | None -> 
-                  IntMap.add i real_typ bd_alltype, real_typ  
-              | Some cur_typ ->
-                  let real_typ = (determine_refine_type epos cur_typ real_typ) in
-                  IntMap.add i real_typ bd_alltype, real_typ
-          )
-        | _ -> bd_alltype, real_typ
-  in
-    
-  (*The function refine the rettyp of ref_typ according to the types of its arguments.*)
-  let rec apply epos ref_typ args_typ bd_alltype = 
-    match args_typ with
-      | [] -> 
-         let bd_alltype, ret_typ = refine_bd_alltype epos ref_typ ref_typ bd_alltype in
-          bd_alltype, ret_typ 
-      | typ :: args_typ -> 
-          (match ref_typ with 
-            | MOFun_type ([refarg], refret) ->
-                let bd_alltype, _ = refine_bd_alltype  epos typ refarg bd_alltype in
-                apply epos refret [] bd_alltype
-            | MOFun_type (refarg:: refargs , refret) ->
-                let bd_alltype, _  = refine_bd_alltype  epos refarg typ bd_alltype in
-                apply epos (MOFun_type (refargs, refret)) args_typ bd_alltype
-            | _ -> 
-                bd_alltype, MOAll_type (get_fresh_int () )
-          )
-  in
-
-  let refine_with_bd_alltyp args_typ bd_alltype =
-    List.map
-      (fun arg ->
-       ( match arg with
-        | MOAll_type(i) ->
-          (match IntMap.find_opt i bd_alltype with
-            | None -> arg
-            | Some typ  -> typ
-          )
-        | _ -> arg
-       )
-      )
-      args_typ
-  in
-
-  let get_module curmodulei refmodulei = 
-    match refmodulei with 
-      | None -> curmodulei 
-      | Some mi -> mi
-  in
-  (* For a reference to modi.i, provide its type *)
-  let rec find_and_get_type epos modi i deep bd_alltype = 
-    let modtopvar_map = IntMap.find modi var_types in
-    let typ,pars_pos = IntMap.find i modtopvar_map in
-    let typ_with_deep = get_type_at_deep pars_pos typ deep in 
-    match typ_with_deep, past_var_map with 
-      | MORef_type (nmodi, ni, ndeep, args), Some past_map ->
-          (match nmodi, modi, ni, i with 
-            | Some inmodi, modi, ni, i when (inmodi = modi && ni = i ) ->
-                let past_i = IntMap.find i past_map in
-                let modi = get_module modi nmodi in
-                let bd_alltype, typ = find_and_get_type epos modi past_i ndeep bd_alltype in
-                apply epos typ args bd_alltype 
-            | None, modi, ni, i when (0 = modi && ni = i ) ->  
-                let past_i = IntMap.find i past_map in
-                let modi = get_module modi nmodi in
-                let bd_alltype,typ  = find_and_get_type epos modi past_i ndeep bd_alltype in
-                apply epos typ args bd_alltype
-            | _ -> 
-                let modi = get_module modi nmodi in
-                let bd_alltype, typ = find_and_get_type epos modi ni ndeep bd_alltype in
-                apply epos typ args bd_alltype
-          )
-      | MORef_type (nmodi, ni, ndeep, args), _  -> 
-          let modi = get_module modi nmodi in
-          let bd_alltype, typ = find_and_get_type epos modi ni ndeep bd_alltype in
-          apply epos typ args bd_alltype
-      | _,_ -> bd_alltype, typ_with_deep
-  in
-
-  let rec _recRemoveRef epos bd_alltype modi typ = 
-    match typ with 
-      | MOComposed_type ctyp ->
-        let bd_alltype, new_moct_fields = 
-            IntMap.fold
-              (fun i tfield (bd_alltype, newtypmap) -> 
-                let bd_alltype, motf_typ = 
-                  _recRemoveRef epos bd_alltype modi tfield.motf_type 
-                in
-                bd_alltype, IntMap.add i {tfield with motf_type = motf_typ } newtypmap ) 
-              ctyp.moct_fields (bd_alltype, IntMap.empty)
-        in 
-        bd_alltype, 
-        MOComposed_type {ctyp with moct_fields = new_moct_fields}
-      | MOBase_type _ -> bd_alltype, typ
-      | MOTuple_type ttyp -> 
-        let bd_alltype, tup_typ = 
-          List.fold_left
-          (fun (bd_alltype, newlst) typ ->
-            let bd_alltype, el = _recRemoveRef epos bd_alltype modi typ in
-            bd_alltype, el::newlst
-           )
-          (bd_alltype, []) ttyp 
-        in bd_alltype, MOTuple_type (List.rev tup_typ)
-      | MOList_type typ -> 
-        let bd_alltype, typ = _recRemoveRef epos bd_alltype modi typ in
-        bd_alltype, MOList_type typ
-      | MOOption_type typ -> 
-        let bd_alltype, typ = _recRemoveRef epos bd_alltype modi typ in
-        bd_alltype, MOOption_type typ
-      | MOSet_type typ -> 
-        let bd_alltype, typ = _recRemoveRef epos bd_alltype modi typ in
-        bd_alltype, MOSet_type typ
-      | MOMap_type (typk, typv) -> 
-          let bd_alltype, typk = _recRemoveRef epos bd_alltype modi typk in
-          let bd_alltype, typv = _recRemoveRef epos bd_alltype modi typv in
-          bd_alltype, MOMap_type (typk, typv)
-      | MOFun_type (argst, rett) -> 
-        let bd_alltype, new_lst_args = 
-        List.fold_left
-          (fun (bd_alltype, newlst) arg ->
-            let bd_alltype, newel = _recRemoveRef epos bd_alltype modi arg in
-            bd_alltype, newel::newlst
-          )
-          (bd_alltype, []) argst
-        in
-        
-        let bd_alltype, newrett = _recRemoveRef epos bd_alltype modi rett in
-
-        (*we can need to refine args type using the ret type.
-          As in the following exemple
-              let $af $i = $Int.toString $i
-          For $af, rett is ref 1[0], for newrett, it is (fun int -> string) 
-        *)
-       let new_lst_args =  
-          refine_with_bd_alltyp (List.rev new_lst_args) bd_alltype 
-        in 
-
-       (*let new_lst_args =  (List.rev new_lst_args) in*)
-        bd_alltype, MOFun_type (new_lst_args, newrett)
-      | MOAll_type _  -> bd_alltype , typ 
-      | MOUnit_type  -> bd_alltype, typ 
-      
-      | MORef_type (refmodi, i , deep, args) -> 
-         let modi = get_module modi refmodi in
-         let bd_alltype, typ = find_and_get_type epos modi i deep bd_alltype in
-            let bd_alltype, typ = apply epos typ args bd_alltype in
-            bd_alltype, typ
-      | MOTupel_type (refmodi , i , deep , args,  position) -> 
-          let modi = get_module modi refmodi in
-          let bd_alltype, typ = find_and_get_type epos modi i deep bd_alltype in
-          let bd_alltype, typ = apply epos typ args bd_alltype in 
-          bd_alltype, get_type_from_tuple_el dummy_position typ position
-    in
-
-    let new_topvar_types = 
-    IntMap.fold
-      (fun modi topvar_map newtopvar_map ->
-        (*For every module in topvar map*)
-        let newMap = 
-          IntMap.fold
-          (fun i (typ,pars_pos)  newMap -> 
-            let _, newtyp = _recRemoveRef pars_pos IntMap.empty modi typ in
-            IntMap.add i (newtyp,  pars_pos) newMap
-          )
-          topvar_map IntMap.empty
-        in 
-        IntMap.add modi newMap newtopvar_map
-      )
-      var_types (IntMap.empty)
-    in 
-    new_topvar_types
 
 
+  (* END PART 3: TYPE DETERMINATION *)
 
-let get_type_from_topvar_types optiprog var_types (imod, idref, deep) args = 
-  let modul = 
-    (match imod with
-      | None -> IntMap.find optiprog.mopg_name var_types
-      | Some i -> IntMap.find i var_types 
-    )
-  in
-  let base_typ, pars_pos = IntMap.find idref modul in
-  let typ = 
-    match deep with 
-      | 0 -> base_typ
-      | i -> get_type_at_deep pars_pos base_typ deep
-  in 
-  determine_refapplication_type typ pars_pos args IntMap.empty
-
-
-(*Full type checking step *)
-
-
-(*expr should have a type copatible with required_typ, else we would throw a
-TypeError exception.*)
-let type_check_has_type fulloptiprog optiprog var_types required_typ expr =
-  debug_print (sprintf "checking expr '%s' has type '%s'\n" 
-                        (moval_loc_to_string expr) (type_to_string required_typ));
-  let rec has_type required found = 
-    let has_unique_type required found = 
-    match required, found with
-      | MOComposed_type ctyp, MOComposed_type ctyp2 ->
-          ctyp.moct_name = ctyp2.moct_name
-      | MOBase_type (MTypeString), MOBase_type (MTypeString) 
-      | MOBase_type (MTypeBool), MOBase_type (MTypeBool) 
-      | MOBase_type (MTypeInt), MOBase_type (MTypeInt) 
-      | MOBase_type (MTypeFloat), MOBase_type (MTypeFloat) 
-      | MOBase_type (MTypeCmd), MOBase_type (MTypeCmd) -> true 
-      | MOTuple_type (typlst), MOTuple_type (typlst2) ->
-          List.fold_left2 (fun b typa typb -> b && (has_type typa typb) ) true typlst typlst2
-      | MOList_type (typa), MOList_type (typb) -> 
-          has_type typa typb
-      | MOOption_type (typa), MOOption_type (typb) -> 
-          has_type typa typb
-      | MOSet_type (typa), MOSet_type(typb) -> 
-          has_type typa typb
-      | MOMap_type (keya, vala), MOMap_type(keyb, valb) ->  
-          (has_type keya keyb) && (has_type vala valb)
-      | MOFun_type (argsa, reta), MOFun_type (argsb, retb) ->
-          (has_type reta retb) && 
-          List.fold_left2 (fun b arga argb -> b && (has_type arga argb)) true argsa argsb
-      | MOAll_type i, MOAll_type i2 -> i = i2
-      | MOUnit_type, MOUnit_type -> true
-      | MOUnit_type, _ -> true (*TODO : this should be discussed. *)
-      | MOAll_type i, _ -> true
-      | _, MOAll_type i2 -> true
-      | MORef_type (_,_,_,_), _ -> raise (InternalError "Gufo internal error (ref should not exist)") (*because we should have no more ref at this point *)
-      | _, MORef_type(_,_,_,_) -> raise (InternalError "Gufo internal error (ref should not exist)")
-      | MOTupel_type (_,_,_,_,_), _ -> raise (InternalError "unexpected tupel)")
-      | _, MOTupel_type (_,_,_,_,_) ->  raise (InternalError "unexpected tupel)")
-      | _, _ -> raise_typeError 
-                  (sprintf "Incompatible type: %s found while type %s required" 
-                           (type_to_string found) (type_to_string required))
-                  expr.loc_pos
-    in has_unique_type required found
-  in
-  let rec get_type_from_ref_ typ =
-    match typ with 
-      | MORef_type (imod, idref, deep, args) ->
-          let typ = 
-            get_type_from_topvar_types optiprog var_types (imod, idref, deep) args in 
-
-            (*TODO P*)
-          get_type_from_ref_ typ
-      | MOTupel_type (imod, iref, deep,args, position) -> 
-          let typ = 
-            get_type_from_topvar_types optiprog var_types (imod, iref, deep) args in 
-          get_type_from_ref_ (get_type_from_tuple_el dummy_position typ position)
-      | _ -> typ 
-  in
-  let typ_from_expr, _locScope = determine_type fulloptiprog optiprog 
-                        (IntMap.find optiprog.mopg_name var_types) (Some required_typ) expr in
-  let found_type = get_type_from_ref_ typ_from_expr in
-  let _ = has_type required_typ found_type in
-  found_type
-
-(*This stuff is the stuff managing allTypeMap. 
-  allTypeMap is a map describing the relation between types, especially with
-  MOAll_type.
- *)
-type allType_relation = {
-  at_real_type : motype option;
-  at_linked_type : IntSet.t
-}
-
-(*
- * debug an allType_relation, first argument is the id of the relation.
-*)
-let debug_print_allType_relation i rel = 
-  (match rel.at_real_type with
-    | None ->
-      debug_print (sprintf "%d is not linked with real type " i) 
-    | Some realtyp ->
-      debug_print (sprintf "%d is linked with real type %s " i (type_to_string realtyp)) 
-  );
-  IntSet.iter 
-    (fun linkedt -> 
-      debug_print (sprintf "%d is linked with allType type %d " i  linkedt) 
-    ) 
-  rel.at_linked_type
-
-let allType_getRealType_ t1 map = 
-  match IntMap.find_opt t1 map with
-    | None -> None
-    | Some relation -> 
-        relation.at_real_type 
-
-let allType_get_linkedtype t1 map = 
-  match IntMap.find_opt t1 map with
-    | None -> IntSet.empty
-    | Some relation -> 
-        relation.at_linked_type
-
-(*Try to get a real type either directly (because t1 is linked with a real type
-or indirectly, because t1 is linked with a linked type linked with a real
-one. If no type found, return t1.*)
-let allType_getRealType t1 map =
-  let search_though_linked_types idt1 map = 
-    let rec search_though_linked_types_ idt1 map exploredSet = 
-      let setToExplore = allType_get_linkedtype idt1 map in
-        (*TODO: for now we just do find_first_opt, this means, we cannot have
-          contradictory tipes, let's hope, it just never happen :) *)
-        let possibleLinkedWithReal = 
-        IntSet.find_first_opt
-          (fun t -> match allType_getRealType_ t map with 
-                      | None -> false
-                      | Some _ -> true        
-          ) 
-          setToExplore
-      in
-      match possibleLinkedWithReal with
-        | Some linkedt -> (allType_getRealType_ linkedt map), exploredSet
-        | None -> (*no concrete stuff found*)
-          let exploredSet = IntSet.union exploredSet setToExplore in
-          (*we want the set of type linked with setToExplore with are not in exploredSet*)
-          let toExplore = 
-            IntSet.fold (fun t toExplore -> 
-                          IntSet.union toExplore (allType_get_linkedtype t map) 
-                        ) 
-            setToExplore IntSet.empty
-          in 
-          let toExplore = IntSet.diff toExplore exploredSet in
-          match IntSet.is_empty toExplore with
-            | true -> None, exploredSet
-            | false -> 
-              IntSet.fold
-                (fun linkedt (foundt,exploredSet) -> 
-                  match foundt with
-                    | Some t -> foundt, exploredSet (*do nothing, just return*)
-                    | None -> 
-                        search_though_linked_types_ linkedt map exploredSet 
-                )
-                toExplore (None, exploredSet)
-    in
-      search_though_linked_types_ idt1 map IntSet.empty
-  in
-  match t1 with 
-    | MOAll_type idt1 -> 
-      (match allType_getRealType_ idt1 map with
-        | Some t -> t
-        | None -> 
-            let newt, _ = search_though_linked_types idt1 map in 
-          (match newt with
-            | None -> t1
-            | Some newt -> newt
-          )
-      )
-    | otherType -> t1
-
-(*create the relation in the map if it does not exist.*)
-let create_relation_if_not_exist t1 map = 
-  let rel = 
-    match IntMap.find_opt t1 map with
-      | None -> {
-                  at_real_type = None;
-                  at_linked_type = IntSet.empty;
-                }
-      | Some rel -> rel 
-    in 
-    IntMap.add t1 rel map
-
-let allType_addRelation t1 t2 map =
-  debug_print (sprintf "Adding relation between %d and %d \n" t1 t2);
-  (*we should create the relation in the map only we there is no conflict
-    between t1 and tonly we there is no conflict between t1 and t2*)
-  let map = create_relation_if_not_exist t1 map in 
-  let map = create_relation_if_not_exist t2 map in 
-  let relation1 = IntMap.find t1 map in
-  let relation2 = IntMap.find t2 map in
-  match allType_getRealType (MOAll_type t1) map , allType_getRealType (MOAll_type t2) map with
-    | MOAll_type t1, MOAll_type t2 -> 
-      debug_print (sprintf "Linking types");
-      let relation1 = 
-        { relation1 with at_linked_type = IntSet.add t2 relation1.at_linked_type;
-        } in
-      let relation2 = 
-        { relation2 with at_linked_type = IntSet.add t2 relation2.at_linked_type;
-        } in
-      let map = IntMap.add t1 relation1 map in
-      let map = IntMap.add t2 relation2 map in
-      map
-    | realType1, MOAll_type t2 -> 
-      debug_print (sprintf "%d take type %s" t2 (type_to_string realType1));
-      let relation2 =
-        { relation2 with at_real_type = Some realType1} in 
-        IntMap.add t2 relation2 map 
-    | MOAll_type t1, realType2 -> 
-      debug_print (sprintf "%d take type %s" t1 (type_to_string realType2));
-      let relation1 =
-        { relation1 with at_real_type = Some realType2} in 
-        IntMap.add t1 relation1 map 
-    | realType1, realType2 -> 
-        let realType =  determine_refine_type dummy_position realType1 realType2 in
-        debug_print (sprintf "realtypes %s and %s are merged in %s"  (type_to_string realType1) (type_to_string realType2) (type_to_string realType) );
-        let relation1 ={ relation1 with at_real_type = Some realType} in 
-        let relation2 ={ relation2 with at_real_type = Some realType} in 
-        let map = IntMap.add t1 relation1 map in
-        let map = IntMap.add t2 relation2 map in
-        map
-
-
-
-let allType_addRealType t1 real_typ map = 
-  let map = create_relation_if_not_exist t1 map in 
-  let relation1 = IntMap.find t1 map in
-  let relation1 = 
-    match relation1.at_real_type with
-      | None -> {relation1 with at_real_type = Some real_typ}
-      | Some typ  ->
-        {relation1 with 
-          at_real_type = Some (determine_refine_type dummy_position typ real_typ);
-        }
-  in 
-  IntMap.add t1 relation1 map
-
-(*Try to refine type using the information from the allTypeMap map.
-  For exemple if your type is Option('9) and '9 is linked with type int, you
-  will get Option(int).
-*)
-let rec refine_allTypeConstraint typ allTypeMap = 
-  match typ with 
-   | MOComposed_type mcomp -> 
-    (*TODO : strangely moct_internal_val is a mtype_val and not an motype_val.
-            for now, I left it, and comment the following code but it might to
-            needed to investigate this.
-      *)
-(*
-     let internal_val = 
-      StringMap.map 
-        (fun aval -> refine_allTypeConstraint aval allTypeMap)
-        mcomp.moct_internal_val
-     in
-       MOComposed_type {mcomp with moct_internal_val = internal_val}
-*)
-       MOComposed_type mcomp  
-   | MOBase_type bval -> MOBase_type bval
-   | MOTuple_type tupTyp -> 
-      MOTuple_type 
-        (List.map (fun aval -> refine_allTypeConstraint aval allTypeMap) tupTyp)
-   | MOList_type t -> MOList_type (refine_allTypeConstraint t allTypeMap)
-   | MOOption_type t -> MOOption_type (refine_allTypeConstraint t allTypeMap)
-   | MOSet_type t -> MOSet_type (refine_allTypeConstraint t allTypeMap)
-   | MOMap_type (kt, vt) ->
-       MOMap_type(refine_allTypeConstraint kt allTypeMap, 
-                  refine_allTypeConstraint vt allTypeMap)
-   | MOFun_type (argstyps, rettyp) ->
-        let argstyps = 
-          List.map (fun aval -> refine_allTypeConstraint aval allTypeMap) argstyps
-        in
-        let rettyp = refine_allTypeConstraint rettyp allTypeMap in
-        MOFun_type (argstyps, rettyp)
-   | MOAll_type i -> 
-      allType_getRealType (MOAll_type i) allTypeMap
-   | MOUnit_type -> MOUnit_type
-   | MORef_type (_,_,_, _ ) -> raise (InternalError "type checker error.")
-   | MOTupel_type _ -> raise (InternalError "type checker error.")
-
-
-(*This function check an exepected type and an effectively found one, using it
-to feed the allTypeMap map.
-  For exemple if your real type is int while the expected one is '1, '1 will be
-linked with te type int in the allTypeMap map.
-*)
-let type_check_has_type_with_allTypeConstraint epos
-      fulloptiprog optiprog var_types required_typ real_typ allTypeMap
-  =
-  let rec has_type required found allTypeMap = 
-    let has_unique_type required found = 
-    match required, found with
-      | MOComposed_type ctyp, MOComposed_type ctyp2 ->
-          (match ctyp.moct_name = ctyp2.moct_name with
-            | true -> MOComposed_type ctyp, allTypeMap
-            | false -> 
-                raise_typeError 
-                  (sprintf "Incompatible type: %s found while type %s required"
-                         (type_to_string found) (type_to_string required))
-                  epos
-          )
-      | MOBase_type (MTypeString), MOBase_type (MTypeString) ->
-          MOBase_type (MTypeString), allTypeMap
-      | MOBase_type (MTypeBool), MOBase_type (MTypeBool) ->
-          MOBase_type (MTypeBool), allTypeMap
-      | MOBase_type (MTypeInt), MOBase_type (MTypeInt) ->
-          MOBase_type (MTypeInt), allTypeMap
-      | MOBase_type (MTypeFloat), MOBase_type (MTypeFloat) ->
-          MOBase_type (MTypeFloat), allTypeMap
-      | MOBase_type (MTypeCmd), MOBase_type (MTypeCmd) -> 
-          MOBase_type (MTypeCmd), allTypeMap
-      | MOTuple_type (typlst), MOTuple_type (typlst2) ->
-          let new_typlst, allTypeMap = 
-          List.fold_left2 
-            (fun (new_typlst,allTypeMap) typa typb -> 
-              let res, allTypeMap = (has_type typa typb allTypeMap) in
-              res::new_typlst , allTypeMap
-            )  
-          ([],allTypeMap) typlst typlst2
-          in 
-            MOTuple_type (List.rev new_typlst), allTypeMap
-      | MOList_type (typa), MOList_type (typb) -> 
-          let newtyp, allTypeMap = has_type typa typb allTypeMap in
-          MOList_type(newtyp), allTypeMap
-      | MOOption_type (typa), MOOption_type (typb) -> 
-          let newtyp, allTypeMap = has_type typa typb allTypeMap in
-          MOOption_type newtyp, allTypeMap
-      | MOSet_type (typa), MOSet_type(typb) -> 
-          let newtyp, allTypeMap = has_type typa typb allTypeMap in
-          MOSet_type (newtyp), allTypeMap
-      | MOMap_type (keya, vala), MOMap_type(keyb, valb) ->  
-          let resk, allTypeMap = (has_type keya keyb allTypeMap) in
-          let resv, allTypeMap = (has_type vala valb allTypeMap) in
-           MOMap_type(resk,resv), allTypeMap
-      | MOFun_type (argsa, reta), MOFun_type (argsb, retb) ->
-          let resret, allTypeMap = has_type reta retb allTypeMap in  
-          let argstyps, allTypeMap =
-          List.fold_left2 
-            (fun (argstyps, allTypeMap) arga argb -> 
-              let res, allTypeMap = (has_type arga argb allTypeMap) in
-              res::argstyps , allTypeMap
-            ) 
-            ([], allTypeMap) argsa argsb
-           in 
-            MOFun_type(List.rev argstyps, resret), allTypeMap
-      | MOAll_type i, MOAll_type i2 -> 
-          MOAll_type i, allType_addRelation i i2 allTypeMap
-      | MOUnit_type, MOUnit_type -> MOUnit_type, allTypeMap
-      | MOUnit_type, _ -> MOUnit_type, allTypeMap (*TODO : this should be discussed. *)
-      | MOAll_type i, typ -> typ, allType_addRealType i typ allTypeMap
-      | typ, MOAll_type i2 -> typ, allType_addRealType i2 typ allTypeMap
-      | MORef_type (mod1,idref1,deep1,arg1), _ -> 
-          let required = 
-            get_type_from_topvar_types optiprog var_types (mod1, idref1, deep1) arg1 
-          in
-          has_type required found allTypeMap 
-      | _, MORef_type(_,_,_,_) -> raise (InternalError "Gufo internal error (ref should not exist2)")
-      | MOTupel_type (_,_,_,_,_), _ -> raise (InternalError "unexpected tupel)")
-      | _, MOTupel_type (_,_,_,_,_) ->  raise (InternalError "unexpected tupel)")
-      | _, _ -> raise_typeError 
-                  (sprintf "Incompatible type: %s found while type %s required" 
-                    (type_to_string found) (type_to_string required))
-                  epos
-    in has_unique_type required found
-  in
-    let real_typ, allTypeMap = has_type required_typ real_typ allTypeMap in
-    real_typ, allTypeMap
-
-(*expr should have a type compatible with required_typ, else we would throw a
-TypeError exception.*)
-(*
-  allTypeMap has type allType_relation IntMap.t
-*)
-let expr_check_has_type_with_allTypeConstraint 
-      fulloptiprog optiprog var_types required_typ expr allTypeMap
-  =
-  let rec get_type_from_ref_ typ =
-    match typ with 
-      | MORef_type (imod, idref, deep, args) ->
-          let typ = 
-            get_type_from_topvar_types optiprog var_types (imod, idref, deep) args in 
-
-            (*TODO P*)
-          get_type_from_ref_ typ
-      | MOTupel_type (imod, iref, deep,args, position) -> 
-          let typ = 
-            get_type_from_topvar_types optiprog var_types (imod, iref, deep) args in 
-          get_type_from_ref_ (get_type_from_tuple_el dummy_position typ position)
-      | _ -> typ 
-  in
-  debug_print (sprintf "checking expr '%s' has type '%s'\n" (moval_loc_to_string expr) (type_to_string required_typ));
-  let typ_from_expr, _locScope = determine_type fulloptiprog optiprog 
-                        (IntMap.find optiprog.mopg_name var_types) (Some required_typ) expr in
-  let found_type = get_type_from_ref_ typ_from_expr in
-  type_check_has_type_with_allTypeConstraint expr.loc_pos
-      fulloptiprog optiprog var_types required_typ found_type allTypeMap 
-
-
-
-    (*stringOrRef should always provide a string*)
-let rec type_check_stringOrRef fulloptiprog optiprog typScope sor = 
-  match sor with
-    | MOSORString sor -> true
-    | MOSORExpr aval -> 
-        let _ = type_check_has_type fulloptiprog optiprog typScope (MOBase_type(MTypeString)) aval
-        in true
-
-
-
-and type_check_cmdseq fulloptiprog optiprog typScope cmdseq = 
-  let type_check_cmd_args args = 
-    List.fold_left
-      (fun b sor -> b && (type_check_stringOrRef fulloptiprog optiprog typScope sor ))
-      true args
-  in
-  let type_check_cmd_output output = 
-    match output with
-      | MOCMDOStdOut
-      | MOCMDOStdErr -> true
-      | MOCMDOFile sor
-      | MOCMDOFileAppend sor -> type_check_stringOrRef fulloptiprog optiprog typScope sor
-  in
-  let type_check_cmd_outputerr output = 
-    match output with
-      | MOCMDEStdOut
-      | MOCMDEStdErr -> true
-      | MOCMDEFile sor
-      | MOCMDEFileAppend sor -> type_check_stringOrRef fulloptiprog optiprog typScope sor
-  in
-  let type_check_cmd_input input = 
-    match input with
-      | MOCMDIStdIn -> true
-      | MOCMDIFile sor -> type_check_stringOrRef fulloptiprog optiprog typScope sor
-  in
-  let type_check_cmd cmd = 
-    let cmdv = cmd.loc_val in
-    type_check_cmd_args cmdv.mocm_args &&
-    type_check_cmd_output cmdv.mocm_output &&
-    type_check_cmd_outputerr cmdv.mocm_outputerr &&
-    type_check_cmd_input cmdv.mocm_input_src
-  in
-  match cmdseq.loc_val with 
-    | MOSimpleCmd cmd -> 
-        type_check_cmd cmd
-    | MOForkedCmd cmdseq -> type_check_cmdseq fulloptiprog optiprog typScope cmdseq
-    | MOAndCmd (cmdseqa, cmdseqb) 
-    | MOOrCmd (cmdseqa, cmdseqb)
-    | MOSequenceCmd (cmdseqa, cmdseqb)
-    | MOPipedCmd (cmdseqa, cmdseqb) -> type_check_cmdseq fulloptiprog optiprog typScope cmdseqa &&
-                                       type_check_cmdseq fulloptiprog optiprog typScope cmdseqb
-
-
-  (*This function returns true or fail with a TypeError exception *)
-and type_check_val fulloptiprog optiprog typScope v = 
-  let progScope = (IntMap.find optiprog.mopg_name typScope) in
-  match v.loc_val with 
-    | MOSimple_val sv ->
-        (match sv with 
-          | MOBase_val MOTypeCmdVal cmdseq -> type_check_cmdseq fulloptiprog optiprog typScope cmdseq 
-          | MOBase_val _ -> true
-          | MOTuple_val tup -> 
-              List.fold_left (fun b el -> b && type_check_val fulloptiprog optiprog typScope el) 
-              true tup.loc_val
-          | MOList_val lst ->
-              (match lst.loc_val with
-                | [] -> true
-                | hd::lst -> 
-                  let typ_hd,_ = determine_type fulloptiprog optiprog 
-                            progScope None hd in
-                  (*check that every list element has same type*)
-                  List.fold_left 
-                  (fun b el -> 
-                    let _typ = (type_check_has_type fulloptiprog optiprog typScope typ_hd el) in
-                    b && (type_check_val fulloptiprog optiprog typScope el)) 
-                  true lst
-              )
-          | MONone_val -> true
-          | MOSome_val v -> type_check_val fulloptiprog optiprog typScope v
-          | MOSet_val set ->
-              (try 
-                let atyp,_ = determine_type fulloptiprog optiprog progScope
-                  None (simple_to_core_val (MSet.choose set.loc_val))
-                in
-                  MSet.fold
-                    (fun el b -> 
-                      let el_core = simple_to_core_val el in
-                      let _typ = (type_check_has_type fulloptiprog optiprog typScope atyp el_core)
-                      in
-                      b && (type_check_val fulloptiprog optiprog typScope el_core))
-                    set.loc_val true 
-              with Not_found -> true (*empty set is ok*)
-              )
-          | MOMap_val map -> 
-              (try 
-                let ex_key, ex_val = MMap.choose map.loc_val in
-                let (atypkey,_), (atypval,_) = 
-                  determine_type fulloptiprog optiprog progScope None (simple_to_core_val ex_key), 
-                  determine_type fulloptiprog optiprog progScope None ex_val
-                in
-                  MMap.fold
-                    (fun k el b -> b &&
-                      (
-                        let k_core = simple_to_core_val k in
-                        let _typ = (type_check_has_type fulloptiprog optiprog typScope atypkey (k_core)) in
-                        let _typ = (type_check_has_type fulloptiprog optiprog typScope atypval el) in
-                        (type_check_val fulloptiprog optiprog typScope k_core) && 
-                        (type_check_val fulloptiprog optiprog typScope el)
-                      )
-                    )
-                    map.loc_val true 
-              with | Not_found -> true (*empty map is ok*)
-              )
-          | MOFun_val fv -> 
-              type_check_val fulloptiprog optiprog typScope fv.loc_val.mofv_body 
-          | MOEmpty_val -> true
-        )
-    | MOComposed_val ctypv ->
-        let ctypv_modul, ctypv_id = ctypv.mocv_resolved_type in
-        let ctyp = find_type_in_prog fulloptiprog ctypv_modul ctypv_id in
-        (*we should check field are filled with correct types *)
-        IntMap.fold 
-          (fun i vf b -> 
-            let tf = (IntMap.find i ctyp.moct_fields).motf_type in
-            let _typ = (type_check_has_type fulloptiprog optiprog typScope tf vf) in
-            b && (type_check_val fulloptiprog optiprog typScope vf)
-          ) 
-          ctypv.mocv_fields true 
-    | MORef_val (ref, args) ->
-
-        let check_with_lst =
-          match ref.morv_index with
-            | None -> true
-            | Some lst -> 
-                let _check_is_int =
-                  List.iter
-                  (fun v -> 
-                    let _ = 
-                      type_check_has_type fulloptiprog optiprog typScope 
-                        (MOBase_type MTypeInt ) v in
-                    ()
-                  )
-                   lst
-                in
-                  List.fold_left 
-                    (fun b v -> type_check_val fulloptiprog optiprog typScope v)
-                    true lst
-        in
-
-        (*if there is args, this is a function call, we have to check the
-         * argument of the call.*)
-        (match args with
-          | [] -> check_with_lst
-          | lst ->
-            (**allTypeMap allows to check that the 'alltype' within the
-            function call are coherent.
-            For exemple if the function f has signature f: '1 -> '1 -> '2,
-            allTypeMap will check that the first and the second argument are
-            compatibles.
-            *)
-            let check_ref reft args = 
-              (match reft.loc_val with
-                | MORef_type (modul, id_ref,deep,nargs) ->
-                    (*There should be no ref type at this level.*)
-                    true
-                | MOFun_type(args_type, ret) ->
-                    (*This is possible that there are more args than there
-                      * are required argument. In that case the nth
-                      * outbounds. 
-                      * This should be possible only if the ret is itself a fun.
-                      * *)
-                    (match (Stdlib.compare (List.length args) (List.length args_type) )
-                    with 
-                      | i when i > 0 ->  
-                          (*TODO*)
-                          true
-                      | _ -> 
-                      let res,_, _allTypeMap = 
-                        List.fold_left 
-                        (fun (b,pos, allTypeMap) arg ->  
-                            let arg_req_type = List.nth args_type pos in
-                            let typ, allTypeMap = 
-                                expr_check_has_type_with_allTypeConstraint 
-                                  fulloptiprog optiprog typScope arg_req_type arg allTypeMap
-                            in
-                            (debug_print (sprintf "arg should have type %s \n" (type_to_string arg_req_type)));
-                            (debug_print (sprintf "arg has type %s \n" (type_to_string typ)));
-                            (b && (type_check_val fulloptiprog optiprog typScope arg)), pos+1, allTypeMap
-                        ) (true,0, IntMap.empty) args 
-                      in res
-                    )
-                | _ -> 
-                    raise_typeError ("Invalid function call") reft.loc_pos
-              )
-            in
-            let ftyp = get_type_from_ref fulloptiprog optiprog typScope ref in 
-            check_ref ftyp args  
-         )
-    | MOEnvRef_val (_) -> 
-      true
-    | MOBasicFunBody_val (op, a, b) -> 
-        (type_check_val fulloptiprog optiprog typScope a) && (type_check_val fulloptiprog optiprog typScope b)
-    | MOBind_val bd ->
-        (match bd.mobd_name with
-          | [(id,pars_pos,pos)] ->
-              let const, _ = (IntMap.find id progScope) in
-              let typ,_ = determine_type fulloptiprog optiprog progScope (Some const) bd.mobd_value  in typ
-          | _ -> assert false (*TODO*) 
-        );
-        type_check_val fulloptiprog optiprog typScope bd.mobd_value && type_check_val fulloptiprog optiprog typScope bd.mobd_body
-    | MOIf_val (cond, thn, els) ->
-        let _typ = type_check_has_type fulloptiprog optiprog typScope (MOBase_type MTypeBool) cond in
-        (let thn_type,_ = determine_type fulloptiprog optiprog progScope None thn
-         in 
-         let _typ = type_check_has_type fulloptiprog optiprog typScope thn_type els in
-            type_check_val fulloptiprog optiprog typScope cond && 
-            type_check_val fulloptiprog optiprog typScope thn && 
-            type_check_val fulloptiprog optiprog typScope els
-      )
-    | MOComp_val (op, a , b) ->
-        let typa,_ = determine_type fulloptiprog optiprog progScope None a in
-        let _typ = type_check_has_type fulloptiprog optiprog typScope typa b in
-        type_check_val fulloptiprog optiprog typScope a && 
-        type_check_val fulloptiprog optiprog typScope b
-    | MOBody_val lstbody -> 
-        let rev = List.rev lstbody in
-        let main, _others = List.hd rev, List.rev (List.tl rev) in
-        (*TODO check others against unit*)
-(*         List.fold_left (fun b bd -> ) true others *)
-        type_check_val fulloptiprog optiprog typScope main
-
-
-let type_check_prog fulloptiprog optiprog top_types = 
-  IntMap.iter
-  (fun i v -> 
-    match v with 
-      | MOTop_val v -> let _res = type_check_val fulloptiprog optiprog top_types v in ()
-      | MOTupEl_val _ -> ()
-  )
-  optiprog.mopg_topvar;
-  let _ = type_check_val fulloptiprog optiprog top_types optiprog.mopg_topcal in ()
-
-
-(*For every user module, valid correct typing or throw a TypeError exception.
-*)
-let type_check fulloptiprog top_types = 
-  debug_info (debug_title3 "Doing final type check");
-  let _ = 
-    (*check every modules*)
-    IntMap.iter
-      (fun modi el -> 
-        match el with 
-          | MOSystemMod s -> ()
-              (*We don't check them*)
-          | MOUserMod optiprog -> 
-              type_check_prog fulloptiprog optiprog top_types
-      )
-      fulloptiprog.mofp_progmodules
-  in
-  (*for main prog *)
-  type_check_prog fulloptiprog fulloptiprog.mofp_mainprog top_types
-(*
-  ;
-  let finalAlltypeMap = (!alltypeMap) in
-  (*check the coherency of the alltypeMap *)
-  IntMap.iteri 
-    (fun i lstConstraint ->  
-      (*We first check that there is no uncoherency within the list of constraint*)
-      let res_typ = 
-      List.fold_left 
-        (fun res_typ const -> 
-          determine_refine_type res_typ const
-        )
-        (MOAll_type (get_fresh_int ())) lstConstraint
-    ) (finalAlltypeMap)
-*)
-
-
-
-  (*debug function: print for every top level, the type in order to control.*)
-let debug_to_level_type fulloptiprog var_types = 
-
-  debug_info (debug_title3 "toplevel var (and type)");
-  (*if the iname come from a tuple reference, it will not be present in
-   * mopg_topvar_debugname*)
-  let find_debug_name prog iname = 
-    try IntMap.find iname prog.mopg_topvar_debugname
-    with Not_found  -> "_tuple_"
-
-  in 
-  IntMap.iter
-    (
-      (*for every modules*)
-      fun modi toptypmap ->
-        let mod_str = IntMap.find modi fulloptiprog.mofp_progmap_debug in
-        IntMap.iter 
-          (fun var (typ,pars_pos) ->
-            let var_str = 
-              match IntMap.find_opt modi fulloptiprog.mofp_progmodules with
-                | None -> find_debug_name fulloptiprog.mofp_mainprog var
-                | Some (MOUserMod mprog) -> find_debug_name mprog var
-                | Some (MOSystemMod sysmod) -> (IntMap.find var sysmod.mosm_topvar).mosmv_name
-            in
-            debug_print (sprintf "from module %s: %d (%s) : %s\n" mod_str var var_str (type_to_string (typ)))
-          )
-          toptypmap
-    )
-    var_types
-
-(*END Determining the type of every top level function *)
-  (* END PART 3: FULL TYPE CHECKING *)
 
   (* PART 2: TRANSFORMATION OF EXPR *)
   (* From parsed to opt but with only minimal type checking (deductible from 
@@ -1992,7 +840,34 @@ let get_bind_vars_from_topvar topvar =
    * *)
 let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
 
-  let rec parsedToOpt_composed_val ?topvar:(topvar = None) optiprog locScope mct = 
+(*
+box a value within a variable.
+  in gufo code, "aval" become "let $x = aval in ($x) ." 
+  The goal of the boxing is to give information to the type checker: 
+  The type checker first collect constraints (on variables) and then solve the
+  constraint.
+  We cannot express constraint over expressions, so adding interna variables
+  though this boxing allows to have variables where it is needed.
+  
+*)
+  let rec box_val ?topvar:(topvar = None) locScope aval = 
+    let new_internal_var = get_fresh_int () in
+      {aval with loc_val = MOBind_val 
+      {
+       mobd_name = [(new_internal_var, aval.loc_pos ,[])];
+       mobd_debugnames = IntMap.empty;
+       mobd_value = parsedToOpt_expr ~topvar optiprog locScope aval;
+       mobd_body = {aval with loc_val = 
+                     MORef_val( {
+                     morv_module = Some (optiprog.mopg_name); 
+                     morv_varname =  {aval with loc_val=new_internal_var} , [];
+                     morv_index = None; 
+                     morv_debugname = "";
+                 },[])} ;
+       }}
+ 
+
+  and parsedToOpt_composed_val ?topvar:(topvar = None) optiprog locScope mct = 
     (*the field name allow to recognize the composed type, we then check every
      * field has name according to the same object.*)
     let parsedToOpt_field def_modul fd =
@@ -2080,8 +955,10 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
   and parsedToOpt_stringOrRef ?topvar:(topvar = None) optiprog locScope sor = 
     match sor with 
     | SORString s -> MOSORString s
-    | SORExpr tval -> MOSORExpr (parsedToOpt_expr ~topvar optiprog locScope tval)
-  
+    | SORExpr tval -> 
+        MOSORExpr (box_val ~topvar locScope tval)
+
+
   and parsedToOpt_cmd_output ?topvar:(topvar = None) optiprog locScope cout = 
     match cout with 
       | MCMDOStdOut -> MOCMDOStdOut
@@ -2197,28 +1074,31 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
     | MTuple_val tup -> 
         MOTuple_val ({tup with loc_val = List.map (parsedToOpt_expr ~topvar optiprog locScope) tup.loc_val})
     | MList_val lst -> 
-        MOList_val {lst with loc_val = (List.map (parsedToOpt_expr ~topvar optiprog locScope) lst.loc_val)}
+        MOList_val {lst with 
+                    loc_val = (List.map 
+                                (box_val ~topvar locScope) 
+                              lst.loc_val)
+                   }
     | MNone_val -> MONone_val
     | MSome_val s -> 
         MOSome_val (parsedToOpt_expr ~topvar optiprog locScope s)
     | MSet_val slst ->
-        let set = 
-          List.fold_left 
-            (fun set el -> 
-              MSet.add (core_to_simple_val
-                        (parsedToOpt_expr ~topvar optiprog locScope el)) set
-            ) 
-            MSet.empty slst.loc_val
-        in MOSet_val {slst with loc_val = set}
+        MOSet_val {slst with 
+                    loc_val = 
+                      (List.fold_left (fun set el ->
+                        MSet.add (core_to_simple_val (box_val ~topvar locScope el)) set
+                      )
+                      MSet.empty slst.loc_val);
+                   }
     | MMap_val mlst -> 
         let map = 
-          List.fold_left 
-            (fun map (k,el) -> 
-              MMap.add (core_to_simple_val (parsedToOpt_expr ~topvar optiprog locScope k)) 
-                       (parsedToOpt_expr ~topvar optiprog locScope el) map
-            ) 
-            MMap.empty mlst.loc_val
-        in MOMap_val {mlst with loc_val = map}
+          (List.fold_left 
+            (fun map (k,el) ->
+              MMap.add (core_to_simple_val (box_val ~topvar locScope k))
+                       (box_val ~topvar locScope el) map
+          )
+          MMap.empty mlst.loc_val);
+        in MOMap_val({mlst with loc_val = map})
     | MFun_val (args, body) -> 
       let onames,locScope, ofunargs = 
         List.fold_left 
@@ -2447,19 +1327,26 @@ let parsedToOpt_topval fulloptiprog oldprog optiprog is_main_prog past_var_map =
         | MBasicFunBody_val (op, args) ->
             (match args with 
             |  [a;b] -> 
-                MOBasicFunBody_val (op, parsedToOpt_expr ~topvar optiprog locScope a, 
-                                        parsedToOpt_expr ~topvar optiprog locScope b)
+                let ba = box_val ~topvar locScope a in
+                let bb = box_val ~topvar locScope b in
+                MOBasicFunBody_val (op, ba, 
+                                        bb)
             |  _ -> raise_syntaxError "basic operators (+,-,/,mod...) are binary." op.loc_pos
             )
         | MBind_val bd -> 
             MOBind_val (parsedToOpt_binding ~topvar optiprog locScope bd)
         | MIf_val (cond, thn, els) ->
-            MOIf_val(parsedToOpt_expr ~topvar optiprog locScope cond,
-                     parsedToOpt_expr ~topvar optiprog locScope thn, 
-                     parsedToOpt_expr ~topvar optiprog locScope els)
+            
+              let boxed_cond = box_val ~topvar locScope cond in
+              let boxed_thn = box_val ~topvar locScope thn in
+              let boxed_els = box_val ~topvar locScope els in
+              MOIf_val(boxed_cond,
+                     boxed_thn, 
+                     boxed_els)
         | MComp_val (op, left, right) -> 
-            MOComp_val (op, parsedToOpt_expr ~topvar optiprog locScope left, 
-                        parsedToOpt_expr ~topvar optiprog locScope right)
+            let boxed_left = box_val ~topvar locScope left in 
+            let boxed_right = box_val ~topvar locScope right in 
+            MOComp_val (op, boxed_left, boxed_right)
         | MBody_val dblst -> 
             MOBody_val 
               (List.map (fun bd -> parsedToOpt_expr ~topvar optiprog locScope bd) dblst)
@@ -2633,10 +1520,13 @@ let parsedToOpt_topval_intmap prog optiprog =
 let moref_to_moctype fulloptiprog optiprog = 
   let replace_field fd = 
     let rec ref_to_ctype typ = 
-      match typ with
+      {typ with loc_val = ref_to_ctype_ typ }
+    
+    and ref_to_ctype_ typ = 
+      match typ.loc_val with
         |  MOUnit_type  
         |  MOAll_type _ 
-        |  MOBase_type _ -> typ
+        |  MOBase_type _ -> typ.loc_val
         |  MOTuple_type lst -> 
            MOTuple_type (List.map ref_to_ctype lst)
         |  MOList_type typ -> 
@@ -2735,33 +1625,35 @@ let parsedToOpt_type fulloptiprog oldprog optiprog =
   in
 
   let rec parsedToOpt_type_simpletype st = 
-    match st with 
-    | MBase_type mt -> MOBase_type mt
-    | MTuple_type tup ->  MOTuple_type (List.map parsedToOpt_type_simpletype tup)
-    | MList_type lst ->  MOList_type (parsedToOpt_type_simpletype lst)
-    | MOption_type optt ->  MOOption_type (parsedToOpt_type_simpletype optt)
-    | MSet_type settyp ->  MOSet_type (parsedToOpt_type_simpletype settyp )
-    | MMap_type (keytyp, eltyp) -> 
-         MOMap_type (parsedToOpt_type_simpletype keytyp, parsedToOpt_type_simpletype eltyp )
-    | MFun_type (typlst, rettyp) -> 
-           MOFun_type(List.map parsedToOpt_type_simpletype typlst, 
-                       parsedToOpt_type_simpletype rettyp)
-    | MUnit -> MOUnit_type
-    | MRef_type ref -> 
-        (match ref.mrv_module with 
-          | None ->  handle_ref_val_from_prog optiprog ref
-          | Some mo -> 
-              let modprog = GufoModules.get_module_prog_from_modulestr mo fulloptiprog in
-              (match modprog with 
-                | MOUserMod oprog_mod -> handle_ref_val_from_prog oprog_mod ref
-                | MOSystemMod _ -> 
-                    let modul, id = GufoModules.get_oref_from_sysmodule ref fulloptiprog
-                    in
-                    MORef_type (Some modul, id, 0, [])
-              )
-        )
-    | MAll_type v -> raise (InternalError "Gufo internal error") (*TODO*)
-
+    let stval = 
+      (match st.loc_val with 
+      | MBase_type mt -> MOBase_type mt
+      | MTuple_type tup ->  MOTuple_type (List.map parsedToOpt_type_simpletype tup)
+      | MList_type lst ->  MOList_type (parsedToOpt_type_simpletype lst)
+      | MOption_type optt ->  MOOption_type (parsedToOpt_type_simpletype optt)
+      | MSet_type settyp ->  MOSet_type (parsedToOpt_type_simpletype settyp )
+      | MMap_type (keytyp, eltyp) -> 
+           MOMap_type (parsedToOpt_type_simpletype keytyp, parsedToOpt_type_simpletype eltyp )
+      | MFun_type (typlst, rettyp) -> 
+             MOFun_type(List.map parsedToOpt_type_simpletype typlst, 
+                         parsedToOpt_type_simpletype rettyp)
+      | MUnit -> MOUnit_type
+      | MRef_type ref -> 
+          (match ref.mrv_module with 
+            | None ->  handle_ref_val_from_prog optiprog ref
+            | Some mo -> 
+                let modprog = GufoModules.get_module_prog_from_modulestr mo fulloptiprog in
+                (match modprog with 
+                  | MOUserMod oprog_mod -> handle_ref_val_from_prog oprog_mod ref
+                  | MOSystemMod _ -> 
+                      let modul, id = GufoModules.get_oref_from_sysmodule ref fulloptiprog
+                      in
+                      MORef_type (Some modul, id, 0, [])
+                )
+          )
+      | MAll_type v -> raise (InternalError "Gufo internal error") (*TODO*)
+    )
+    in {st with loc_val = stval}
 
   in
 
@@ -2815,400 +1707,6 @@ let parsedToOpt_type fulloptiprog oldprog optiprog =
 
 
   (* END PART 1: TRANSFORMATION OF TYPE *)
-
-
-
-(*PART 4 
- * During first part of part 3, we determine a type using the determine_type
-function. However, they keep beiing unprecise because there is still
-references.
-  For exemple if you have funa(funb(anArg)), if funb type is deduced from the
-anArg, the return type of funa might be unprecise.
-  Here, we do a bottom to top analysis:
-    We consider the type of anArg, to determine the type the call funb(anArg),
-to finally get the one of this call of funa(funb(anArg).
-type_check_val_to_top returns a new var_types and a current resulting type.
-*
-  For now this function use determine_refine_type but this function might not be enought; it does not update var_types. It does not link a MOAllType to a concrete type.
-*)
-
-
-let rec type_check_val_to_top_ fulloptiprog optiprog modi varval var_types = 
-  (*var_types contains strictly more accurate information than a locScope (as
-used in the determine_type* functions.). So to call some determine_type*
-function we used it to not lost informations. *)
-(*   let locScope = IntMap.find optiprog.mopg_name var_types in *)
-  let get_type_from_var_types var_types idmodul id =
-    match IntMap.find_opt idmodul var_types with
-      | None -> raise (InternalError "type checker error.")(*We hope this cannot happen.*)
-      | Some modulmap -> 
-          (match IntMap.find_opt id.loc_val modulmap with
-            | None -> raise (InternalError "type checker error.")(*We hope this cannot happen.*)
-            | Some typ_and_pos -> typ_and_pos
-          )
-  in 
-
-  let rec type_check_val_to_top_funargs args var_types = 
-    List.map
-    (fun funarg -> 
-      match funarg with
-        | MOBaseArg i -> 
-            let v, pos = get_type_from_var_types var_types modi i in
-            {loc_val = v; loc_pos = pos}
-        | MOTupleArg lstfunarg -> 
-            {loc_val = (MOTuple_type (
-              List.map (fun typ_pos -> typ_pos.loc_val )
-                (type_check_val_to_top_funargs lstfunarg var_types)) );
-             loc_pos = lstfunarg.loc_pos;
-            }
-    ) args.loc_val
-  in
-
-  (*Specific for commands *)
-  let rec do_analyse_cmd var_types cmdVal =
-    let do_analyse_stringOrRef_cmd var_types sor =
-      match sor with 
-        | MOSORString _ -> var_types
-        | MOSORExpr e -> 
-            let var_types, _ = 
-              type_check_val_to_top fulloptiprog optiprog modi e var_types in
-            var_types
-    in
-    let do_analyse_output_cmd var_types out = 
-      match out with
-        | MOCMDOStdOut
-        | MOCMDOStdErr -> var_types
-        | MOCMDOFile sor   
-        | MOCMDOFileAppend sor -> do_analyse_stringOrRef_cmd var_types sor
-    in
-    let do_analyse_outputerr_cmd var_types out = 
-      match out with
-        | MOCMDEStdOut
-        | MOCMDEStdErr -> var_types
-        | MOCMDEFile sor 
-        | MOCMDEFileAppend sor -> do_analyse_stringOrRef_cmd var_types sor
-    in
-    let do_analyse_input var_types inp = 
-      match inp with
-        | MOCMDIStdIn -> var_types
-        | MOCMDIFile sor -> do_analyse_stringOrRef_cmd var_types sor
-    in
-    match cmdVal.loc_val with 
-      | MOSimpleCmd cval ->
-          let var_types = 
-            List.fold_left 
-            (fun var_types arg -> do_analyse_stringOrRef_cmd var_types arg 
-            ) var_types cval.loc_val.mocm_args in
-          let var_types = do_analyse_output_cmd var_types cval.loc_val.mocm_output in
-          let var_types = do_analyse_outputerr_cmd var_types cval.loc_val.mocm_outputerr in
-          let var_types = do_analyse_input var_types cval.loc_val.mocm_input_src in
-          var_types
-      | MOForkedCmd seq -> do_analyse_cmd var_types seq
-      | MOAndCmd (cmd1, cmd2) ->
-          do_analyse_cmd (do_analyse_cmd var_types cmd1) cmd2 
-      | MOOrCmd (cmd1, cmd2) ->
-          do_analyse_cmd (do_analyse_cmd var_types cmd1) cmd2 
-      | MOSequenceCmd (cmd1, cmd2 )->
-          do_analyse_cmd (do_analyse_cmd var_types cmd1) cmd2 
-      | MOPipedCmd (cmd1, cmd2) -> 
-          do_analyse_cmd (do_analyse_cmd var_types cmd1) cmd2 
-  in
-  (*Specific function for funcall*)
-  let do_analyse_funcall var_types refval args args_typ =
-    let allTypeMap = IntMap.empty in
-    (*Check if a real arguments is compatible with the expected one and return the resulting type.*)
-    let check_arg required real allTypeMap = 
-      type_check_has_type_with_allTypeConstraint real.loc_pos fulloptiprog optiprog var_types required real.loc_val allTypeMap
-    in
-
-    (*For now this function just return an updated allTypeMap without worrying about var_types. TODO: it should update var_types. *)
-    let rec do_analyse_funcall_ epos var_types ftyp args_types allTypeMap = 
-      match ftyp with
-        | MOFun_type(args_required_type, ret) ->
-          (match (Stdlib.compare (List.length args_types) (List.length args_required_type) )
-              with 
-                | i when i > 0 ->  
-                  (*This is possible that there are more args than there
-                   * are required argument. In that case the nth
-                   * outbounds. 
-                   * This should be possible only if the ret is itself a fun.
-                   * *)
-                  (*We check every arg catched by the function, and rec call on
-                   * the returned type + the additionnal arguments.*)
-                  let cur_fun_args_types, ret_fun_args_types = 
-                    list_split_at_idx args_types (List.length args_required_type) 
-                  in
-                  let allTypeMap =
-                    List.fold_left2 (fun allTypeMap required real -> 
-                                      let _,allTypeMap = 
-                                        check_arg required real allTypeMap in
-                                      allTypeMap
-                                    ) 
-                      allTypeMap
-                      args_required_type 
-                      cur_fun_args_types
-                  in
-                  let ret = allType_getRealType ret allTypeMap in
-                  let ret, allTypeMap = 
-                    do_analyse_funcall_ epos var_types ret ret_fun_args_types allTypeMap
-                  in
-                  ret, allTypeMap
-                | _ -> 
-                    let cur_fun_required_types, _ = 
-                      list_split_at_idx args_required_type (List.length args_types) 
-                    in
-                    let allTypeMap,_ = 
-                    List.fold_left2 
-                      (fun (allTypeMap,args) required real -> 
-                        let _,allTypeMap = 
-                          check_arg required real allTypeMap in
-                        let cur_arg, args =
-                          match args with
-                            | [] -> assert false
-                            | [a] -> a, []
-                            | a::b -> a, b
-                        in
-                        let required = refine_allTypeConstraint required allTypeMap
-                        in
-                        let _, allTypeMap =
-                        expr_check_has_type_with_allTypeConstraint
-                          fulloptiprog optiprog var_types required cur_arg allTypeMap
-                        in
-                        allTypeMap, args
-                      ) 
-                      (allTypeMap, args)
-                      cur_fun_required_types
-                      args_types
-                    in
-                    (*the types of the argument might impact the ret type*)
-                    (*TODO: debug allTypeMap*)
-                    let ret = allType_getRealType ret allTypeMap in
-                    ret, allTypeMap
-          )
-          | _ -> 
-              raise_typeError "Invalid function call" epos
-    in
-    (*first we check the arguments *)
-(*
-    let var_types, args_types = 
-      List.fold_left (fun (var_types, args_types) v -> 
-        let var_types, next_type =
-        type_check_val_to_top_ fulloptiprog optiprog v var_types
-        in
-        var_types, next_type::args_types
-      ) (var_types, [] ) args
-    in 
-*)
-    let funname, field = refval.morv_varname in
-    (*then the function itself *)
-    let modulId = 
-      match refval.morv_module with
-        | None -> optiprog.mopg_name 
-            (*need to get the current module id*)
-        | Some modulId -> modulId
-    in 
-    let funtype, fun_pos =  
-      match (List.rev field) with 
-        | [] -> get_type_from_var_types var_types modulId funname
-        | fd::lst -> (get_type_field_from_field fulloptiprog optiprog fd).motf_type, funname.loc_pos
-    in
-    
-      debug_print(sprintf "function %d ret type before analysis: %s \n"  
-        (funname.loc_val) 
-        (type_to_string funtype));
-    match args_typ with
-      | [] -> 
-        (*no args, we return funtype*) (funtype, var_types)
-      | lst -> 
-          let funtyp, allTypeMap = do_analyse_funcall_ 
-                                     funname.loc_pos var_types 
-                                     funtype args_typ allTypeMap
-          in  funtyp, var_types
-  in
-
-  match varval.loc_val with 
-    | MOSimple_val (MOBase_val (MOTypeCmdVal cmdVal)) -> 
-        do_analyse_cmd var_types cmdVal , (MOBase_type MTypeCmd)
-    | MOSimple_val (MOBase_val (MOTypeStringVal _)) -> 
-        var_types, (MOBase_type MTypeString)
-    | MOSimple_val (MOBase_val (MOTypeIntVal _)) -> 
-        var_types, MOBase_type MTypeInt
-    | MOSimple_val (MOBase_val (MOTypeBoolVal _)) -> 
-        var_types, MOBase_type MTypeBool
-    | MOSimple_val (MOBase_val (MOTypeFloatVal _)) -> 
-        var_types, MOBase_type MTypeFloat
-    | MOSimple_val (MOTuple_val vallist) -> 
-      let var_types, rev_lstType = 
-        List.fold_left 
-          (fun (var_types, lstTyp ) aval -> 
-            let var_types, res = 
-              type_check_val_to_top fulloptiprog optiprog modi aval var_types in
-            var_types, res.loc_val::lstTyp
-          ) 
-          (var_types, [] ) vallist.loc_val
-      in var_types, MOTuple_type (List.rev(rev_lstType))
-    | MOSimple_val (MOList_val vallist) -> 
-      let var_types, res = List.fold_left 
-        (fun (var_types, res_typ) aval -> 
-          let var_types, res = 
-            type_check_val_to_top fulloptiprog optiprog modi aval var_types 
-          in
-            var_types, determine_refine_type varval.loc_pos res_typ res.loc_val
-        )
-        (var_types, (MOAll_type (get_fresh_int ()))) vallist.loc_val
-      in
-      var_types, MOList_type res
-    | MOSimple_val (MONone_val) -> 
-      var_types, MOOption_type (MOAll_type (get_fresh_int ()))
-    | MOSimple_val (MOSome_val v) -> 
-      let var_types, res = type_check_val_to_top fulloptiprog optiprog modi v var_types 
-      in
-        var_types, MOOption_type (res.loc_val)
-    | MOSimple_val (MOSet_val setval) -> 
-      let var_types, res = 
-        MSet.fold
-         (fun aval (var_types, res_typ) -> 
-           let var_types, res = 
-            type_check_val_to_top fulloptiprog optiprog modi (simple_to_core_val aval) var_types 
-           in
-             var_types, determine_refine_type varval.loc_pos res_typ res.loc_val
-         )
-         setval.loc_val (var_types, (MOAll_type (get_fresh_int ())))
-      in var_types, MOSet_type res
-    | MOSimple_val (MOMap_val mapval) -> 
-      let var_types, key_res, res = 
-        MMap.fold
-        (fun key aval (var_types, key_res_typ , res_typ) -> 
-          let var_types, key_res = type_check_val_to_top fulloptiprog optiprog
-                                    modi (simple_to_core_val key) var_types 
-          in
-          let var_types, res = 
-            type_check_val_to_top fulloptiprog optiprog modi aval var_types 
-          in
-            var_types, determine_refine_type varval.loc_pos key_res_typ  key_res.loc_val ,
-            determine_refine_type varval.loc_pos res_typ res.loc_val
-        )
-        mapval.loc_val 
-        (var_types, (MOAll_type (get_fresh_int ())), (MOAll_type (get_fresh_int ())))
-      in
-      var_types, MOMap_type (key_res, res)
-    | MOSimple_val (MOFun_val fval) ->
-      let fval = fval.loc_val in
-      let lst_args = type_check_val_to_top_funargs fval.mofv_args_id var_types
-      in
-      let var_types, res = 
-        type_check_val_to_top fulloptiprog optiprog modi fval.mofv_body var_types 
-      in
-        var_types, MOFun_type 
-                    (List.map (fun typ_pos -> typ_pos.loc_val) lst_args, 
-                    res.loc_val)
-    | MOSimple_val (MOEmpty_val) -> var_types, MOUnit_type
-    | MOComposed_val comptype ->
-        var_types, MOComposed_type (determine_type_composed fulloptiprog optiprog comptype)
-    | MORef_val (refval, args) ->
-      let var_types, rev_args_types = 
-        List.fold_left 
-          (fun (var_types, args_types) arg -> 
-            let var_types, typ = 
-              type_check_val_to_top fulloptiprog optiprog modi arg var_types
-            in 
-      debug_print(sprintf "function  has type args: %s \n"  (type_to_string typ.loc_val));
-            var_types, typ::args_types
-          )
-          (var_types, []) args
-      in
-      let ret,allTypeMap  = do_analyse_funcall var_types refval args (List.rev rev_args_types) in
-      debug_print(sprintf "function  has type ret: %s \n"  (type_to_string ret));
-
-
-      var_types, ret
-    | MOEnvRef_val _ -> 
-        var_types, MOBase_type (MTypeString)
-    | MOBasicFunBody_val (op, arga, argb) -> 
-        let var_types, typArga = 
-          type_check_val_to_top fulloptiprog optiprog modi arga var_types in
-        let var_types, typArgb = 
-          type_check_val_to_top fulloptiprog optiprog modi argb var_types in
-        var_types, determine_refine_type arga.loc_pos typArga.loc_val typArgb.loc_val
-    | MOBind_val bd -> 
-      let var_types, bdval_typ = type_check_val_to_top fulloptiprog optiprog modi bd.mobd_value var_types in
-      let var_types, bdbody_typ = type_check_val_to_top fulloptiprog optiprog modi bd.mobd_body var_types 
-       in
-      (*Enough?*)
-      var_types, bdbody_typ.loc_val
-    | MOIf_val (cond, v1, v2) -> 
-        let var_types, cond_typ = 
-          type_check_val_to_top fulloptiprog optiprog modi cond var_types in 
-        (*TODO: ok? *)
-        let _typ = determine_refine_type varval.loc_pos cond_typ.loc_val
-                    (MOBase_type (MTypeBool)) in
-        let var_types, v1_typ = 
-          type_check_val_to_top fulloptiprog optiprog modi v1 var_types in
-        let var_types, v2_typ = 
-          type_check_val_to_top fulloptiprog optiprog modi v2 var_types in
-        var_types, determine_refine_type varval.loc_pos v1_typ.loc_val v2_typ.loc_val
-    | MOComp_val (op, v1, v2) -> 
-        let var_types, v1_typ = 
-          type_check_val_to_top fulloptiprog optiprog modi v1 var_types in
-        let var_types, v2_typ = 
-          type_check_val_to_top fulloptiprog optiprog modi v2 var_types in
-        let _typ = determine_refine_type varval.loc_pos v1_typ.loc_val v2_typ.loc_val in
-        var_types, MOBase_type MTypeBool
-    | MOBody_val (lst) -> 
-        let var_types, typ = 
-          List.fold_left 
-          (fun (var_types, _) elval -> 
-            type_check_val_to_top fulloptiprog optiprog modi elval  var_types
-          )
-          (var_types, (box_loc MOUnit_type)) lst
-        in
-        var_types, typ.loc_val
-
-and type_check_val_to_top fulloptiprog optiprog modi varval var_types = 
-   let var_types, typ = 
-     type_check_val_to_top_ fulloptiprog optiprog modi varval var_types in
-   var_types, {loc_val = typ; loc_pos = varval.loc_pos}
-
-
-let type_check_prog_to_top fulloptiprog optiprog modi var_types = 
-  debug_info(debug_title3 (sprintf "Module %d\n" modi )) ;
-  let var_types = 
-    IntMap.fold
-    (fun vari  varval var_types -> 
-      match varval with 
-        | MOTop_val aval -> 
-            let var_types, typ = 
-              type_check_val_to_top fulloptiprog optiprog modi aval var_types 
-            in
-            var_types
-        | MOTupEl_val _  -> var_types
-    )
-    optiprog.mopg_topvar var_types
-  in 
-  let var_types, _  = 
-    type_check_val_to_top fulloptiprog optiprog modi optiprog.mopg_topcal var_types
-  in var_types
-
-
-let type_check_bottom_to_top fulloptiprog var_types = 
-  (*For every modules*)
-  debug_info(debug_title2 "part4: bottom to top analysis");
-  let var_types = 
-  IntMap.fold
-  (fun modi optimod var_types ->
-    match optimod with
-      | MOUserMod optiprog -> type_check_prog_to_top fulloptiprog optiprog modi var_types
-      | MOSystemMod sysmod -> var_types
-  )
-   fulloptiprog.mofp_progmodules var_types 
-  in
-  type_check_prog_to_top fulloptiprog fulloptiprog.mofp_mainprog 0 var_types
-    
-    
-
-(*END PART 4 *)
-
-
 
 
 
@@ -3319,28 +1817,32 @@ let parsedToOpt fullprog =
   in
   let fulloptiprog = {fulloptiprog with mofp_progmodules = modul_progs} in
   (*FROM PART 3*)
-  (*First step, we compute toplevel var. It is done in one run (one
-   * representation traversal) and sometimes the determined type is a reference
-   * to another variable type.*)
-  (*In fact : var_types does not only contains type of toplevel vars
-  but of every vars: this is possible because each var (independantly from source
-  file name, has an internal int id which is unique): this allow to have a global
-  scope. *)
-  (*
-  We need to add position information to the types of the vars.
+  (*Trying determine type.
+    We first compute a set a constraints.
+    Map each program variable to a set of constraint.
   *)
   debug_info (debug_title2 "part3: full type checking");
-  let var_types = top_level_types fulloptiprog in 
-  (*Second stop, we want to remove references type from the toplevels types.*)
-  let var_types = top_level_types_no_ref var_types None in
-  debug_to_level_type fulloptiprog var_types ;
-  (*Third step, look inside the code*)
-   type_check fulloptiprog var_types   ;
-  (*PART 4 *)
-  debug_info (debug_title2 "Part4: full type checking");
-  let var_types = type_check_bottom_to_top fulloptiprog var_types in
-  fulloptiprog, var_types
+  let constraints = extract_constraints fulloptiprog in 
+  let _debug_constraints = GufoSolver.debug_constraints in 
+  let resolvedTypes = GufoSolver.solver constraints in
+  let resolvedTypes = 
+    IntMap.map
+      (fun modMap ->
+        IntMap.map 
+        (fun loctype -> loctype.loc_val, loctype.loc_pos)
+        modMap
+      )
+      resolvedTypes
+  in
+  fulloptiprog, resolvedTypes
 
+  (*Second stop, we want to remove references type from the toplevels types.*)
+(*   debug_to_level_type fulloptiprog var_types ; *)
+  (*PART 4 *)
+(*   debug_info (debug_title2 "Part4: full type checking"); *)
+(*   let var_types = type_check_bottom_to_top fulloptiprog var_types in *)
+(*   fulloptiprog, var_types *)
+(*   fulloptiprog, IntMap.empty *)
 
 
 
@@ -3589,14 +2091,26 @@ let add_prog_to_optprog fulloptiprog fullprog =
      modules with variable id unique within the whole program. This would make
      it easier to get type from this map.*)
   debug_info(debug_title2 "PART 3");
-  let var_types = top_level_types nfulloptiprog in 
+  let constraints = extract_constraints nfulloptiprog in 
+  debug_info(debug_title2 "extracting constraint 3-2");
+  let _debug_constraints = GufoSolver.debug_constraints constraints in 
+  debug_info(debug_title2 "solving constraint");
+  let resolvedTypes = GufoSolver.solver constraints in
+  let resolvedTypes = 
+    IntMap.map
+      (fun modMap ->
+        IntMap.map 
+        (fun loctype -> 
+            loctype.loc_val, loctype.loc_pos)
+        modMap
+      )
+      resolvedTypes
+  in
+  nfulloptiprog, resolvedTypes
+(*   let var_types = top_level_types nfulloptiprog in  *)
   (*PART 3 *)
-  debug_print "dump var_types before top_level_types_no_ref\n";
-  IntMap.iter
-    (fun ivar (typ, _pars_pos) -> debug_print (sprintf "\t\t %d : %s\n" ivar (type_to_string typ)))
-    (IntMap.find 0 var_types);
-  let var_types = top_level_types_no_ref var_types past_var_map in
-  debug_print "dump var_types after top_level_types_no_ref\n";
+(*
+  debug_print "dump var_types \n";
   IntMap.iter
     (fun ivar (typ, _pars_pos) -> debug_print (sprintf "\t\t %d : %s\n" ivar (type_to_string typ)))
     (IntMap.find 0 var_types);
@@ -3604,14 +2118,13 @@ let add_prog_to_optprog fulloptiprog fullprog =
 
   (*PART 3 *)
    debug_to_level_type nfulloptiprog var_types ;
-  (*PART 3 *)
-   type_check nfulloptiprog var_types   ;
   (*PART 4 *)
   debug_info(debug_title2 "PART 4");
   debug_print "dumping var_types at beginning of part 4";
   debug_var_type var_types;
   let var_types = type_check_bottom_to_top nfulloptiprog var_types in
   nfulloptiprog, var_types
+*)
 
   
 let add_module_to_optprog progname fulloptiprog moduleprog = 
@@ -3634,7 +2147,6 @@ let add_module_to_optprog progname fulloptiprog moduleprog =
     }
   in
 
-(*   let  = search_modules moduleprog in *)
   (*FROM PART 1*)
   (*do the provide_type_id for the moduleprog*)
   debug_info(debug_title2 "PART 1");
@@ -3655,10 +2167,14 @@ let add_module_to_optprog progname fulloptiprog moduleprog =
   let fulloptiprog = {fulloptiprog with mofp_progmodules = modul_progs} in
   (*FROM PART 3*)
   debug_info(debug_title2 "PART 3");
+  let constraints = extract_constraints fulloptiprog in 
+  debug_info(debug_title2 "extracting constraint 3-1");
+  let _debug_constraints = GufoSolver.debug_constraints in 
+  let resolvedTypes = GufoSolver.solver constraints in
+(*   nfulloptiprog, resolvedTypes *)
+(*
   let var_types = top_level_types fulloptiprog in 
-  let var_types = top_level_types_no_ref var_types None in
   debug_to_level_type fulloptiprog var_types ;
-   type_check fulloptiprog var_types   ;
   (*END PART 3*)
   (*PART 4 *)
   debug_info(debug_title2 "PART 4");
@@ -3666,5 +2182,17 @@ let add_module_to_optprog progname fulloptiprog moduleprog =
   debug_print (sprintf "Dumping fulloptiprog modules after adding modules: %s \n"
           (fulloptiprogModules_to_string fulloptiprog));
 
-  fulloptiprog, var_types
+*)
+  let resolvedTypes = 
+    IntMap.mapi
+      (fun modi modMap ->
+        IntMap.mapi
+        (fun vari loctype -> 
+          Printf.printf "final map %d %d\n" modi vari;
+          loctype.loc_val, loctype.loc_pos)
+        modMap
+      )
+      resolvedTypes
+  in
+  fulloptiprog, resolvedTypes
 

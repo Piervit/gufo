@@ -40,17 +40,29 @@ let types =
         {
           mosmf_name = "res";
           mosmf_intname= 2;
-          mosmf_type= MOOption_type (MOBase_type (MTypeInt));
+          mosmf_type= 
+            motypeCoreFunToMoType
+              (MOCOption_type (MOCBase_type (MTypeInt) ))
+              "Cmd.res"
+            ;
         };
       {
         mosmf_name = "print";
           mosmf_intname= 3;
-          mosmf_type= (MOBase_type (MTypeString));
+          mosmf_type= 
+            motypeCoreFunToMoType
+            (MOCBase_type (MTypeString))
+            "Cmd.print"
+            ;
         };
       {
         mosmf_name = "print_err";
           mosmf_intname= 4;
-          mosmf_type= (MOBase_type (MTypeString));
+          mosmf_type= 
+            motypeCoreFunToMoType
+              (MOCBase_type (MTypeString))
+              "Cmd.print_err" 
+            ;
         }
 
       ];
@@ -67,9 +79,13 @@ let topvars =
       mosmv_description = "Return the text from the output of the program executed in first argument.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOFun_type
-        ([MOList_type (MOBase_type (MTypeCmd)); ], 
-         MOList_type (MOBase_type (MTypeString)));
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([MOCList_type (MOCBase_type (MTypeCmd)) ;  ] , 
+           MOCList_type (MOCBase_type (MTypeString)) )  
+          )
+          "Cmd.text"
+        ;
       mosmv_action= text;
     };
   ]

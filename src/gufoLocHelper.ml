@@ -29,6 +29,25 @@ let string_of_int_loc iloc =
 
 let box_loc v = box_with_dummy_pos v
 
+let box_loc_corefun v name =
+  let pars_pos = {
+    ppos_start = {
+   	pos_fname = name ;
+   	pos_lnum = 0;
+   	pos_bol = 0;
+   	pos_cnum = 0;
+    };
+    ppos_end = {
+   	pos_fname = name ;
+   	pos_lnum = 0;
+   	pos_bol = 0;
+   	pos_cnum = 0;
+    }
+  }
+  in 
+  {loc_val = v ; loc_pos = pars_pos}
+
+
 let lst_val_only loc_lst = List.map (fun a -> a.loc_val) loc_lst
 
 let pos_merging pos_a pos_b =

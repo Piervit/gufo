@@ -102,7 +102,7 @@ val sysmodctype_to_ctype : Gufo.MCore.mosysmoduletype -> Gufo.MCore.mocomposed_t
  *
  * Return every types defined in a standard library modules as a map of type.
  *)
-val get_types_map : Gufo.MCore.mosysmodule -> (Gufo.MCore.motype * GufoParsed.pars_position) GenUtils.IntMap.t
+val get_types_map : Gufo.MCore.mosysmodule -> Gufo.MCore.TypeSet.t GenUtils.IntMap.t
 
 val get_system_modules : GufoParsed.mmodultype IntMap.t 
 val get_system_modules_dep : IntSet.t IntMap.t 

@@ -81,10 +81,12 @@ let topvars =
       mosmv_description = "Return the number of elements of the set as an integer.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOFun_type
-        ([ MOSet_type( MOAll_type (-20) );
-        ], MOBase_type(MTypeInt))
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCSet_type( MOCAll_type (-20) );
+          ], MOCBase_type(MTypeInt))
+          )
+          "Set.cardinal"
         ;
       mosmv_action= cardinal;
     };
@@ -93,11 +95,13 @@ let topvars =
       mosmv_description = "Return true if the element is in the set. Else, return false.";
       mosmv_intname = 2;
       mosmv_type = 
-        MOFun_type
-        ([ MOSet_type( MOAll_type (-20) );
-           MOAll_type (-20) 
-        ], MOBase_type(MTypeBool))
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCSet_type( MOCAll_type (-20) );
+             MOCAll_type (-20) 
+          ], MOCBase_type(MTypeBool))
+          )
+          "Set.is_in"
         ;
       mosmv_action= is_in;
     };
@@ -106,11 +110,14 @@ let topvars =
       mosmv_description = "Do the union of two sets. ";
       mosmv_intname = 3;
       mosmv_type = 
-        MOFun_type
-        ([ MOSet_type( MOAll_type (-20) );
-           MOSet_type( MOAll_type (-20) );
-        ], 
-           MOSet_type( MOAll_type (-20) ))
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCSet_type( MOCAll_type (-20) );
+             MOCSet_type( MOCAll_type (-20) );
+          ], 
+             MOCSet_type( MOCAll_type (-20) ))
+          )
+          "Set.union"
         ;
       mosmv_action= union;
     };
@@ -119,11 +126,14 @@ let topvars =
       mosmv_description = "Add a specific value to a set.";
       mosmv_intname = 4;
       mosmv_type = 
-        MOFun_type
-        ([ MOSet_type( MOAll_type (-20) );
-           MOAll_type (-20) ;
-        ], 
-           MOSet_type( MOAll_type (-20) ))
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCSet_type( MOCAll_type (-20) );
+             MOCAll_type (-20) ;
+          ], 
+             MOCSet_type( MOCAll_type (-20) ))
+          )
+          "Set.add"
         ;
       mosmv_action= add;
     };
@@ -132,11 +142,14 @@ let topvars =
       mosmv_description = "Remove a specific value from a set.";
       mosmv_intname = 5;
       mosmv_type = 
-        MOFun_type
-        ([ MOSet_type( MOAll_type (-20) );
-           MOAll_type (-20) ;
-        ], 
-           MOSet_type( MOAll_type (-20) ))
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCSet_type( MOCAll_type (-20) );
+             MOCAll_type (-20) ;
+          ], 
+             MOCSet_type( MOCAll_type (-20) ))
+          ) 
+        "Set.rm"
         ;
       mosmv_action= rm;
     };

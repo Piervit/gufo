@@ -56,10 +56,12 @@ let topvars =
       mosmv_description = "Return the int argument as a string.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOFun_type
-        ([ MOBase_type (MTypeInt) ;]
-        , MOBase_type (MTypeString))
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ (MOCBase_type (MTypeInt))  ;]
+          , MOCBase_type (MTypeString) )
+          )
+          "Int.toString"
         ;
       mosmv_action= toString;
     };
@@ -70,10 +72,12 @@ return it as an integer: return None, it is not parsable as int, else return
 '(Some i)' with i the parsed integer.";
       mosmv_intname = 2;
       mosmv_type = 
-        MOFun_type
-        ([ MOBase_type (MTypeString) ;]
-        , MOOption_type (MOBase_type (MTypeInt)))
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCBase_type (MTypeString) ; ]
+          , MOCOption_type (MOCBase_type (MTypeInt)) ) 
+          )
+          "Int.fromString"
         ;
       mosmv_action= fromString;
     };

@@ -45,6 +45,13 @@ val add_prog_to_optprog: Gufo.MCore.fullprogopt ->
                           (Gufo.MCore.motype * GufoParsed.pars_position) 
                             GenUtils.IntMap.t GenUtils.IntMap.t
 
+(*
+val add_prog_to_optprog : Gufo.MCore.fullprogopt ->
+      GufoParsed.fullprog ->
+        Gufo.MCore.fullprogopt * 
+        Gufo.MCore.TypeSet.t GenUtils.IntMap.t GenUtils.IntMap.t
+*)
+
 val add_module_to_optprog : string -> Gufo.MCore.fullprogopt -> GufoParsed.mprogram -> Gufo.MCore.fullprogopt * (Gufo.MCore.motype * GufoParsed.pars_position) GenUtils.IntMap.t GenUtils.IntMap.t
 
 (*This function should not be used if you are not sure about what you are doing.

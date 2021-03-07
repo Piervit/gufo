@@ -63,9 +63,13 @@ let topvars =
         If optval is set to 'some i', return i, else return defval.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOFun_type
-        ([ MOOption_type (MOAll_type 1) ; (MOAll_type 1) ]
-        , MOAll_type 1)
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCOption_type (MOCAll_type 1) ; (MOCAll_type 1) ]
+          , MOCAll_type 1)
+          )
+          "Opt.get"
+
         
         ;
       mosmv_action= get;
@@ -77,9 +81,12 @@ let topvars =
         error (this should be used only when you are sure the option is set.";
       mosmv_intname = 2;
       mosmv_type = 
-        MOFun_type
-        ([ MOOption_type (MOAll_type 1) ; ]
-        , MOAll_type 1)
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCOption_type (MOCAll_type 1) ; ]
+          , MOCAll_type 1)
+          )
+          "Opt.force"
         ;
       mosmv_action= force;
     };

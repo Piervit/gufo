@@ -58,10 +58,12 @@ let topvars =
       mosmv_description = "Return the float argument as a string.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOFun_type
-        ([ MOBase_type (MTypeFloat) ;]
-        , MOBase_type (MTypeString))
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCBase_type (MTypeFloat)  ;]
+          , MOCBase_type (MTypeString)  )
+          )
+          "Flat.toString"
         ;
       mosmv_action= toString;
     };
@@ -72,10 +74,14 @@ return it as an floateger: return None, it is not parsable as float, else return
 '(Some i)' with i the parsed floateger.";
       mosmv_intname = 2;
       mosmv_type = 
-        MOFun_type
-        ([ MOBase_type (MTypeString) ;]
-        , MOOption_type (MOBase_type (MTypeFloat)))
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCBase_type (MTypeString) ;]
+          , 
+            (MOCOption_type (MOCBase_type (MTypeFloat)) )   
+            )
+          )
+          "Float.fromString"
         ;
       mosmv_action= fromString;
     };

@@ -29,7 +29,7 @@ open Gufo_lexer
 open Gufo_lexing
 
 open GufoStartComp
-
+open GufoLocHelper
 
 
 let modtypes = IntMap.empty
@@ -46,9 +46,11 @@ let topvars =
       mosmv_description = "Load the given file as a as a gufo module.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOFun_type
-        ([ MOBase_type (MTypeString) ;]
-        , MOBase_type (MTypeBool))
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ (MOCBase_type (MTypeString) ) ;]
+          , (MOCBase_type MTypeBool )))
+        "Base.load"
         ;
       mosmv_action= loadProg;
     };
@@ -62,6 +64,7 @@ let mosysmodule =
   mosm_typstrfield2int= StringMap.empty;
   mosm_typstrfield2inttype = StringMap.empty;
   mosm_typfield2inttype = IntMap.empty;
-  mosm_topvar= List.fold_left (fun acc vars -> IntMap.add vars.mosmv_intname vars acc) IntMap.empty topvars;
+  mosm_topvar= 
+    List.fold_left (fun acc vars -> IntMap.add vars.mosmv_intname vars acc) IntMap.empty topvars;
   mosm_varstr2int= List.fold_left (fun acc vars -> StringMap.add vars.mosmv_name vars.mosmv_intname acc) StringMap.empty topvars;
 }

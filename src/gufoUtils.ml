@@ -244,7 +244,7 @@ open GufoParsed
 
   let fold_over_mref_type apply_fun acc mtype = 
     let rec fold_over_mref_simple_type apply_fun acc ms = 
-          match ms with 
+          match ms.loc_val with 
             | MBase_type _ -> acc
             | MTuple_type mtyplst -> 
                 List.fold_left (fold_over_mref_simple_type apply_fun) acc mtyplst

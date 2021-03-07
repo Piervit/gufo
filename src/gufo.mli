@@ -35,7 +35,7 @@ sig
 
   type motype_field = {
     motf_name : int located;
-    motf_type: motype;
+    motf_type: motype located;
     motf_debugname : string;
   }
   
@@ -52,15 +52,15 @@ sig
   and motype =
    | MOComposed_type of mocomposed_type
    | MOBase_type of mobase_type
-   | MOTuple_type of motype list
-   | MOList_type of motype
-   | MOOption_type of motype
-   | MOSet_type of motype
-   | MOMap_type of motype * motype
-   | MOFun_type of motype list * motype (*arguments type, ret type *)
+   | MOTuple_type of motype located list
+   | MOList_type of motype located
+   | MOOption_type of motype located
+   | MOSet_type of motype located
+   | MOMap_type of motype located * motype located
+   | MOFun_type of (motype located) list * motype located (*arguments type, ret type *)
    | MOAll_type of int(*ocaml 'a , the int is only an identifier*)
    | MOUnit_type
-   | MORef_type of int option * int * int * motype list
+   | MORef_type of int option * int * int * (motype located) list
  (*
    (module * id_ref * deep *args ) 
    THIS TYPE IS A TRICKY ONE, because it is
@@ -91,7 +91,7 @@ sig
   type and should lead to an error.
    
    *)
-   | MOTupel_type of int option * int *int * motype list * int list
+   | MOTupel_type of int option * int *int * (motype located) list * int list
    (*
     * (*module * id_ref * deep * args * pos_in_tuble *)
     * appears in PART 3 of type checking in a similar way than MORef_type.
@@ -107,6 +107,26 @@ sig
     *
     *
     * *)
+
+
+  (*motype without location used by core module (such as gufoModInt)*)
+  and motypeCoreFun =
+   | MOCComposed_type of mocomposed_type
+   | MOCBase_type of mobase_type
+   | MOCTuple_type of motypeCoreFun list
+   | MOCList_type of motypeCoreFun
+   | MOCOption_type of motypeCoreFun
+   | MOCSet_type of motypeCoreFun
+   | MOCMap_type of motypeCoreFun * motypeCoreFun
+   | MOCFun_type of (motypeCoreFun ) list * motypeCoreFun
+   | MOCAll_type of int
+   | MOCUnit_type
+   | MOCRef_type of int option * int * int * (motypeCoreFun ) list
+   | MOCTupel_type of int option * int * int * (motypeCoreFun ) list * int list
+
+
+  val motypeCoreFunToMoType : motypeCoreFun -> string -> motype located
+
   module SimpleCore : 
    sig
      type mitype_val
@@ -193,6 +213,10 @@ sig
       val of_list: elt list -> t
     end
 
+
+  module TypeSet: Set.S with type elt = motype located
+  
+
   type movar = {
     mova_name: int list; (*we have a list when the input is a tuple, for
     exemple in the case "let a,b= 5" then mva_name is ("a","b"). *)
@@ -277,7 +301,7 @@ sig
   and mocomposed_type_val = {
     mocv_module_def : int option ; (*the module in which the type is defined.*)
     mocv_fields: motype_val located IntMap.t; (*The key are are name of the field, the values are the value of the field.*)
-    mocv_resolved_type : int option *int ; (*module, id of the type*)
+    mocv_resolved_type : int option * int ; (*module, id of the type*)
   }
  
   and mofun_val = {
@@ -349,14 +373,14 @@ sig
     mosmv_name: string;
     mosmv_description: string; (*A comment associated to the function or variable.*)
     mosmv_intname: int;
-    mosmv_type: motype; 
+    mosmv_type: motype located; 
     mosmv_action: (motype_val located list -> topvar_val IntMap.t -> motype_val located); (* function argument -> scope -> function res *)
   }
 
   and mosysmodulefield = {
     mosmf_name : string;
     mosmf_intname: int;
-    mosmf_type: motype;
+    mosmf_type: motype located;
   }
 
   and mosysmoduletype = {
@@ -483,7 +507,7 @@ environment 'env'. Raise NotFould if not found.*)
   (**PRINTER **)
 
   (* return the type as a string *)
-  val type_to_string: motype -> string
+  val type_to_string: motype located -> string
 
   (* return the val as a string *)
   val moval_to_string: motype_val -> string

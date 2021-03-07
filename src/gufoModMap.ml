@@ -103,10 +103,12 @@ let topvars =
       mosmv_description = "Return the number of elements in the map.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOFun_type
-        ([ MOMap_type( MOAll_type (-20), MOAll_type (-21) );
-        ], MOBase_type(MTypeInt))
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCMap_type( MOCAll_type (-20), MOCAll_type (-21) );
+          ], MOCBase_type(MTypeInt))
+          )
+          "Map.cardinal"
         ;
       mosmv_action= cardinal;
     };
@@ -116,11 +118,13 @@ let topvars =
       mosmv_description = "Return true if the element is in the map. Else, return false.";
       mosmv_intname = 2;
       mosmv_type = 
-        MOFun_type
-        ([ MOMap_type( MOAll_type (-20), MOAll_type (-21) );
-           MOAll_type (-20) 
-        ], MOBase_type(MTypeBool))
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCMap_type( MOCAll_type (-20), MOCAll_type (-21) );
+             MOCAll_type (-20) 
+          ], MOCBase_type(MTypeBool))
+          )
+          "Map.is_in"
         ;
       mosmv_action= is_in;
     };
@@ -129,11 +133,14 @@ let topvars =
       mosmv_description = "Get the element of the map pointed by the key.";
       mosmv_intname = 3;
       mosmv_type = 
-        MOFun_type
-        ([ MOMap_type( MOAll_type (-20), MOAll_type (-21) );
-           MOAll_type (-20) 
-        ], 
-           MOOption_type (MOAll_type (-21)))
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCMap_type( MOCAll_type (-20), MOCAll_type (-21) );
+             MOCAll_type (-20) 
+          ], 
+             MOCOption_type (MOCAll_type (-21)))
+          )
+          "Map.get"
         ;
       mosmv_action= get;
     };
@@ -143,11 +150,14 @@ let topvars =
                            exists, the value of the second map is used.";
       mosmv_intname = 4;
       mosmv_type = 
-        MOFun_type
-        ([ MOMap_type( MOAll_type (-20), MOAll_type (-21) );
-           MOMap_type( MOAll_type (-20), MOAll_type (-21) )
-        ], 
-           MOMap_type( MOAll_type (-20), MOAll_type (-21) ))
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCMap_type( MOCAll_type (-20), MOCAll_type (-21) );
+             MOCMap_type( MOCAll_type (-20), MOCAll_type (-21) )
+          ], 
+             MOCMap_type( MOCAll_type (-20), MOCAll_type (-21) ))
+          )
+        "Map.union"
         ;
       mosmv_action= mwith;
     };
@@ -156,13 +166,16 @@ let topvars =
       mosmv_description = "Add a (key, value) to a map.";
       mosmv_intname = 5;
       mosmv_type = 
-        MOFun_type
-        ([ 
-          MOMap_type( MOAll_type (-20), MOAll_type (-21) );
-          MOAll_type (-20); 
-          MOAll_type (-21);
-        ], 
-          MOMap_type( MOAll_type (-20), MOAll_type (-21) ))
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ 
+            MOCMap_type( MOCAll_type (-20), MOCAll_type (-21) );
+            MOCAll_type (-20); 
+            MOCAll_type (-21);
+          ], 
+            MOCMap_type( MOCAll_type (-20), MOCAll_type (-21) ))
+          )
+          "Map.add"
         ;
       mosmv_action= add;
     };
@@ -171,12 +184,15 @@ let topvars =
       mosmv_description = "remove a key and its associated value from the map.";
       mosmv_intname = 6;
       mosmv_type = 
-        MOFun_type
-        ([ 
-          MOMap_type( MOAll_type (-20), MOAll_type (-21) );
-          MOAll_type (-20); 
-        ], 
-          MOMap_type( MOAll_type (-20), MOAll_type (-21) ))
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ 
+            MOCMap_type( MOCAll_type (-20), MOCAll_type (-21) );
+            MOCAll_type (-20); 
+          ], 
+            MOCMap_type( MOCAll_type (-20), MOCAll_type (-21) ))
+          )
+          "Map.rm"
         ;
       mosmv_action= rm;
     };

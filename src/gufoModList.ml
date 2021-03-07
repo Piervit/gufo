@@ -49,11 +49,13 @@ let topvars =
       mosmv_description = "Iterate over the elements of the list.";
       mosmv_intname = 2;
       mosmv_type = 
-        MOFun_type
-        ([ MOFun_type([MOAll_type 1], MOUnit_type) ; 
-          MOList_type( MOAll_type 1 )
-        ], MOUnit_type)
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCFun_type([(MOCAll_type 1)], (MOCUnit_type )) ; 
+            (MOCList_type( MOCAll_type 1 )) 
+          ], MOCUnit_type)
+          )
+          "List.iter"
         ;
       mosmv_action= iter;
     };
@@ -62,9 +64,11 @@ let topvars =
       mosmv_description = "Return the size of the given list.";
       mosmv_intname = 1;
       mosmv_type = 
-        MOFun_type
-        ([ MOList_type( MOAll_type 1 )], MOBase_type (MTypeInt))
-        
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ MOCList_type( MOCAll_type 1 )], MOCBase_type (MTypeInt))
+          )
+          "List.length"
         ;
       mosmv_action= length;
     };
@@ -75,11 +79,14 @@ let topvars =
                           respecting the predicate.";
       mosmv_intname = 3;
       mosmv_type = 
-        MOFun_type
-        ([MOFun_type ([MOAll_type 1], MOBase_type (MTypeBool));
-          MOList_type( MOAll_type 1 );
-         ], 
-         MOList_type( MOAll_type 1 ))
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([MOCFun_type ([MOCAll_type 1], MOCBase_type (MTypeBool));
+            MOCList_type( MOCAll_type 1 );
+           ], 
+           MOCList_type( MOCAll_type 1 ))
+          )
+          "List.filter"
         ;
       mosmv_action= filter;
     };
@@ -88,11 +95,14 @@ let topvars =
       mosmv_description = "Apply the given function to elements of the list.";
       mosmv_intname = 4;
       mosmv_type = 
-        MOFun_type
-        ([MOFun_type ([MOAll_type 1], MOAll_type 2 );
-          MOList_type( MOAll_type 1 );
-         ], 
-         MOList_type( MOAll_type 2 ))
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([MOCFun_type ([MOCAll_type 1], MOCAll_type 2 );
+            MOCList_type( MOCAll_type 1 );
+           ], 
+           MOCList_type( MOCAll_type 2 ))
+          )
+          "List.map"
         ;
       mosmv_action= map;
     };
@@ -101,13 +111,16 @@ let topvars =
       mosmv_description = "";
       mosmv_intname = 4;
       mosmv_type = 
-        MOFun_type
-        ([ 
-           MOFun_type ([MOAll_type 2; MOAll_type 1], MOAll_type 2 );
-           MOAll_type 2 ;
-           MOList_type( MOAll_type 1 );
-         ], 
-         MOAll_type 2 )
+        motypeCoreFunToMoType
+          (MOCFun_type
+          ([ 
+             MOCFun_type ([MOCAll_type 2; MOCAll_type 1], MOCAll_type 2 );
+             MOCAll_type 2 ;
+             MOCList_type( MOCAll_type 1 );
+           ], 
+           MOCAll_type 2 )
+           )
+           "List.fold_left"
         ;
       mosmv_action= fold_left;
     };

@@ -30,7 +30,7 @@ struct
 
   type motype_field = {
     motf_name : int located;
-    motf_type: motype;
+    motf_type: motype located;
     motf_debugname : string;
   }
   
@@ -47,16 +47,87 @@ struct
   and motype =
    | MOComposed_type of mocomposed_type
    | MOBase_type of mobase_type
-   | MOTuple_type of motype list
-   | MOList_type of motype
-   | MOOption_type of motype
-   | MOSet_type of motype
-   | MOMap_type of motype * motype
-   | MOFun_type of motype list * motype 
+   | MOTuple_type of motype located list
+   | MOList_type of motype located
+   | MOOption_type of motype located
+   | MOSet_type of motype located
+   | MOMap_type of motype located * motype located
+   | MOFun_type of (motype located) list * motype  located
    | MOAll_type of int
    | MOUnit_type
-   | MORef_type of int option * int * int * motype list
-   | MOTupel_type of int option * int *int * motype list * int list
+   | MORef_type of int option * int * int * (motype located) list
+   | MOTupel_type of int option * int *int * (motype located) list * int list
+
+  and motypeCoreFun =
+   | MOCComposed_type of mocomposed_type
+   | MOCBase_type of mobase_type
+   | MOCTuple_type of motypeCoreFun list
+   | MOCList_type of motypeCoreFun
+   | MOCOption_type of motypeCoreFun
+   | MOCSet_type of motypeCoreFun
+   | MOCMap_type of motypeCoreFun * motypeCoreFun
+   | MOCFun_type of (motypeCoreFun ) list * motypeCoreFun
+   | MOCAll_type of int
+   | MOCUnit_type
+   | MOCRef_type of int option * int * int * (motypeCoreFun ) list
+   | MOCTupel_type of int option * int *int * (motypeCoreFun ) list * int list
+
+
+  let rec motypeCoreFunToMoType tcf fname =
+    match tcf with 
+   | MOCComposed_type ct -> box_loc_corefun (MOComposed_type ct) fname
+   | MOCBase_type bt -> box_loc_corefun (MOBase_type bt) fname
+   | MOCTuple_type tt -> 
+      box_loc_corefun 
+        (MOTuple_type (List.map (fun t -> motypeCoreFunToMoType t fname) tt)) 
+        fname
+   | MOCList_type t -> 
+      box_loc_corefun 
+        (MOList_type (motypeCoreFunToMoType t fname)) 
+      fname
+   | MOCOption_type t -> 
+      box_loc_corefun 
+        (MOOption_type (motypeCoreFunToMoType t fname)) 
+      fname
+   | MOCSet_type t -> 
+      box_loc_corefun 
+        (MOSet_type (motypeCoreFunToMoType t fname)) 
+      fname
+   | MOCMap_type (kt,vt) ->
+      box_loc_corefun 
+        (MOMap_type (motypeCoreFunToMoType kt fname, 
+                     motypeCoreFunToMoType vt fname)) 
+      fname
+   | MOCFun_type (argst,rett) -> 
+      box_loc_corefun 
+        (MOFun_type 
+          ((List.map (fun t -> motypeCoreFunToMoType t fname) argst),
+          (motypeCoreFunToMoType rett fname))
+        ) 
+        fname
+   | MOCAll_type i ->
+      box_loc_corefun (MOAll_type i) fname
+   | MOCUnit_type -> box_loc_corefun (MOUnit_type) fname
+   | MOCRef_type (aopt, b, c, tl ) ->
+      box_loc_corefun 
+        (MORef_type (aopt,
+                    b,
+                    c,
+                    (List.map (fun t -> motypeCoreFunToMoType t fname) tl))
+        ) 
+      fname
+   | MOCTupel_type (aopt,b,c, tl, d) ->
+      box_loc_corefun 
+        (MOTupel_type(aopt,
+                    b,
+                    c,
+                    (List.map (fun t -> motypeCoreFunToMoType t fname) tl),
+                    d
+                   )
+        )
+      fname
+
+
    
   module SimpleCore = 
    struct 
@@ -127,7 +198,7 @@ struct
       and micomposed_type_val = {
         micv_module_def : int option; 
         micv_fields: mitype_val located IntMap.t; 
-        micv_resolved_type : int option *int ; 
+        micv_resolved_type : int option * int ; 
       }
       
       and miref_val = {
@@ -637,9 +708,210 @@ struct
       let compare a b = type_compare a b
    end
 
+
   module MMap = Map.Make(SimpleCore)
   module MSet = Set.Make(SimpleCore)
 
+(*
+see https://stackoverflow.com/questions/3223952/recursive-set-in-ocaml
+*)
+
+(*
+module rec MOTypeRes : sig
+  type motype_resolv =
+   | MORComposed_type of mocomposed_type
+   | MORBase_type of mobase_type
+   | MORTuple_type of TypeSet.t list
+   | MORList_type of TypeSet.t
+   | MOROption_type of TypeSet.t
+   | MORSet_type of TypeSet.t
+   | MORMap_type of TypeSet.t * TypeSet.t
+   | MORFun_type of TypeSet.t list * TypeSet.t (*arguments type, ret type *)
+   | MORAll_type of int(*ocaml 'a , the int is only an identifier*)
+   | MORUnit_type
+   | MORRef_type of int option * int * int * TypeSet.t list
+   | MORTupel_type of int option * int *int * TypeSet.t list * int list
+
+  type t = motype_resolv located
+
+  val compare: t -> t -> int
+  end
+  = struct
+  type motype_resolv  =
+   | MORComposed_type of mocomposed_type
+   | MORBase_type of mobase_type
+   | MORTuple_type of TypeSet.t list
+   | MORList_type of TypeSet.t
+   | MOROption_type of TypeSet.t
+   | MORSet_type of TypeSet.t
+   | MORMap_type of TypeSet.t * TypeSet.t
+   | MORFun_type of TypeSet.t list * TypeSet.t (*arguments type, ret type *)
+   | MORAll_type of int(*ocaml 'a , the int is only an identifier*)
+   | MORUnit_type
+   | MORRef_type of int option * int * int * TypeSet.t list
+   | MORTupel_type of int option * int *int * TypeSet.t list * int list
+
+  type t = motype_resolv located
+
+*)
+  module MOTypeRes = 
+  struct
+  type t = motype located 
+
+  let rec motypelist_compare lst1 lst2 = 
+   match (List.length lst1) - (List.length lst2) with
+     | 0 -> 
+         List.fold_left2
+           (fun acc set1 set2 ->
+             match acc with
+               | 0 -> compare set1 set2
+               | i -> i
+           )
+           0 lst1 lst2
+     | i -> i
+  
+  
+  and compare t1 t2 = 
+    compare_ t1.loc_val t2.loc_val 
+  
+  and compare_ t1 t2 = 
+    match t1 , t2 with
+     | (MOComposed_type ct, MOComposed_type ct2) -> 
+        ct.moct_name - ct2.moct_name
+     | MOComposed_type ct, _ -> 1 
+     | MOBase_type MTypeString, MOBase_type MTypeString -> 0 
+     | MOBase_type MTypeString,  _ -> 1
+     | MOBase_type MTypeBool, MOBase_type MTypeBool -> 0 
+     | MOBase_type MTypeBool,  _ -> 1
+     | MOBase_type MTypeInt, MOBase_type MTypeInt -> 0 
+     | MOBase_type MTypeInt, _ ->  1
+     | MOBase_type MTypeFloat, MOBase_type MTypeFloat -> 0 
+     | MOBase_type MTypeFloat , _ -> 1
+     | MOBase_type MTypeCmd, MOBase_type MTypeCmd-> 0 
+     | MOBase_type MTypeCmd, _ ->  1 
+     | MOTuple_type lst1, MOTuple_type lst2 -> 
+        motypelist_compare lst1 lst2
+     | MOTuple_type lst1, _ -> 1
+     | MOList_type t1, MOList_type t2 -> compare t1 t2
+     | MOList_type t1, _ -> 1
+     | MOOption_type t1, MOOption_type t2 -> compare t1 t2
+     | MOOption_type _t1, _ -> 1
+     | MOSet_type t1, MOSet_type t2 -> compare t1 t2
+     | MOSet_type _t1, _ -> 1
+     | MOMap_type (k1,t1) , MOMap_type (k2,t2) -> 
+        (match (compare k1 k2) with
+          | 0 -> compare t1 t2
+          | i -> i
+        )
+     | MOMap_type _, _ -> 1
+     | MOFun_type (args1, ret1), MOFun_type (args2, ret2) -> 
+        (match compare ret1 ret2 with
+          | 0 -> motypelist_compare args1 args2
+          | i -> i 
+        )
+     | MOFun_type _ , _ -> 1
+     | MOAll_type t1, MOAll_type t2 -> t1 - t2
+     | MOAll_type _t1, _ -> 1
+     | MORef_type (modul1, id1, deep1, args1) , 
+       MORef_type (modul2, id2, deep2, args2) -> 
+          (match modul1, modul2 with
+            | Some _, None  -> 1
+            | None , Some _ -> -1
+            | Some i, Some j when i = j ->
+                (match id1 - id2 with
+                  | 0 ->
+                    (match deep1 - deep2 with
+                      | 0 -> motypelist_compare args1 args2 
+                      | i -> i 
+                    )
+                  | i -> i 
+                )
+            | None, None ->
+                (match id1 - id2 with
+                  | 0 ->
+                    (match deep1 - deep2 with
+                      | 0 -> motypelist_compare args1 args2 
+                      | i -> i 
+                    )
+                  | i -> i 
+                )
+            | Some i, Some j -> i - j 
+          )
+     | MORef_type _ , _ -> 1
+     | MOUnit_type, MOUnit_type -> 0
+     | MOUnit_type, _ -> 1
+     | _ -> -1
+   
+  
+  
+  end
+  module TypeSet : Set.S with type elt = motype located
+           = Set.Make(MOTypeRes)
+
+  open MOTypeRes 
+(*
+  let rec motypeForSet motype = (* -> motype_resolv *)
+    match motype.loc_val with
+     | MOComposed_type ct -> {motype with loc_val = MOComposed_type ct}
+     | MOBase_type bt -> {motype with loc_val = MORBase_type bt}
+     | MOTuple_type lstType -> 
+        {motype with loc_val = 
+          MORTuple_type 
+            (List.map (fun el -> TypeSet.singleton (motypeForSet el)) 
+            lstType )
+        }
+     | MOList_type lt -> 
+        {motype with loc_val = 
+          MORList_type (TypeSet.singleton (motypeForSet lt))
+        }
+     | MOOption_type ot -> 
+        {motype with loc_val = 
+          MOROption_type (TypeSet.singleton (motypeForSet ot))
+        }
+     | MOSet_type st -> 
+        {motype with loc_val = 
+          MORSet_type (TypeSet.singleton (motypeForSet st))
+        }
+     | MOMap_type (kt, vt) ->
+        {motype with loc_val = 
+          MORMap_type(TypeSet.singleton (motypeForSet kt), 
+                      TypeSet.singleton (motypeForSet kt))
+        }
+     | MOFun_type (argst, rett) ->
+        {motype with loc_val = 
+          MORFun_type(
+            (List.map 
+              (fun at -> TypeSet.singleton (motypeForSet at))
+              argst), 
+            TypeSet.singleton (motypeForSet rett))
+        }
+     | MOAll_type i ->
+        {motype with loc_val = MORAll_type i }
+     | MOUnit_type ->
+        {motype with loc_val = MORUnit_type }
+     | MORef_type (mi, i, d, argst) ->
+        {motype with loc_val = 
+          MORRef_type (mi,i,d,
+                        (List.map 
+                          (fun at -> TypeSet.singleton (motypeForSet at))
+                        argst)
+        )}
+     | MOTupel_type(mi, i, d, argst, p ) ->
+        {motype with loc_val = 
+          MORTupel_type(mi,i,d,
+                        (List.map 
+                          (fun at -> TypeSet.singleton (motypeForSet at))
+                        argst),
+                        p
+        )}
+
+  let typeSetSingleton tl =
+    TypeSet.singleton (motypeForSet tl)
+
+  let typeSetAdd tl sing =
+    TypeSet.add (motypeForSet tl) sing
+
+*)
   type movar = {
     mova_name: int list; (*we have a list when the input is a tuple, for
     exemple in the case "let a,b= 5" then mva_name is ("a","b"). *)
@@ -721,7 +993,7 @@ struct
   and mocomposed_type_val = {
     mocv_module_def : int option ; 
     mocv_fields: motype_val located IntMap.t; 
-    mocv_resolved_type : int option *int ; 
+    mocv_resolved_type : int option * int ; 
   }
   
   and mofun_val = {
@@ -783,14 +1055,14 @@ struct
     mosmv_name: string;
     mosmv_description: string; (*A comment associated to the function or variable.*)
     mosmv_intname: int;
-    mosmv_type: motype; 
+    mosmv_type: motype located; 
     mosmv_action: (motype_val located list -> topvar_val IntMap.t -> motype_val located); 
   }
 
   and mosysmodulefield = {
     mosmf_name : string;
     mosmf_intname: int;
-    mosmf_type: motype;
+    mosmf_type: motype located;
   }
 
   and mosysmoduletype = {
@@ -1287,7 +1559,7 @@ struct
   (** PRINTER **)
 
   let rec type_to_string typ = 
-    (match typ with
+    (match typ.loc_val with
       | MOComposed_type mct -> mct.moct_debugname
       | MOBase_type bt -> GufoParsed.basetype_to_str bt
       | MOTuple_type lsttyp -> 

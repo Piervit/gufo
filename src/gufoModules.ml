@@ -99,7 +99,9 @@ let sysmodctype_to_ctype sysmodtyp =
 let get_types_map modu = 
   IntMap.fold
     (fun k el map_toptypes  ->
-      IntMap.add el.mosmv_intname (el.mosmv_type, dummy_position) map_toptypes
+      IntMap.add el.mosmv_intname 
+        (TypeSet.singleton el.mosmv_type)
+      map_toptypes
     ) 
   modu.mosm_topvar
   IntMap.empty

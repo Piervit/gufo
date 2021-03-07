@@ -488,7 +488,7 @@ let rec get_type_at_deep pos typ deep =
     | 0 -> typ 
     | i -> 
         (
-          match typ with 
+          match typ.loc_val with 
             | MOList_type subtyp
             | MOSet_type subtyp
             | MOMap_type (_,subtyp) ->
@@ -575,11 +575,9 @@ let get_type_from_ref fulloptiprog optiprog typScope ref =
   in
   (*we have to check the indexes*)
   match ref.morv_index with
-    | None -> {loc_val = typ_with_field; loc_pos = pars_pos}
+    | None -> typ_with_field 
     | Some lst -> 
-        {loc_val = get_type_at_deep pars_pos typ_with_field (List.length lst);
-         loc_pos = pars_pos;
-        }
+         get_type_at_deep pars_pos typ_with_field (List.length lst)
 
 
 

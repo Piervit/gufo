@@ -121,7 +121,7 @@ and mbase_type_val =
 
 and mtype_field = {
   mtf_name : string located;
-  mtf_type: msimple_type;
+  mtf_type: msimple_type located;
   mtf_extend: string option;
 }
 
@@ -153,12 +153,12 @@ and mref_val = {
 
 and msimple_type =
   | MBase_type of mbase_type
-  | MTuple_type of msimple_type list
-  | MList_type of msimple_type
-  | MOption_type of msimple_type
-  | MSet_type of msimple_type
-  | MMap_type of msimple_type * msimple_type
-  | MFun_type of msimple_type list * msimple_type (*arguments type, ret type *)
+  | MTuple_type of (msimple_type located) list
+  | MList_type of (msimple_type located)
+  | MOption_type of (msimple_type located)
+  | MSet_type of (msimple_type located)
+  | MMap_type of (msimple_type located) * (msimple_type located)
+  | MFun_type of (msimple_type located) list * (msimple_type located) (*arguments type, ret type *)
   | MRef_type of mref_val
   | MAll_type of string(*ocaml 'a , the int is only an identifier*)
   | MUnit 
@@ -182,7 +182,7 @@ and mfunarg =
 
 and mtype =
   | MComposed_type of mcomposed_type
-  | MSimple_type of msimple_type
+  | MSimple_type of msimple_type located
 
 and mtype_val = 
   | MComposed_val of mcomposed_type_val
@@ -298,7 +298,7 @@ let ref_to_string var =
 
 
 let rec dump_mtype_short mytype = 
-      match mytype with
+      match mytype.loc_val with
         | MBase_type mybasetype -> 
             dump_base_type mybasetype;
         | MTuple_type types -> 
@@ -348,38 +348,40 @@ let rec dump_mtype mytype =
             open_hovbox 2;
             List.iter (fun fd -> dump_mtype_field fd; print_newline()) mycomptype.mct_fields;
             close_box ()
-        | MSimple_type MBase_type mybasetype -> 
-          dump_base_type mybasetype;
-          print_newline()
-        | MSimple_type MList_type mybasetype -> 
-          print_string "list"; dump_mtype_short mybasetype ;
-          print_newline()
-        | MSimple_type MOption_type mybasetype -> 
-          print_string "option"; dump_mtype_short mybasetype;
-          print_newline()
-        | MSimple_type MSet_type mybasetype -> 
-          print_string "set"; dump_mtype_short mybasetype;
-          print_newline()
-        | MSimple_type MMap_type (keytype, maptype) -> 
-            print_string "map["; dump_mtype_short keytype; print_string"] "; dump_mtype_short maptype;
-          print_newline()
-        | MSimple_type MFun_type (args, ret_type) -> 
-          (print_string "fun ("; 
-          List.iter (fun typ -> dump_mtype_short typ ; print_string " -> ") args; dump_mtype_short ret_type );
-          print_string ")";
-          print_newline();
-        | MSimple_type MUnit ->
-          print_string "()"
-        | MSimple_type (MTuple_type typlst) ->
-            print_string "(";
-            dump_mtype (MSimple_type (List.hd typlst));
-            List.iter (fun typ -> print_string ", "; dump_mtype (MSimple_type typ)) (List.tl typlst) ;
-            print_string ")"
-        | MSimple_type (MRef_type rval) -> 
-            print_string (ref_to_string rval)
-        | MSimple_type (MAll_type str) -> 
-            print_string str
-
+        | MSimple_type st ->
+          (match st.loc_val with 
+            MBase_type mybasetype -> 
+              dump_base_type mybasetype;
+              print_newline()
+            | MList_type mybasetype -> 
+              print_string "list"; dump_mtype_short mybasetype;
+              print_newline()
+            | MOption_type mybasetype -> 
+              print_string "option"; dump_mtype_short mybasetype;
+              print_newline()
+            | MSet_type mybasetype -> 
+              print_string "set"; dump_mtype_short mybasetype;
+              print_newline()
+            | MMap_type (keytype, maptype) -> 
+                print_string "map["; dump_mtype_short keytype; print_string"] "; dump_mtype_short maptype;
+              print_newline()
+            | MFun_type (args, ret_type) -> 
+              (print_string "fun ("; 
+              List.iter (fun typ -> dump_mtype_short typ; print_string " -> ") args; dump_mtype_short ret_type);
+              print_string ")";
+              print_newline();
+            | MUnit ->
+              print_string "()"
+            | (MTuple_type typlst) ->
+                print_string "(";
+                dump_mtype (MSimple_type ((List.hd typlst)));
+                List.iter (fun typ -> print_string ", "; dump_mtype (MSimple_type typ)) (List.tl typlst) ;
+                print_string ")"
+            | (MRef_type rval) -> 
+                print_string (ref_to_string rval)
+            | (MAll_type str) -> 
+                print_string str
+          )
         );
     close_box ()
 

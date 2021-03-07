@@ -24,6 +24,11 @@ val string_of_float_loc: float located -> string located
 val string_of_int_loc: int located -> string located
 val box_loc : 'a -> 'a located
 
+(*box_loc_corefun v name -> loc
+  box value v using the corefun name as location.
+*)
+val box_loc_corefun : 'a -> string -> 'a located
+
 val val_at_pos : 'a -> pars_position -> 'a located
 
 val lst_val_only : 'a located list -> 'a list

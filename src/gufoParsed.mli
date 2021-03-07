@@ -120,7 +120,7 @@ and mbase_type_val =
 
 and mtype_field = {
   mtf_name : string located;
-  mtf_type: msimple_type;
+  mtf_type: msimple_type located;
   mtf_extend: string option;
 }
 
@@ -159,12 +159,12 @@ and menvref_val = {
 
 and msimple_type =
   | MBase_type of mbase_type
-  | MTuple_type of msimple_type list
-  | MList_type of msimple_type
-  | MOption_type of msimple_type
-  | MSet_type of msimple_type
-  | MMap_type of msimple_type * msimple_type
-  | MFun_type of msimple_type list * msimple_type (*arguments type, ret type *)
+  | MTuple_type of (msimple_type located) list
+  | MList_type of msimple_type located
+  | MOption_type of msimple_type located
+  | MSet_type of msimple_type located
+  | MMap_type of msimple_type located * msimple_type located
+  | MFun_type of msimple_type located list * msimple_type located (*arguments type, ret type *)
   | MRef_type of mref_val
   | MAll_type of string(*ocaml 'a , the int is only an identifier*)
   | MUnit 
@@ -188,7 +188,7 @@ and mfunarg =
 
 and mtype =
   | MComposed_type of mcomposed_type
-  | MSimple_type of msimple_type
+  | MSimple_type of msimple_type located
 
 and mtype_val = 
   | MComposed_val of mcomposed_type_val
