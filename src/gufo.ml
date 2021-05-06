@@ -1606,6 +1606,9 @@ module rec MOTypeRes : sig
           )
     )
 
+  let type_to_location_string typ = 
+    GufoParsedHelper.string_of_position typ.loc_pos
+    
 
   let rec moval_to_string_basic v = 
     match v with 

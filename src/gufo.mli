@@ -508,6 +508,7 @@ environment 'env'. Raise NotFould if not found.*)
 
   (* return the type as a string *)
   val type_to_string: motype located -> string
+  val type_to_location_string: motype located -> string
 
   (* return the val as a string *)
   val moval_to_string: motype_val -> string

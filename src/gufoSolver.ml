@@ -10,7 +10,7 @@ open GufoOptUtils
 let debug_typeset imod ivar set = 
         TypeSet.iter
         (fun atype -> 
-          debug_info (Printf.sprintf "%d : %d : %s " imod ivar (type_to_string atype))
+          debug_info (Printf.sprintf "%d : %d : %s (at %s)" imod ivar (type_to_string atype) (type_to_location_string atype))
         )
         set
 
