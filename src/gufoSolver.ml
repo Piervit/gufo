@@ -280,11 +280,11 @@ let resolve modi vari resolved_map typeSet =
             let atyp = IntMap.find_opt id (IntMap.find modul resolved_map) in
             (match atyp with 
               | None -> typ
-              | Some typ ->             
-                  let typ = get_type_at_deep typ.loc_pos typ deep in
+              | Some typfound ->             
+                  let typfound = get_type_at_deep typfound.loc_pos typfound deep in
                   (*Check how to handle linked args*)  
-                  let new_typ = args_refine typ.loc_pos typ args in
-                  new_typ
+                  let new_typ = args_refine typfound.loc_pos typfound args in
+                  {new_typ with loc_pos = typ.loc_pos}
             )
 
         | _ -> typ
