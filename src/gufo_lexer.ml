@@ -56,6 +56,42 @@ let word =  [%sedlex.regexp? (xml_letter | '_'),  Star (xml_letter | '0' .. '9' 
 let arg = [%sedlex.regexp? '-', Opt('-'), Star ('-' | xml_letter ) ]
 let file = [%sedlex.regexp? (xml_letter | '0' .. '9' | '_' | '.' | '-' | '/' | '*' | '.' | '~'), Star ( xml_letter | '0' .. '9' | '_' | '.' | '/' | '-' | '@' | '&' | '$' | '.' | '*')  ]
 
+
+let rec read_string inBuf genBuf =
+  match%sedlex genBuf with
+  | '"' -> Gufo_parser.STRING (Buffer.contents inBuf) 
+  | '\\', '/' -> Buffer.add_char inBuf '/'; read_string inBuf genBuf 
+  | '\\', '\\' -> Buffer.add_char inBuf '\\'; read_string inBuf genBuf 
+  | '\\', 'b'  -> Buffer.add_char inBuf '\b'; read_string inBuf genBuf 
+  | '\\', 'f'  -> Buffer.add_char inBuf '\012'; read_string inBuf genBuf 
+  | '\\', 'n'  -> Buffer.add_char inBuf '\n'; read_string inBuf genBuf 
+  | '\\', 'r'  -> Buffer.add_char inBuf '\r'; read_string inBuf genBuf
+  | '\\', 't'  -> Buffer.add_char inBuf '\t'; read_string inBuf genBuf 
+  | Sub (any,('"' | '\\') ) ->
+    Buffer.add_string inBuf (Sedlexing.Utf8.lexeme genBuf);
+    read_string inBuf genBuf
+  | eof ->  
+      let lex_pos_start, lex_pos_end = (Sedlexing.lexing_positions genBuf) in
+      raise (SyntaxError (GufoParsedHelper.with_lexing_pos  lex_pos_start lex_pos_end 
+              "String is not terminated" ) )
+  | _ -> 
+      let lex_pos_start, lex_pos_end = (Sedlexing.lexing_positions genBuf) in
+      raise (SyntaxError (GufoParsedHelper.with_lexing_pos lex_pos_start lex_pos_end 
+              ("Illegal string character: " ^ Sedlexing.Utf8.lexeme genBuf)))
+
+
+
+
+let try_read_str lexbuf =
+  match%sedlex lexbuf with
+   | '"' ->
+     let start_pos, _end_pos = Sedlexing.lexing_positions lexbuf in
+     let token = read_string (Buffer.create 17) lexbuf in
+     let _start_pos, end_pos =  Sedlexing.lexing_positions lexbuf in
+     Some (token, (start_pos, end_pos))
+   | _ -> None
+
+
 let rec read_ lexbuf = 
   match%sedlex lexbuf with
    | white_space -> read_ lexbuf
@@ -138,8 +174,7 @@ let rec read_ lexbuf =
    | '{'                 -> Gufo_parser.OPEN_BRACE  
    | '}'                 -> Gufo_parser.CLOSE_BRACE  
    | ','                 -> Gufo_parser.COMMA  
-   | '"'                 ->
-                           read_string (Buffer.create 17) lexbuf 
+
    | varname             -> Gufo_parser.VARNAME (Sedlexing.Utf8.lexeme lexbuf)
    | envvar              -> Gufo_parser.ENVVAR (Sedlexing.Utf8.lexeme lexbuf)
 
@@ -155,29 +190,11 @@ let rec read_ lexbuf =
 
 
 
-and read_string inBuf genBuf =
-  match%sedlex genBuf with
-  | '"' -> Gufo_parser.STRING (Buffer.contents inBuf) 
-  | '\\', '/' -> Buffer.add_char inBuf '/'; read_string inBuf genBuf 
-  | '\\', '\\' -> Buffer.add_char inBuf '\\'; read_string inBuf genBuf 
-  | '\\', 'b'  -> Buffer.add_char inBuf '\b'; read_string inBuf genBuf 
-  | '\\', 'f'  -> Buffer.add_char inBuf '\012'; read_string inBuf genBuf 
-  | '\\', 'n'  -> Buffer.add_char inBuf '\n'; read_string inBuf genBuf 
-  | '\\', 'r'  -> Buffer.add_char inBuf '\r'; read_string inBuf genBuf
-  | '\\', 't'  -> Buffer.add_char inBuf '\t'; read_string inBuf genBuf 
-  | Sub (any,('"' | '\\') ) ->
-    Buffer.add_string inBuf (Sedlexing.Utf8.lexeme genBuf);
-    read_string inBuf genBuf
-  | eof ->  
-      let lex_pos_start, lex_pos_end = (Sedlexing.lexing_positions genBuf) in
-      raise (SyntaxError (GufoParsedHelper.with_lexing_pos  lex_pos_start lex_pos_end 
-              "String is not terminated" ) )
-  | _ -> 
-      let lex_pos_start, lex_pos_end = (Sedlexing.lexing_positions genBuf) in
-      raise (SyntaxError (GufoParsedHelper.with_lexing_pos lex_pos_start lex_pos_end 
-              ("Illegal string character: " ^ Sedlexing.Utf8.lexeme genBuf)))
-
 
 let read lexbuf =
-  let data = read_ lexbuf in
-  data, (Sedlexing.lexing_positions lexbuf)
+  let data = try_read_str lexbuf in
+  match data with 
+    | None -> 
+        let data = read_ lexbuf in
+        data, (Sedlexing.lexing_positions lexbuf)
+    | Some (data,pos) -> data, pos
