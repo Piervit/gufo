@@ -105,11 +105,6 @@ let raise_varError msg pos =
 
 (** transformation from gufoParsed to gufo.core **)
 
-let fresh_int = ref 1
-(*get_fresh_int is used to identify uniquely variable.*)
-let get_fresh_int () = 
-  fresh_int:= (!fresh_int + 1); !fresh_int
-
 (*First part of the job will be to get every modules that we have to import. *)
 
 let search_modules mprogram =
@@ -315,48 +310,65 @@ and determine_constraint_basic_fun fulloptiprog optiprog constraint_map op arga 
       determine_constraint_ fulloptiprog optiprog constraint_map argb_unbox in
     let typaloc = {arga_unbox with loc_val = typa} in
     let typbloc = {argb_unbox with loc_val = typb} in
-    let constraint_map = add_constraints ida [typaloc;typbloc] constraint_map in
-    let constraint_map = add_constraints idb [typaloc;typbloc] constraint_map in
+    let constraint_map = add_constraints ida [typaloc;typbloc;expectedType]
+                         constraint_map in
+    let constraint_map = add_constraints idb [typaloc;typbloc;expectedType] 
+                         constraint_map in
     typa, constraint_map
   in
 
   let typ,constraint_map= 
     match op.loc_val with 
     | MConcatenation ->
-        let expectedType = Some (MOBase_type MTypeString) in
+        let expectedType = {op with loc_val = (MOBase_type MTypeString)} in
         for_op expectedType arga argb constraint_map
     | MAddition 
     | MMultiplication 
     | MModulo 
     | MDivision 
     | MSoustraction -> 
-        let expectedType = Some (MOBase_type MTypeInt) in
+        let expectedType = {op with loc_val = (MOBase_type MTypeInt)} in
         for_op expectedType arga argb constraint_map
     | MAdditionFloat 
     | MMultiplicationFLoat
     | MModuloFloat
     | MDivisionFloat
     | MSoustractionFloat -> 
-        let expectedType = Some (MOBase_type MTypeFloat) in
+        let expectedType = {op with loc_val = (MOBase_type MTypeFloat)} in
         for_op expectedType arga argb constraint_map
     | MWithList -> 
         let full_or_type = 
-          MOList_type ({loc_val = MOAll_type (get_fresh_int ()) ;
-           loc_pos = pos_merging arga.loc_pos argb.loc_pos;
-          })
+          {op with loc_val = 
+             MOList_type ({loc_val = MOAll_type (get_fresh_int ()) ;
+             loc_pos = pos_merging arga.loc_pos argb.loc_pos;})
+          }
         in
         for_op full_or_type arga argb constraint_map
     | MWithSet -> 
-        let full_or_type = MOSet_type ({op with loc_val =(MOAll_type (get_fresh_int ()))}) in
+        let full_or_type = 
+          {op with loc_val = MOSet_type 
+                              ({op with loc_val =(MOAll_type (get_fresh_int ()))})} 
+        in
         for_op full_or_type arga argb constraint_map
     | MWithMap -> 
-        let full_or_type = MOMap_type ({op with loc_val = (MOAll_type (get_fresh_int ()))}, {op with loc_val = MOAll_type (get_fresh_int ())}) in
+        let full_or_type = {op with loc_val = MOMap_type 
+              ({op with loc_val = (MOAll_type (get_fresh_int ()))}, 
+              {op with loc_val = MOAll_type (get_fresh_int ())}) 
+        }
+        in
         for_op full_or_type arga argb constraint_map
     | MWithoutSet -> 
-        let full_or_type = MOSet_type ({op with loc_val = MOAll_type (get_fresh_int ())}) in
+        let full_or_type = {op with loc_val = 
+          MOSet_type ({op with loc_val = MOAll_type (get_fresh_int ())}) 
+        }
+        in
         for_op full_or_type arga argb constraint_map
     | MWithoutMap -> 
-        let full_or_type = MOMap_type ({op with loc_val = (MOAll_type (get_fresh_int ()))}, {op with loc_val = MOAll_type (get_fresh_int ())}) in
+        let full_or_type = 
+          {op with loc_val = 
+              MOMap_type ({op with loc_val = (MOAll_type (get_fresh_int ()))},
+                          {op with loc_val = MOAll_type (get_fresh_int ())}) }
+        in
         for_op full_or_type arga argb constraint_map
     | MHasSet -> raise (InternalError "MHas is deprecated.") 
     | MHasMap -> raise (InternalError "SHas is deprecated.") 

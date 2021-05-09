@@ -54,8 +54,4 @@ val add_prog_to_optprog : Gufo.MCore.fullprogopt ->
 
 val add_module_to_optprog : string -> Gufo.MCore.fullprogopt -> GufoParsed.mprogram -> Gufo.MCore.fullprogopt * (Gufo.MCore.motype * GufoParsed.pars_position) GenUtils.IntMap.t GenUtils.IntMap.t
 
-(*This function should not be used if you are not sure about what you are doing.
-  This is only needed from GufoEngine in a case when we have to trick partial
-  interpretation for core system (we need to generate fresh index...).
-*)
-val get_fresh_int : unit -> int
+

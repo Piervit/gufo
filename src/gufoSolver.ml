@@ -1,4 +1,5 @@
 open GufoParsed
+open Gufo
 open Gufo.MCore
 open GufoParsedHelper
 open Printf
@@ -207,7 +208,7 @@ let rec determine_refine_type t1 t2 =
     There is a single element in the typeSet and this element is not a
     MORef_type.
 *)
-let select_resolved resolved_map constraints =
+let select_resolved resolved_map unresolved_map =
   let change = ref false in
   let add_in_module imodul varId elToAdd map = 
     match IntMap.find_opt imodul map with
@@ -235,13 +236,14 @@ let select_resolved resolved_map constraints =
                     (add_in_module imodul varid (TypeSet.choose typeSet) resolveds), 
                     unresolveds
                 )
-              | _ -> (resolveds, 
+              | _ -> 
+                      (resolveds, 
                        add_in_module imodul varid typeSet unresolveds
                      )
           )
           modul (resolveds, unresolveds )
       )
-      constraints (resolved_map, IntMap.empty)
+      unresolved_map (resolved_map, IntMap.empty)
   in !change, resolved_map, unresolved_map
 
 let resolve modi vari resolved_map typeSet =
@@ -297,13 +299,38 @@ let resolve modi vari resolved_map typeSet =
     (fun typ newTypeSet ->
       TypeSet.fold
         (fun typToComp newTypeSet -> 
-            TypeSet.union newTypeSet
-            (determine_refine_type typToComp typ)
+            let res = (determine_refine_type typToComp typ) in
+            res
+(*
+            let newTypeSet = TypeSet.union newTypeSet res in
+            newTypeSet
+*)
         )
         typeSet newTypeSet 
         
     )
     typeSet TypeSet.empty
+
+
+let resolve_free_variables unresolved_map = 
+  IntMap.map
+    (fun modul ->
+      IntMap.map
+        (fun typeSet ->
+          TypeSet.map 
+            (fun typeEl ->
+              (match typeEl.loc_val with
+                 | MORef_type _ ->
+                     (*We consider it not to be resolved.*)
+                    {typeEl with loc_val = MOAll_type (get_fresh_int ())}
+                  | _ -> typeEl
+               )
+            )
+            typeSet 
+        )
+        modul
+    )
+    unresolved_map
 
 (*Return a constraint map with only a single resolved type for a variable
  constraints: Gufo.MCore.TypeSet.t GenUtils.IntMap.t GenUtils.IntMap.t
@@ -341,6 +368,14 @@ constraints and the map of resolved vars.
             | true ->
               try_resolve resolved_map unresolved_map
             | false ->
-                raise_typeError "sadness" (GufoLocHelper.box_loc" ").loc_pos
+                (*This case means, we have still unresolved vars but where not
+                  able te resolve one in the last run.
+                  This can happen when there are "free references", references
+                  which are not linked to a type (for exemple, a function
+                  argument ( fun $f $a = $a + 5 , in this case $a is not
+                  explicitely resolved.))
+                *)
+                let unresolved_map = resolve_free_variables unresolved_map in
+                try_resolve resolved_map unresolved_map
   in
   try_resolve resolved_map unresolved_map

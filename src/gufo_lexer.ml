@@ -82,109 +82,105 @@ let rec read_string inBuf genBuf =
 
 
 
-let try_read_str lexbuf =
+let rec read_ lexbuf = 
   match%sedlex lexbuf with
    | '"' ->
      let start_pos, _end_pos = Sedlexing.lexing_positions lexbuf in
      let token = read_string (Buffer.create 17) lexbuf in
      let _start_pos, end_pos =  Sedlexing.lexing_positions lexbuf in
-     Some (token, (start_pos, end_pos))
-   | _ -> None
-
-
-let rec read_ lexbuf = 
-  match%sedlex lexbuf with
+     token, (start_pos, end_pos)
    | white_space -> read_ lexbuf
    | newline  -> read_ lexbuf 
    | comment  -> read_ lexbuf 
-   | "struct" -> Gufo_parser.STRUCT 
-   | "let"    -> Gufo_parser.LET  
-   | "fun"    -> Gufo_parser.FUN  
+   | "struct" -> Gufo_parser.STRUCT, (Sedlexing.lexing_positions lexbuf)
+   | "let"    -> Gufo_parser.LET, (Sedlexing.lexing_positions lexbuf)
+   | "fun"    -> Gufo_parser.FUN    , (Sedlexing.lexing_positions lexbuf)
 (*    | "_"      -> Gufo_parser.JOKER   *)
-   | ":"      -> Gufo_parser.COLON  
-   | "="      -> Gufo_parser.AFFECTATION  
-   | "True"   -> Gufo_parser.TRUE  
-   | "False"  -> Gufo_parser.FALSE  
+   | ":"      -> Gufo_parser.COLON  , (Sedlexing.lexing_positions lexbuf)
+   | "="      -> Gufo_parser.AFFECTATION  , (Sedlexing.lexing_positions lexbuf)
+   | "True"   -> Gufo_parser.TRUE  , (Sedlexing.lexing_positions lexbuf)
+   | "False"  -> Gufo_parser.FALSE  , (Sedlexing.lexing_positions lexbuf)
    (* pattern matching *)
-   | "->"     -> Gufo_parser.ARROW  
-   | "With"   -> Gufo_parser.WITH  
-   | "SWith"  -> Gufo_parser.WITH_SET 
-   | "MWith"  -> Gufo_parser.WITH_MAP
-   | "SWout"   -> Gufo_parser.WITHOUT_SET 
-   | "MWout"   -> Gufo_parser.WITHOUT_MAP
-   | "*"      -> Gufo_parser.STAR  
-   | "*."     -> Gufo_parser.STAR_DOT
-   | "~"      -> Gufo_parser.TILDE  
-   | ">"      -> Gufo_parser.CLOSING_CHEVRON  
-   | ">-"     -> Gufo_parser.MINUS_CLOSING_CHEVRON  
-   | ">>"     -> Gufo_parser.DOUBLE_CLOSING_CHEVRON  
-   | "2>"     -> Gufo_parser.WRITE_ERROR_TO  
-   | "2>>"    -> Gufo_parser.WRITE_ERROR_NEXT_TO  
-   | "2>&1"   -> Gufo_parser.WRITE_ERROR_TO_STD  
-   | ">&"     -> Gufo_parser.WRITE_ALL_TO  
-   | "&"      -> Gufo_parser.SIMPLE_AND  
-   | "&&"     -> Gufo_parser.AND  
-   | "||"     -> Gufo_parser.OR  
-   | "|"      -> Gufo_parser.PIPE  
-   | "<"      -> Gufo_parser.OPENING_CHEVRON  
-   | "-<"     -> Gufo_parser.MINUS_OPENING_CHEVRON  
-   | "+"      -> Gufo_parser.PLUS  
-   | "+."      -> Gufo_parser.PLUS_DOT
-   | "^"      -> Gufo_parser.PLUS_STR 
-   | "--"     -> Gufo_parser.DOUBLE_MINUS  
-   | "-"      -> Gufo_parser.MINUS  
-   | "-."      -> Gufo_parser.MINUS_DOT
-   | "%"      -> Gufo_parser.DIVISION  
-   | "%."      -> Gufo_parser.DIVISION_DOT
-   | "mod"    -> Gufo_parser.MODULO  
-   | "mod."    -> Gufo_parser.MODULO_DOT
-   | "=="     -> Gufo_parser.EQUALITY  
-   | "!="     -> Gufo_parser.INEQUALITY  
-   | "["      -> Gufo_parser.OPEN_SQRBRACKET  
-   | ".["     -> Gufo_parser.OPEN_SQRIDXBRACKET  
-   | "]"      -> Gufo_parser.CLOSE_SQRBRACKET  
-   | "("      -> Gufo_parser.OPEN_BRACKET  
-   | ")"      -> Gufo_parser.CLOSE_BRACKET  
-   | "int"    -> Gufo_parser.INTTYPE  
-   | "float"  -> Gufo_parser.FLOATTYPE  
-   | "string" -> Gufo_parser.STRINGTYPE  
-   | "bool"   -> Gufo_parser.BOOLTYPE 
-   | "cmd"    -> Gufo_parser.CMDTYPE 
-   | "list"   -> Gufo_parser.LISTTYPE  
-   | "set"    -> Gufo_parser.SETTYPE  
-   | "map"    -> Gufo_parser.MAPTYPE  
-   | "option" -> Gufo_parser.OPTIONTYPE  
+   | "->"     -> Gufo_parser.ARROW  , (Sedlexing.lexing_positions lexbuf)
+   | "With"   -> Gufo_parser.WITH  , (Sedlexing.lexing_positions lexbuf)
+   | "SWith"  -> Gufo_parser.WITH_SET , (Sedlexing.lexing_positions lexbuf)
+   | "MWith"  -> Gufo_parser.WITH_MAP, (Sedlexing.lexing_positions lexbuf)
+   | "SWout"   -> Gufo_parser.WITHOUT_SET , (Sedlexing.lexing_positions lexbuf)
+   | "MWout"   -> Gufo_parser.WITHOUT_MAP, (Sedlexing.lexing_positions lexbuf)
+   | "*"      -> Gufo_parser.STAR  , (Sedlexing.lexing_positions lexbuf)
+   | "*."     -> Gufo_parser.STAR_DOT, (Sedlexing.lexing_positions lexbuf)
+   | "~"      -> Gufo_parser.TILDE  , (Sedlexing.lexing_positions lexbuf)
+   | ">"      -> Gufo_parser.CLOSING_CHEVRON  , (Sedlexing.lexing_positions lexbuf)
+   | ">-"     -> Gufo_parser.MINUS_CLOSING_CHEVRON  , (Sedlexing.lexing_positions lexbuf)
+   | ">>"     -> Gufo_parser.DOUBLE_CLOSING_CHEVRON  , (Sedlexing.lexing_positions lexbuf)
+   | "2>"     -> Gufo_parser.WRITE_ERROR_TO  , (Sedlexing.lexing_positions lexbuf)
+   | "2>>"    -> Gufo_parser.WRITE_ERROR_NEXT_TO  , (Sedlexing.lexing_positions lexbuf)
+   | "2>&1"   -> Gufo_parser.WRITE_ERROR_TO_STD  , (Sedlexing.lexing_positions lexbuf)
+   | ">&"     -> Gufo_parser.WRITE_ALL_TO  , (Sedlexing.lexing_positions lexbuf)
+   | "&"      -> Gufo_parser.SIMPLE_AND  , (Sedlexing.lexing_positions lexbuf)
+   | "&&"     -> Gufo_parser.AND  , (Sedlexing.lexing_positions lexbuf)
+   | "||"     -> Gufo_parser.OR  , (Sedlexing.lexing_positions lexbuf)
+   | "|"      -> Gufo_parser.PIPE  , (Sedlexing.lexing_positions lexbuf)
+   | "<"      -> Gufo_parser.OPENING_CHEVRON  , (Sedlexing.lexing_positions lexbuf)
+   | "-<"     -> Gufo_parser.MINUS_OPENING_CHEVRON  , (Sedlexing.lexing_positions lexbuf)
+   | "+"      -> Gufo_parser.PLUS  , (Sedlexing.lexing_positions lexbuf)
+   | "+."      -> Gufo_parser.PLUS_DOT, (Sedlexing.lexing_positions lexbuf)
+   | "^"      -> Gufo_parser.PLUS_STR , (Sedlexing.lexing_positions lexbuf)
+   | "--"     -> Gufo_parser.DOUBLE_MINUS  , (Sedlexing.lexing_positions lexbuf)
+   | "-"      -> Gufo_parser.MINUS  , (Sedlexing.lexing_positions lexbuf)
+   | "-."      -> Gufo_parser.MINUS_DOT, (Sedlexing.lexing_positions lexbuf)
+   | "%"      -> Gufo_parser.DIVISION  , (Sedlexing.lexing_positions lexbuf)
+   | "%."      -> Gufo_parser.DIVISION_DOT, (Sedlexing.lexing_positions lexbuf)
+   | "mod"    -> Gufo_parser.MODULO  , (Sedlexing.lexing_positions lexbuf)
+   | "mod."    -> Gufo_parser.MODULO_DOT, (Sedlexing.lexing_positions lexbuf)
+   | "=="     -> Gufo_parser.EQUALITY  , (Sedlexing.lexing_positions lexbuf)
+   | "!="     -> Gufo_parser.INEQUALITY  , (Sedlexing.lexing_positions lexbuf)
+   | "["      -> Gufo_parser.OPEN_SQRBRACKET  , (Sedlexing.lexing_positions lexbuf)
+   | ".["     -> Gufo_parser.OPEN_SQRIDXBRACKET  , (Sedlexing.lexing_positions lexbuf)
+   | "]"      -> Gufo_parser.CLOSE_SQRBRACKET  , (Sedlexing.lexing_positions lexbuf)
+   | "("      -> Gufo_parser.OPEN_BRACKET  , (Sedlexing.lexing_positions lexbuf)
+   | ")"      -> Gufo_parser.CLOSE_BRACKET  , (Sedlexing.lexing_positions lexbuf)
+   | "int"    -> Gufo_parser.INTTYPE  , (Sedlexing.lexing_positions lexbuf)
+   | "float"  -> Gufo_parser.FLOATTYPE  , (Sedlexing.lexing_positions lexbuf)
+   | "string" -> Gufo_parser.STRINGTYPE  , (Sedlexing.lexing_positions lexbuf)
+   | "bool"   -> Gufo_parser.BOOLTYPE , (Sedlexing.lexing_positions lexbuf)
+   | "cmd"    -> Gufo_parser.CMDTYPE , (Sedlexing.lexing_positions lexbuf)
+   | "list"   -> Gufo_parser.LISTTYPE  , (Sedlexing.lexing_positions lexbuf)
+   | "set"    -> Gufo_parser.SETTYPE  , (Sedlexing.lexing_positions lexbuf)
+   | "map"    -> Gufo_parser.MAPTYPE  , (Sedlexing.lexing_positions lexbuf)
+   | "option" -> Gufo_parser.OPTIONTYPE  , (Sedlexing.lexing_positions lexbuf)
 
-   | freetype            -> Gufo_parser.FREETYPE (Sedlexing.Utf8.lexeme lexbuf)
-   | "extends"           -> Gufo_parser.EXTENDS  
-   | "SHas?"                -> Gufo_parser.SHAS
-   | "MHas?"                -> Gufo_parser.MHAS
-   | "in"                -> Gufo_parser.IN  
-   | "if"                -> Gufo_parser.IF  
-   | "then"              -> Gufo_parser.THEN  
-   | "else"              -> Gufo_parser.ELSE  
-   | '.'                 -> Gufo_parser.DOT  
-   | int_rep             -> Gufo_parser.INT (int_of_string (Sedlexing.Utf8.lexeme lexbuf)) 
-   | float_rep           -> Gufo_parser.FLOAT (float_of_string (Sedlexing.Utf8.lexeme lexbuf)) 
-   | "None"              -> Gufo_parser.NONE 
-   | "Some"              -> Gufo_parser.SOME 
-   | "**START**"         -> Gufo_parser.START  
-   | ";"                 -> Gufo_parser.SEMICOLON  
-   | ";;"                -> Gufo_parser.DOUBLE_SEMICOLON  
-   | '{'                 -> Gufo_parser.OPEN_BRACE  
-   | '}'                 -> Gufo_parser.CLOSE_BRACE  
-   | ','                 -> Gufo_parser.COMMA  
+   | freetype            -> Gufo_parser.FREETYPE (Sedlexing.Utf8.lexeme lexbuf),
+                            (Sedlexing.lexing_positions lexbuf)
+   | "extends"           -> Gufo_parser.EXTENDS  , (Sedlexing.lexing_positions lexbuf)
+   | "SHas?"                -> Gufo_parser.SHAS, (Sedlexing.lexing_positions lexbuf)
+   | "MHas?"                -> Gufo_parser.MHAS, (Sedlexing.lexing_positions lexbuf)
+   | "in"                -> Gufo_parser.IN  , (Sedlexing.lexing_positions lexbuf)
+   | "if"                -> Gufo_parser.IF  , (Sedlexing.lexing_positions lexbuf)
+   | "then"              -> Gufo_parser.THEN  , (Sedlexing.lexing_positions lexbuf)
+   | "else"              -> Gufo_parser.ELSE  , (Sedlexing.lexing_positions lexbuf)
+   | '.'                 -> Gufo_parser.DOT  , (Sedlexing.lexing_positions lexbuf)
+   | int_rep             -> Gufo_parser.INT (int_of_string (Sedlexing.Utf8.lexeme lexbuf)) , (Sedlexing.lexing_positions lexbuf)
+   | float_rep           -> Gufo_parser.FLOAT (float_of_string (Sedlexing.Utf8.lexeme lexbuf)) , (Sedlexing.lexing_positions lexbuf)
+   | "None"              -> Gufo_parser.NONE , (Sedlexing.lexing_positions lexbuf)
+   | "Some"              -> Gufo_parser.SOME , (Sedlexing.lexing_positions lexbuf)
+   | "**START**"         -> Gufo_parser.START  , (Sedlexing.lexing_positions lexbuf)
+   | ";"                 -> Gufo_parser.SEMICOLON  , (Sedlexing.lexing_positions lexbuf)
+   | ";;"                -> Gufo_parser.DOUBLE_SEMICOLON  , (Sedlexing.lexing_positions lexbuf)
+   | '{'                 -> Gufo_parser.OPEN_BRACE  , (Sedlexing.lexing_positions lexbuf)
+   | '}'                 -> Gufo_parser.CLOSE_BRACE  , (Sedlexing.lexing_positions lexbuf)
+   | ','                 -> Gufo_parser.COMMA  , (Sedlexing.lexing_positions lexbuf)
 
-   | varname             -> Gufo_parser.VARNAME (Sedlexing.Utf8.lexeme lexbuf)
-   | envvar              -> Gufo_parser.ENVVAR (Sedlexing.Utf8.lexeme lexbuf)
+   | varname             -> Gufo_parser.VARNAME (Sedlexing.Utf8.lexeme lexbuf), (Sedlexing.lexing_positions lexbuf)
+   | envvar              -> Gufo_parser.ENVVAR (Sedlexing.Utf8.lexeme lexbuf), (Sedlexing.lexing_positions lexbuf)
 
-   | varfield            -> Gufo_parser.VARFIELD (Sedlexing.Utf8.lexeme lexbuf)
-   | modulVar            -> Gufo_parser.MODULVAR (Sedlexing.Utf8.lexeme lexbuf)
-   | modul               -> Gufo_parser.MODUL (Sedlexing.Utf8.lexeme lexbuf)
-   | word                -> Gufo_parser.WORD (Sedlexing.Utf8.lexeme lexbuf) 
-   | arg                 -> Gufo_parser.ARG (Sedlexing.Utf8.lexeme lexbuf)
-   | file                -> Gufo_parser.FILE (Sedlexing.Utf8.lexeme lexbuf)
-   | eof                 -> Gufo_parser.EOF 
+   | varfield            -> Gufo_parser.VARFIELD (Sedlexing.Utf8.lexeme lexbuf), (Sedlexing.lexing_positions lexbuf)
+   | modulVar            -> Gufo_parser.MODULVAR (Sedlexing.Utf8.lexeme lexbuf), (Sedlexing.lexing_positions lexbuf)
+   | modul               -> Gufo_parser.MODUL (Sedlexing.Utf8.lexeme lexbuf), (Sedlexing.lexing_positions lexbuf)
+   | word                -> Gufo_parser.WORD (Sedlexing.Utf8.lexeme lexbuf) , (Sedlexing.lexing_positions lexbuf)
+   | arg                 -> Gufo_parser.ARG (Sedlexing.Utf8.lexeme lexbuf), (Sedlexing.lexing_positions lexbuf)
+   | file                -> Gufo_parser.FILE (Sedlexing.Utf8.lexeme lexbuf), (Sedlexing.lexing_positions lexbuf)
+   | eof                 -> Gufo_parser.EOF , (Sedlexing.lexing_positions lexbuf)
    | any                   -> raise_ParseErrorWithMsg lexbuf "unexpected character."
    | _ -> raise_ParseErrorWithMsg lexbuf "unexpected character."
 
@@ -192,9 +188,4 @@ let rec read_ lexbuf =
 
 
 let read lexbuf =
-  let data = try_read_str lexbuf in
-  match data with 
-    | None -> 
-        let data = read_ lexbuf in
-        data, (Sedlexing.lexing_positions lexbuf)
-    | Some (data,pos) -> data, pos
+  read_ lexbuf 

@@ -23,6 +23,12 @@ open GufoUtils
 open GufoLocHelper
 open GufoParsedHelper
 
+let fresh_int = ref 1
+(*get_fresh_int is used to identify uniquely variable.*)
+let get_fresh_int () = 
+  fresh_int:= (!fresh_int + 1); !fresh_int
+
+
 
 module MCore =
 struct

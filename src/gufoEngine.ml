@@ -686,14 +686,14 @@ The interpretation will be:
 and systemvar_partial_interpretation ref sysmodulevar argslst =
   let sysfun_nb_args = GufoModuleUtils.getNbArgsFromCoreFunction sysmodulevar in
   let anofun_args_id = List.init (sysfun_nb_args - (List.length argslst)) 
-    (fun i -> box_loc (GufoParsedToOpt.get_fresh_int ()))
+    (fun i -> box_loc (get_fresh_int ()))
   in
   let anofun_args = box_loc(List.map (fun i -> MOBaseArg i) anofun_args_id)
   in
   let body_binding =
     let bd_name = 
       List.init (List.length argslst) 
-        (fun i -> GufoParsedToOpt.get_fresh_int ( ), dummy_position, [i])
+        (fun i -> get_fresh_int ( ), dummy_position, [i])
     in
     let bd_value = box_loc(MOSimple_val (MOTuple_val (box_loc (argslst)))) in
     let bd_body = 
