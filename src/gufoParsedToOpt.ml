@@ -112,7 +112,8 @@ let search_modules mprogram =
     let add_if_not_already modul map = 
       match StringMap.mem modul map with
         | true -> map
-        | false -> StringMap.add modul (get_fresh_int ()) map
+        | false -> 
+                    StringMap.add modul (get_fresh_int ()) map
 
     in
     (*first look at the variable *)
@@ -590,6 +591,8 @@ and determine_constraint_ fulloptiprog optiprog constraint_map e =
                 in
                   MOList_type ((List.hd lst_el_constraints)), constraint_map
             | MONone_val -> 
+
+
                 MOOption_type 
                   ({e with loc_val = MOAll_type (get_fresh_int ())}), constraint_map
             | MOSome_val el -> 
@@ -661,16 +664,29 @@ and determine_constraint_ fulloptiprog optiprog constraint_map e =
                   determine_constraint fulloptiprog optiprog constraint_map
                                  fv.loc_val.mofv_body 
                 in
-                let args_type = 
-                  List.map 
-                    (fun funarg -> 
-                      (match funarg with 
-                        | MOBaseArg bt -> 
-                            {bt with loc_val = MOAll_type(get_fresh_int())}
-                        | MOTupleArg bt ->
-                            {bt with loc_val = MOAll_type(get_fresh_int())}
-                      )
+
+                let rec funarg_to_ref constraint_map  funarg =
+                  match funarg with 
+                     | MOBaseArg bt -> 
+                         (add_constraints bt.loc_val 
+                             [{bt with loc_val= MORef_type (None, bt.loc_val, 0, [])}] 
+                             constraint_map),
+                         {bt with loc_val = MORef_type (None, bt.loc_val, 0, [])}
+                     | MOTupleArg bt ->
+                         let constraint_map, tupTyp = 
+                           List.fold_left_map
+                            (fun constraint_map bt -> 
+                              funarg_to_ref constraint_map bt
+                            )
+                            constraint_map bt.loc_val
+                          in constraint_map, {bt with loc_val = MOTuple_type tupTyp}
+                in
+                let constraint_map, args_type = 
+                  List.fold_left_map 
+                    (fun constraint_map funarg -> 
+                      funarg_to_ref constraint_map funarg 
                     )
+                    constraint_map
                     fv.loc_val.mofv_args_id.loc_val
                 in
                 MOFun_type (args_type, body_type), constraint_map
@@ -863,6 +879,7 @@ box a value within a variable.
   
 *)
   let rec box_val ?topvar:(topvar = None) locScope aval = 
+
     let new_internal_var = get_fresh_int () in
       {aval with loc_val = MOBind_val 
       {
@@ -1502,8 +1519,9 @@ box a value within a variable.
 let parsedToOpt_topval_intmap prog optiprog = 
   let mapping_for_mvars mvarlst = 
     let add_topvar name map = 
+
       match StringMap.find_opt name map with
-        | None -> StringMap.add name (get_fresh_int()) map
+        | None -> StringMap.add name (get_fresh_int ()) map
         | Some _ -> raise (VarError ("Cannot redeclare toplevel variable: variable $"^name^" ." ))
     in
     let rec add_topel el map = 
@@ -1595,7 +1613,7 @@ let provide_type_id oldprog optiprog =
   let typestr2int = 
     StringMap.fold 
       (fun strel _ newmap ->
-          StringMap.add strel (get_fresh_int () ) newmap 
+          StringMap.add strel (get_fresh_int ()) newmap 
       ) 
       oldprog.mpg_types StringMap.empty
   in
@@ -1835,7 +1853,7 @@ let parsedToOpt fullprog =
   *)
   debug_info (debug_title2 "part3: full type checking");
   let constraints = extract_constraints fulloptiprog in 
-  let _debug_constraints = GufoSolver.debug_constraints in 
+  let _debug_constraints = GufoSolver.debug_constraints constraints in 
   let resolvedTypes = GufoSolver.solver constraints in
   let resolvedTypes = 
     IntMap.map
@@ -1916,10 +1934,12 @@ let add_prog_to_optprog fulloptiprog fullprog =
 
           let past_map = ref IntMap.empty in
           let add_topvar name map = 
+
+          let fresh_int = get_fresh_int () in
             (match StringMap.find_opt name map with
-              | None -> StringMap.add name (get_fresh_int()) map
+              | None -> StringMap.add name ((fresh_int)) map
               | Some old_i -> 
-                  let ni = get_fresh_int() in
+                  let ni = fresh_int in
                   past_map := IntMap.add ni old_i (!past_map); 
                   StringMap.add name ni map
             )
@@ -2104,7 +2124,7 @@ let add_prog_to_optprog fulloptiprog fullprog =
      it easier to get type from this map.*)
   debug_info(debug_title2 "PART 3");
   let constraints = extract_constraints nfulloptiprog in 
-  debug_info(debug_title2 "extracting constraint 3-2");
+  debug_info(debug_title2 "extracting constraint");
   let _debug_constraints = GufoSolver.debug_constraints constraints in 
   debug_info(debug_title2 "solving constraint");
   let resolvedTypes = GufoSolver.solver constraints in
