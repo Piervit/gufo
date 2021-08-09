@@ -305,7 +305,15 @@ let print_expr_with_err term expr error_pos =
     - the last "valid part".
   *)
   let error_start = error_pos.ppos_start.pos_cnum in
+  let error_start = match error_start with 
+                      | -1 -> 0
+                      | _ -> error_start
+  in 
   let error_end = error_pos.ppos_end.pos_cnum in
+  let error_end = match error_end with 
+                      | -1 -> 0
+                      | _ -> error_end
+  in 
   let full_expr = (Zed_edit.text (Zed_edit.edit expr)) in 
   let expr_before = Zed_rope.sub full_expr 0 error_start in
   let expr_err= Zed_rope.sub full_expr error_start (error_end - error_start)  in
