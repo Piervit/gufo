@@ -237,17 +237,31 @@ let rec determine_refine_type t1 t2 =
 resolved to resolved_type and allow to transfort in the unresolved map
 reference to this variable to its direct type.*)
 let update_on_ref_resolution unresolved_map rmodul rvarid resolved_type =
+  let rec refine_with_args typ args_ref = 
+    match typ, args_ref with
+      | MOFun_type([], ret_fun), [] ->
+          ret_fun.loc_val
+      | MOFun_type(cur_fun_arg::funargs, ret_fun), cur_arg::args_ref ->
+          (*We have to check the args compatibility.*)
+          let arg_type = determine_refine_type cur_arg  cur_fun_arg in
+          refine_with_args (MOFun_type(funargs, ret_fun)) args_ref
+      | _,_ -> typ 
+  in
+  
   let rec update_typ typ = 
     (match typ.loc_val with
-     | MORef_type (refmod, refi, _,_) ->
+     | MORef_type (refmod, refi, _,args) ->
         let refmod = match refmod with 
             | None -> 0
             | Some i -> i 
         in
         (match refmod - rmodul, refi - rvarid with
           | 0, 0 -> 
-              {typ with loc_val = resolved_type.loc_val}
-          | _ ->  typ
+               (*we have to refine the type depending of the arguments*)  
+              let base_type = refine_with_args resolved_type.loc_val args in
+              {typ with loc_val = base_type} 
+          | _ ->
+                typ
         )
      | MOFun_type (args, ret) ->
           let newArgs = 

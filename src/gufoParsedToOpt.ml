@@ -495,19 +495,6 @@ and determine_ref_with_index ref ref_vtyp  =
 *)
 and determine_constraint_ref_function_call fulloptiprog optiprog constraint_map
                                      ref args typ_ref =
-
-  let precise_with_args constraint_map id ref_typ args_typ =
-    match args_typ with
-      | [] -> 
-        add_constraints id.loc_val [ref_typ] constraint_map
-      | typ :: oargs_typ -> 
-        
-        add_constraints id.loc_val
-          [{loc_val = (MOFun_type (typ::oargs_typ, 
-                        {id with loc_val = MOAll_type (get_fresh_int ())}));
-            loc_pos = id.loc_pos}] 
-          constraint_map
-  in
   (*Determine type of arguments.*)
   let lst_typ_args, constraint_map = 
     List.fold_left 
@@ -520,11 +507,13 @@ and determine_constraint_ref_function_call fulloptiprog optiprog constraint_map
   in
   let lst_typ_args = List.rev lst_typ_args in
   let idloc,_ = ref.morv_varname in
-
-  let constraint_map = 
-    precise_with_args constraint_map idloc typ_ref lst_typ_args 
+  let expr_typ = 
+    match typ_ref.loc_val with
+      | MORef_type (id, varname, deep, _) -> MORef_type (id, varname, deep, lst_typ_args)
+      | _ -> raise (InternalError "Gufo internal error.")
   in
-  let expr_typ = determine_ref_with_index ref typ_ref in 
+  let expr_typ = {typ_ref with loc_val = expr_typ}  in
+  let expr_typ = determine_ref_with_index ref expr_typ in 
   expr_typ, constraint_map
 
 (* 
@@ -704,18 +693,12 @@ and determine_constraint_ fulloptiprog optiprog constraint_map e =
           (match args with 
             | [] -> 
               let typ_ref = determine_ref_with_index ref typ_ref in
-(*
-              let constraint_map = 
-                add_constraints ref_id.loc_val 
-                                [typ_ref] 
-                                constraint_map 
-              in
-*)
               (typ_ref.loc_val, constraint_map)
             | args -> 
                 let expr_typ, constraint_map = 
                   determine_constraint_ref_function_call 
                     fulloptiprog optiprog constraint_map ref args typ_ref in
+                debug_info (Printf.sprintf "EXPR TYPE : %s" (type_to_string expr_typ)) ;
                 expr_typ.loc_val, constraint_map
           )
       | MOEnvRef_val _ -> 
