@@ -1483,8 +1483,9 @@ box a value within a variable.
   in
   match is_main_prog with
     | true -> 
-        let topcal = parsedToOpt_expr optiprog StringMap.empty oldprog.mpg_topcal in
-        let topcap_bind_vars = get_bind_vars_from_topvar topcal in
+        let topcal = (box_val StringMap.empty oldprog.mpg_topcal)
+        in
+          let topcap_bind_vars = get_bind_vars_from_topvar topcal in
         {
           optiprog with 
           mopg_topcal = topcal;
