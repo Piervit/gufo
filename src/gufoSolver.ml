@@ -30,20 +30,23 @@ open GufoOptUtils
 open GufoSolverUtils
 
 
-let debug_typeset_poor set = 
-        TypeSet.iter
-        (fun atype -> 
-          debug_info (Printf.sprintf "type %s (at %s)" (type_to_string atype) (type_to_location_string atype))
-        )
-        set
 
-
-
+(*We use debug_typeset_poor when we want to dump a typeset without beiing able
+to associate it with variable info (imod, ivar). *)
 let debug_typeset imod ivar set = 
         debug_info (Printf.sprintf "%d : %d : " imod ivar);
         TypeSet.iter
         (fun atype -> 
           debug_info (Printf.sprintf "    %d : %d : %s (at %s)" imod ivar (type_to_string atype) (type_to_location_string atype))
+        )
+        set
+
+(*We use debug_typeset_poor when we want to dump a typeset without beiing able
+to associate it with variable info (imod, ivar). *)
+let debug_typeset_poor set = 
+        TypeSet.iter
+        (fun atype -> 
+          debug_info (Printf.sprintf "type %s (at %s)" (type_to_string atype) (type_to_location_string atype))
         )
         set
 
@@ -111,14 +114,15 @@ let determine_refine_type_composed epos i j =
     write this possibility.
 
 *)
-let rec determine_refine_type t1 t2 = 
+let rec determine_refine_type t1 t2 moall_map = 
   let compare_list ilst jlst = 
     (match (List.length ilst - List.length jlst ) with 
       | 0 -> 
         let lst_determine = 
           List.map2
             (fun i j -> 
-               determine_refine_type i j
+               let res, _ = determine_refine_type i j moall_map in
+               res
             )
           ilst jlst
         in
@@ -133,7 +137,8 @@ let rec determine_refine_type t1 t2 =
           | true ->
             Some (List.map2 
               (fun i j -> 
-                TypeSet.choose (determine_refine_type i j)
+                let res, _ = (determine_refine_type i j moall_map) in
+                TypeSet.choose res
               )
               ilst jlst);
           | _ -> None
@@ -143,15 +148,15 @@ let rec determine_refine_type t1 t2 =
   in
   match t1.loc_val, t2.loc_val with
     | _t1, MOAll_type i ->
-        TypeSet.singleton t1 
+        TypeSet.singleton t1, IntMap.add i t1 moall_map 
     | MOAll_type i , _t2 -> 
-        TypeSet.singleton t2 
+        TypeSet.singleton t2, IntMap.add i t2 moall_map 
     | MORef_type (imod, i, deep,args ), _ -> 
-      TypeSet.add t1 (TypeSet.singleton t2)
+      TypeSet.add t1 (TypeSet.singleton t2), moall_map
     | _, MORef_type (imod, i, deep,args ) -> 
-      TypeSet.add t1 (TypeSet.singleton t2)
+      TypeSet.add t1 (TypeSet.singleton t2), moall_map
     | MOUnit_type, MOUnit_type -> 
-        TypeSet.singleton t1
+        TypeSet.singleton t1, moall_map
     | MOUnit_type, _ -> 
         raise_typeError  "cannot refine unit with other type" t1.loc_pos
     | MOComposed_type i , MOComposed_type j -> 
@@ -159,69 +164,70 @@ let rec determine_refine_type t1 t2 =
           {loc_val = MOComposed_type 
                       (determine_refine_type_composed t1.loc_pos i j );
            loc_pos = t1.loc_pos
-          }
+          }, moall_map
     | MOBase_type i , MOBase_type j  -> 
-        determine_refine_base_type t1.loc_pos i j 
+        determine_refine_base_type t1.loc_pos i j , moall_map
     | MOTuple_type ilst , MOTuple_type jlst  ->
         (match (List.length ilst - List.length jlst ) with 
           | 0 -> 
             (match (compare_list ilst jlst) with
-              | None -> TypeSet.add t1 (TypeSet.singleton t2)
+              | None -> TypeSet.add t1 (TypeSet.singleton t2), moall_map
               | Some mlst -> 
-                 TypeSet.singleton {t1 with loc_val = (MOTuple_type mlst)}
+                 TypeSet.singleton {t1 with loc_val = (MOTuple_type mlst)}, moall_map
             )
           | _ -> raise_typeError 
                   "Cannot merge together tuple types of different lengths."
                   t1.loc_pos
         )
     | MOList_type i , MOList_type j  -> 
-        let resdet = (determine_refine_type i j) in
+        let resdet, moall_map = (determine_refine_type i j moall_map ) in
         (match (TypeSet.cardinal resdet ) == 1 with
           | true -> 
               TypeSet.singleton {
                 t1 with loc_val = MOList_type (TypeSet.choose resdet)
-              }
-          | false -> TypeSet.add t1 (TypeSet.singleton t2)
+              }, moall_map
+          | false -> TypeSet.add t1 (TypeSet.singleton t2), moall_map
         )
     | MOOption_type i, MOOption_type j -> 
-        let resdet = (determine_refine_type i j) in
+        let resdet, moall_map = (determine_refine_type i j moall_map) in
         (match (TypeSet.cardinal resdet ) == 1 with
           | true -> 
             TypeSet.singleton 
-              {t1 with loc_val = MOOption_type(TypeSet.choose resdet)}
-          | false -> TypeSet.add t1 (TypeSet.singleton t2)
+              {t1 with loc_val = MOOption_type(TypeSet.choose resdet)}, moall_map
+          | false -> TypeSet.add t1 (TypeSet.singleton t2), moall_map
         )
     | MOSet_type i, MOSet_type j ->
-        let resdet = (determine_refine_type i j) in
+        let resdet, moall_map = (determine_refine_type i j moall_map) in
         (match (TypeSet.cardinal resdet ) == 1 with
           | true -> 
             TypeSet.singleton 
-              {t1 with loc_val = MOSet_type(TypeSet.choose resdet)}
-          | false -> TypeSet.add t1 (TypeSet.singleton t2)
+              {t1 with loc_val = MOSet_type(TypeSet.choose resdet)}, moall_map
+          | false -> TypeSet.add t1 (TypeSet.singleton t2), moall_map
         )
     | MOMap_type (k,v), MOMap_type(kp,vp) ->
-        let resk = (determine_refine_type k kp) in
-        let resv = (determine_refine_type v vp) in
+        let resk, moall_map = (determine_refine_type k kp moall_map) in
+        let resv, moall_map = (determine_refine_type v vp moall_map) in
         (match ((TypeSet.cardinal resk ) == 1) &&  
               ((TypeSet.cardinal resv ) == 1)
         with
           | true -> 
             TypeSet.singleton {t1 with loc_val = MOMap_type((TypeSet.choose resk),
-                                               ((TypeSet.choose resv)))}
-          | false -> TypeSet.add t1 (TypeSet.singleton t2)
+                                               ((TypeSet.choose resv)))}, moall_map
+          | false -> TypeSet.add t1 (TypeSet.singleton t2), moall_map
         )
     | MOFun_type(aargs, aret), MOFun_type(bargs, bret) -> 
         (match (List.length aargs - List.length bargs ) with 
           | 0 -> 
             (match (compare_list aargs bargs ) with
-              | None -> TypeSet.add t1 (TypeSet.singleton t2)
+              | None -> TypeSet.add t1 (TypeSet.singleton t2), moall_map
               | Some mlst -> 
-                  let resret = (determine_refine_type aret bret) in
+                  let resret, moall_map = (determine_refine_type aret bret moall_map) in
                   (match (TypeSet.cardinal resret) == 1 with
                     | true -> 
                       TypeSet.singleton 
-                        {t1 with loc_val = (MOFun_type (mlst, TypeSet.choose resret))}
-                    | false -> TypeSet.add t1 (TypeSet.singleton t2)
+                        {t1 with loc_val = (MOFun_type (mlst, TypeSet.choose resret))},
+                        moall_map
+                    | false -> TypeSet.add t1 (TypeSet.singleton t2), moall_map
                   )
             )
           | _ -> raise_typeError 
@@ -237,14 +243,29 @@ let rec determine_refine_type t1 t2 =
 resolved to resolved_type and allow to transfort in the unresolved map
 reference to this variable to its direct type.*)
 let update_on_ref_resolution unresolved_map rmodul rvarid resolved_type =
-  let rec refine_with_args typ args_ref = 
+
+  let rec refine_with_args typ args_ref moall_map = 
     match typ, args_ref with
       | MOFun_type([], ret_fun), [] ->
-          ret_fun.loc_val
+          (match ret_fun.loc_val with
+            | MOAll_type i -> 
+                (match IntMap.find_opt i moall_map with
+                  | None -> ret_fun.loc_val
+                  | Some t -> 
+                      t.loc_val
+                )
+            | _ -> ret_fun.loc_val
+          )
       | MOFun_type(cur_fun_arg::funargs, ret_fun), cur_arg::args_ref ->
           (*We have to check the args compatibility.*)
-          let arg_type = determine_refine_type cur_arg  cur_fun_arg in
-          refine_with_args (MOFun_type(funargs, ret_fun)) args_ref
+          let arg_type, moall_map = determine_refine_type cur_arg cur_fun_arg moall_map in
+          (match cur_fun_arg.loc_val with 
+            | MOAll_type i  -> 
+              let moall_map = IntMap.add i (TypeSet.choose arg_type) moall_map in
+              refine_with_args (MOFun_type(funargs, ret_fun)) args_ref moall_map
+            | _  -> 
+              refine_with_args (MOFun_type(funargs, ret_fun)) args_ref moall_map
+          )
       | _,_ -> typ 
   in
   
@@ -258,7 +279,7 @@ let update_on_ref_resolution unresolved_map rmodul rvarid resolved_type =
         (match refmod - rmodul, refi - rvarid with
           | 0, 0 -> 
                (*we have to refine the type depending of the arguments*)  
-              let base_type = refine_with_args resolved_type.loc_val args in
+              let base_type = refine_with_args resolved_type.loc_val args (IntMap.empty) in
               {typ with loc_val = base_type} 
           | _ ->
                 typ
@@ -292,7 +313,9 @@ let update_on_ref_resolution unresolved_map rmodul rvarid resolved_type =
 (*extract resolved constraints from the set.
   A variable is resolved when:
     - There is a single element in the typeSet and this element is not a
-    MORef_type.
+    MORef_type nor a MOfun.
+    - There is a single element in the typeSet and this element is a MOFun
+      which arguments and return type are all resolved.
     - There is a single 'concrete' type (neither MOAll, neither a ref) in the
     typeset and the eventuel ref types can be converted to this type.
 *)
@@ -319,6 +342,32 @@ let select_resolved resolved_map unresolved_map =
                      (resolveds, 
                        add_in_module imodul varid typeSet unresolveds
                      )
+                  | MOFun_type (args, ret) ->
+                        let rec is_resolved arg = 
+                          (match arg.loc_val with
+                            | MORef_type _ -> false
+                            | MOFun_type (args, ret) ->
+                                List.for_all is_resolved args && (is_resolved ret)
+                            | _ ->  true
+                          )
+                        in
+                        (match (List.for_all is_resolved args && (is_resolved ret)) with
+                          | false -> 
+                              (*not resolved *)
+                              (resolveds, 
+                                add_in_module imodul varid typeSet unresolveds
+                              )
+                          | true ->
+                              (*resolved*)
+                              change := true;
+                              (*When we resolve a ref, we should update every place where
+                                it is used.*)
+                              let resolved_type = (TypeSet.choose typeSet) in
+                              let unresolveds = update_on_ref_resolution unresolveds
+                                                  imodul varid resolved_type in
+                              (add_in_module imodul varid (TypeSet.choose typeSet) resolveds), 
+                              unresolveds
+                        )
                   | _ -> 
                     change := true;
                     (*When we resolve a ref, we should update every place where
@@ -360,6 +409,7 @@ let resolve modi vari resolved_map typeSet =
           )
   in
 
+  (*try to replace reference to (refModul, refId, refDeep, refArgs by its resolved type. *)
   let ref_to_real_type refModul refId refDeep refArgs curTyp =
     let modul = 
       (match refModul with
@@ -409,7 +459,8 @@ let resolve modi vari resolved_map typeSet =
                   )
               in
                 {typ with loc_val = MOFun_type(newArgsList, newRet)}
-        | _ -> typ
+        | _ ->
+              typ
       )
       typeSet
   in
@@ -426,7 +477,7 @@ let resolve modi vari resolved_map typeSet =
       (fun typ accTypeSet ->
         TypeSet.fold
           (fun typToComp accTypeSet -> 
-            let res = (determine_refine_type typToComp typ) in
+            let res, _ = (determine_refine_type typToComp typ IntMap.empty) in
             TypeSet.fold
               (fun resEl accTypeSet ->
                 TypeSet.add resEl accTypeSet
@@ -465,6 +516,20 @@ let resolve_free_variables unresolved_map =
           | false -> false
           | true -> 
               (match (TypeSet.choose typeSet).loc_val with
+                | MOFun_type (args, ret) -> 
+                    (
+                      match ret.loc_val with 
+                        | MORef_type (imod, ivar, _ , _) ->
+                            let imod = match imod with
+                              | None -> 0 
+                              | Some i -> i
+                            in
+                            (match imod - idmodul, ivar - idvar with
+                              | 0 , 0 -> true
+                              | _  -> false
+                            )
+                        | _ -> false
+                    )
                 | MORef_type (imod, ivar, _, _ ) -> 
                     let imod = match imod with
                       | None -> 0 
@@ -541,7 +606,17 @@ let resolve_free_variables unresolved_map =
             | None -> unresolved_map
             | Some newTypeSing ->
               do_change:= true;
-              replace_in_map unresolved_map aSingletonConst (TypeSet.singleton newTypeSing)
+              debug_info (Printf.sprintf "Rule 1 transformation applied.\n");
+              let aSingletonPrevVal = (TypeSet.choose (get_el_from_modulVarId unresolved_map aSingletonConst)) in
+              (match aSingletonPrevVal.loc_val with
+                | MOFun_type (args, _ret) ->
+                    replace_in_map unresolved_map aSingletonConst 
+                      (TypeSet.singleton {aSingletonPrevVal 
+                                          with loc_val = MOFun_type (args, 
+                                                                     newTypeSing)})
+                | _ -> 
+                    replace_in_map unresolved_map aSingletonConst (TypeSet.singleton newTypeSing)
+              )
           
       )
       unresolved_map
@@ -595,8 +670,8 @@ let resolve_free_variables unresolved_map =
 
   let unresolved_map, change = rule1 unresolved_map in
   match change with 
-    | true ->  unresolved_map
-    | false -> let unresolved_map, _ = rule2 unresolved_map in unresolved_map
+    | true ->  unresolved_map, true
+    | false -> rule2 unresolved_map 
 
 (*Return a constraint map with only a single resolved type for a variable
  constraints: Gufo.MCore.TypeSet.t GenUtils.IntMap.t GenUtils.IntMap.t
@@ -606,7 +681,6 @@ let solver constraints =
   We keep a map of thouse resolved vars.
 *)
   let _, resolved_map, unresolved_map = select_resolved IntMap.empty constraints in
-
 (*
   In a loop, we try to resolve every var, which can be solved using their
 constraints and the map of resolved vars.
@@ -642,8 +716,7 @@ constraints and the map of resolved vars.
                   argument ( fun $f $a = $a + 5 , in this case $a is not
                   explicitely resolved.))
                 *)
-                debug_constraints unresolved_map;
-                let unresolved_map = resolve_free_variables unresolved_map in
+                let unresolved_map, change = resolve_free_variables unresolved_map in
                 debug_constraints unresolved_map;
                 try_resolve resolved_map unresolved_map
   in

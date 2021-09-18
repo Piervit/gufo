@@ -580,8 +580,6 @@ and determine_constraint_ fulloptiprog optiprog constraint_map e =
                 in
                   MOList_type ((List.hd lst_el_constraints)), constraint_map
             | MONone_val -> 
-
-
                 MOOption_type 
                   ({e with loc_val = MOAll_type (get_fresh_int ())}), constraint_map
             | MOSome_val el -> 
