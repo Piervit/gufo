@@ -208,9 +208,13 @@ and mcomp_op =
   | Egal      (* == *)
   | NotEqual (* != *)
   | LessThan  (* < *)
+  | LessThanDot  (* <. *)
   | LessOrEq  (* <= *)
+  | LessOrEqDot  (* <=. *)
   | GreaterThan (* > *)
+  | GreaterThanDot (* >. *)
   | GreaterOrEq (* >= *)
+  | GreaterOrEqDot (* >=. *)
 
 and mbinding = {
   mbd_name : var_decl; 

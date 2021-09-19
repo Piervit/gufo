@@ -631,9 +631,13 @@ let rec apply_opcomp toplevel arg2valMap op leftv rightv =
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
             box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left.loc_val < right.loc_val)))))
+        | _ -> assert false
+      )
+  | LessThanDot ->
+      (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
-            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc(left.loc_val < right.loc_val)))))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left.loc_val < right.loc_val)))))
         | _ -> assert false
       )
   | LessOrEq ->
@@ -641,9 +645,13 @@ let rec apply_opcomp toplevel arg2valMap op leftv rightv =
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
             box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc (left.loc_val <= right.loc_val)))))
+        | _ -> assert false
+      )
+  | LessOrEqDot ->
+      (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
-            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left.loc_val <= right.loc_val)))))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc (left.loc_val <= right.loc_val)))))
         | _ -> assert false
       )
   | GreaterThan ->
@@ -651,9 +659,13 @@ let rec apply_opcomp toplevel arg2valMap op leftv rightv =
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
             box_loc(MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left.loc_val > right.loc_val)))))
+        | _ -> assert false
+      )
+  | GreaterThanDot ->
+      (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
-            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left.loc_val > right.loc_val)))))
+            box_loc(MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left.loc_val > right.loc_val)))))
         | _ -> assert false
       )
   | GreaterOrEq ->
@@ -661,10 +673,15 @@ let rec apply_opcomp toplevel arg2valMap op leftv rightv =
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
             box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left.loc_val >= right.loc_val)))))
+        | _ -> assert false
+      )
+  | GreaterOrEqDot ->
+      (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
             box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left.loc_val >= right.loc_val)))))
         | _ -> assert false
+
       )
 
 and apply_in_body toplevel arg2valMap bodieslst = 

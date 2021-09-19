@@ -61,7 +61,9 @@ issue for commands such as 'ls *'.
 %token TILDE(* userdir *)
 (* command rilated *)
 %token CLOSING_CHEVRON (* > *)
+%token CLOSING_CHEVRON_DOT (* >. *)
 %token EQ_CLOSING_CHEVRON (* >= *)
+%token EQ_CLOSING_CHEVRON_DOT (* >=. *)
 %token MINUS_CLOSING_CHEVRON 
 %token DOUBLE_CLOSING_CHEVRON (* >> *)
 %token WRITE_ERROR_TO (* 2> *)
@@ -69,7 +71,9 @@ issue for commands such as 'ls *'.
 %token WRITE_ERROR_TO_STD (* 2>&1 *)
 %token WRITE_ALL_TO (* >& *)
 %token OPENING_CHEVRON 
+%token OPENING_CHEVRON_DOT
 %token EQ_OPENING_CHEVRON  (* <= *)
+%token EQ_OPENING_CHEVRON_DOT  (* <=. *)
 %token MINUS_OPENING_CHEVRON 
 %token PIPE
 %token SIMPLE_AND
@@ -628,12 +632,21 @@ comp_expr :
     {MComp_val ({loc_val=NotEqual;loc_pos=eq.loc_pos}, expr1, expr2) }
   | expr1 = located(varassign_in_expr) ; eq=located(CLOSING_CHEVRON) ; expr2 = located(varassign_in_expr)
     {MComp_val ({loc_val=GreaterThan;loc_pos=eq.loc_pos}, expr1, expr2) }
+  | expr1 = located(varassign_in_expr) ; eq=located(CLOSING_CHEVRON_DOT) ; expr2 = located(varassign_in_expr)
+    {MComp_val ({loc_val=GreaterThanDot;loc_pos=eq.loc_pos}, expr1, expr2) }
   | expr1 = located(varassign_in_expr) ; eq=located(EQ_CLOSING_CHEVRON); expr2 = located(varassign_in_expr)
     {MComp_val ({loc_val=GreaterOrEq;loc_pos=eq.loc_pos}, expr1, expr2) }
+  | expr1 = located(varassign_in_expr) ; eq=located(EQ_CLOSING_CHEVRON_DOT); expr2 = located(varassign_in_expr)
+    {MComp_val ({loc_val=GreaterOrEqDot;loc_pos=eq.loc_pos}, expr1, expr2) }
   | expr1 = located(varassign_in_expr) ; eq=located(OPENING_CHEVRON) ; expr2 = located(varassign_in_expr)
     {MComp_val ({loc_val=LessThan;loc_pos=eq.loc_pos}, expr1, expr2) }
   | expr1 = located(varassign_in_expr) ; eq=located(EQ_OPENING_CHEVRON); expr2 = located(varassign_in_expr)
     {MComp_val ({loc_val=LessOrEq;loc_pos=eq.loc_pos}, expr1, expr2) }
+  | expr1 = located(varassign_in_expr) ; eq=located(OPENING_CHEVRON_DOT) ; expr2 = located(varassign_in_expr)
+    {MComp_val ({loc_val=LessThanDot;loc_pos=eq.loc_pos}, expr1, expr2) }
+  | expr1 = located(varassign_in_expr) ; eq=located(EQ_OPENING_CHEVRON_DOT); expr2 = located(varassign_in_expr)
+    {MComp_val ({loc_val=LessOrEqDot;loc_pos=eq.loc_pos}, expr1, expr2) }
+
 
 anonymousfun: 
   | OPEN_BRACKET; FUN; args = located(funargs_top); ARROW;   body = located(topvarassign); CLOSE_BRACKET; 

@@ -207,17 +207,30 @@ and mcomp_op =
                 Can be applied to every type    
                 *)
   | LessThan  (* < 
-                Can be applied to numeric type (int, float)
+                Can be applied to integer type 
+              *)
+  | LessThanDot  (* <.
+                Can be applied to float type
               *)
   | LessOrEq  (* <= 
-                Can be applied to numeric type (int, float)
+                Can be applied to integer type
+              *)
+  | LessOrEqDot  (* <=.
+                Can be applied to float type
               *)
   | GreaterThan (* > 
-                Can be applied to numeric type (int, float)
+                Can be applied to integer type 
+                *)
+  | GreaterThanDot (* >.
+                Can be applied to float type 
                 *)
   | GreaterOrEq (* >= 
-                Can be applied to numeric type (int, float)
+                Can be applied to integer type
                 *)
+  | GreaterOrEqDot (* >=.
+                Can be applied to float type 
+                *)
+
 
 and mbinding = {
   mbd_name : var_decl;
@@ -592,12 +605,20 @@ and dump_mtype_val varval =
                 print_comp " != " 
             | LessThan ->
                 print_comp " < " 
+            | LessThanDot ->
+                print_comp " <. " 
             | LessOrEq ->
                 print_comp " <= " 
+            | LessOrEqDot ->
+                print_comp " <=. " 
             | GreaterThan ->
                 print_comp " > " 
+            | GreaterThanDot ->
+                print_comp " >. " 
             | GreaterOrEq ->
                 print_comp " >= " 
+            | GreaterOrEq ->
+                print_comp " >=. " 
           )
       | MBody_val bodylst -> 
           List.iter (fun bd -> dump_mtype_val bd.loc_val; print_string " ;; ") bodylst

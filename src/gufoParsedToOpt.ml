@@ -289,14 +289,46 @@ and determine_constraint_comp fulloptiprog optiprog constraint_map op arga argb 
                            fulloptiprog optiprog constraint_map vala in
     let typb, constraint_map = determine_constraint_
                            fulloptiprog optiprog constraint_map valb in
+    let constraint_ida, constraint_idb= 
+    (match op.loc_val with 
+      | LessThan 
+      | LessOrEq 
+      | GreaterThan 
+      | GreaterOrEq -> 
+                      [{vala with loc_val = typa};
+                       {valb with loc_val = typb};
+                       {vala with loc_val = (MOBase_type MTypeInt)};
+                      ],
+                      [{vala with loc_val = typa};
+                       {valb with loc_val = typb};
+                       {valb with loc_val = (MOBase_type MTypeInt)};
+                      ]
+      | LessThanDot
+      | LessOrEqDot
+      | GreaterThanDot 
+      | GreaterOrEqDot -> 
+                      [{vala with loc_val = typa};
+                       {valb with loc_val = typb};
+                       {vala with loc_val = (MOBase_type MTypeFloat)};
+                      ],
+                      [{vala with loc_val = typa};
+                       {valb with loc_val = typb};
+                       {valb with loc_val = (MOBase_type MTypeFloat)};
+                      ]
+      | _ -> (*no constraint on == and != *)
+                      [{vala with loc_val = typa};
+                       {valb with loc_val = typb};
+                      ],
+                      [{vala with loc_val = typa};
+                       {valb with loc_val = typb};
+                      ]
+    ) 
+    in
     let constraint_map = add_constraints id_a 
-                                         [{vala with loc_val = typa};
-                                          {valb with loc_val = typb};
-                                         ] 
+                                         constraint_ida 
                                          constraint_map in
     let constraint_map = add_constraints id_b 
-                                         [{vala with loc_val = typa};
-                                          {valb with loc_val = typb}] 
+                                         constraint_idb 
                                          constraint_map in
       MOBase_type (MTypeBool), constraint_map
  
