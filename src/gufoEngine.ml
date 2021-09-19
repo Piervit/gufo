@@ -1216,11 +1216,13 @@ and apply_cmdseq_val toplevel to_fork (pip_write,pip_read) arg2valMap cmdseq =
         (res, MOSequenceCmd((box_loc cmdseqa), (box_loc cmdseqb)))
     | MOPipedCmd (cmda, cmdb) ->
         let (newpip_read, newpip_write) = Unix.pipe ~cloexec:true () in 
-        let (_,cmda_run) = 
-          apply_cmdseq_val toplevel to_fork (Some newpip_write, pip_read) arg2valMap cmda
+        let _ = 
+          Thread.create (fun (toplevel, to_fork, pip, arg2valMap, cmda ) -> apply_cmdseq_val toplevel to_fork pip arg2valMap cmda) 
+            (toplevel, to_fork, (Some newpip_write, pip_read), arg2valMap, cmda)
+          
         in
         let (res, cmdb_run) = apply_cmdseq_val toplevel to_fork (pip_write, Some newpip_read) arg2valMap cmdb
-        in (res, MOPipedCmd ((box_loc cmda_run), (box_loc cmdb_run)))
+        in (res, MOPipedCmd ((cmda), (box_loc cmdb_run)))
 
 and apply_basic_fun toplevel arg2valMap op arga argb =
   let reduced_arga = apply_motype_val toplevel arg2valMap arga in
