@@ -134,6 +134,8 @@ let rec read_ lexbuf =
    | "mod"    -> Gufo_parser.MODULO  , (Sedlexing.lexing_positions lexbuf)
    | "mod."    -> Gufo_parser.MODULO_DOT, (Sedlexing.lexing_positions lexbuf)
    | "=="     -> Gufo_parser.EQUALITY  , (Sedlexing.lexing_positions lexbuf)
+   | "<="     -> Gufo_parser.EQ_OPENING_CHEVRON, (Sedlexing.lexing_positions lexbuf)
+   | ">="     -> Gufo_parser.EQ_CLOSING_CHEVRON, (Sedlexing.lexing_positions lexbuf)
    | "!="     -> Gufo_parser.INEQUALITY  , (Sedlexing.lexing_positions lexbuf)
    | "["      -> Gufo_parser.OPEN_SQRBRACKET  , (Sedlexing.lexing_positions lexbuf)
    | ".["     -> Gufo_parser.OPEN_SQRIDXBRACKET  , (Sedlexing.lexing_positions lexbuf)

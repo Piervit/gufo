@@ -69,7 +69,7 @@ issue for commands such as 'ls *'.
 %token WRITE_ERROR_TO_STD (* 2>&1 *)
 %token WRITE_ALL_TO (* >& *)
 %token OPENING_CHEVRON 
-%token EQ_OPENING_CHEVRON 
+%token EQ_OPENING_CHEVRON  (* <= *)
 %token MINUS_OPENING_CHEVRON 
 %token PIPE
 %token SIMPLE_AND
