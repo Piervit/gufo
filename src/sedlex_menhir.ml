@@ -16,12 +16,19 @@
 
     Author: Pierre Vittet
 *)
- 
+open Stdlib.Lexing
   
 (** [ParseError (file, line_start, line_end , col_start, col_end , token, reason)] *)
-exception ParseError of (string * int * int * int * int * string * string option)
+(* exception ParseError of (string * int * int * int * int * string * string option) *)
+(** [ParseError (pos_start, pos_end,  token, reason)] *)
+exception ParseError of (Stdlib.Lexing.position * Stdlib.Lexing.position * string * string option)
 
-let string_of_ParseError (file, line_start, line_end, col_start, col_end , tok, reason) =
+let string_of_ParseError (start_pos, end_pos, tok, reason) =
+  let file = start_pos.pos_fname in
+  let line_start = start_pos.pos_lnum in
+  let line_end = end_pos.pos_lnum in
+  let col_start = start_pos.pos_cnum in
+  let col_end = end_pos.pos_cnum in
   let file_to_string file =
     if file = "" then ""
     else " on file " ^ file
@@ -45,24 +52,14 @@ let raise_ParseError lexbuf =
   let tok = Sedlexing.Utf8.lexeme lexbuf in
   let open Lexing in
   let (start_pos, end_pos) = Sedlexing.lexing_positions lexbuf in 
-  raise @@ ParseError (start_pos.pos_fname, 
-                       start_pos.pos_lnum, 
-                       end_pos.pos_lnum,
-                       start_pos.pos_cnum,
-                       end_pos.pos_cnum, 
-                       tok, None)
+  raise @@ ParseError (start_pos, end_pos, tok, None)
 
 
 let raise_ParseErrorWithMsg lexbuf msg =
   let tok = Sedlexing.Utf8.lexeme lexbuf in
   let open Lexing in
   let (start_pos, end_pos) = Sedlexing.lexing_positions lexbuf in
-  raise @@ ParseError (start_pos.pos_fname, 
-                       start_pos.pos_lnum, 
-                       end_pos.pos_lnum,
-                       start_pos.pos_cnum,
-                       end_pos.pos_cnum, 
-                       tok, Some msg)
+  raise @@ ParseError (start_pos, end_pos, tok, Some msg)
 
 
 

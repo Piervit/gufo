@@ -561,13 +561,13 @@ let analyse_and_print term cur_expr =
       | SyntaxError (reason) -> 
          print_expr_with_err term cur_expr reason.loc_pos >>=
             (fun () -> print_err term cur_expr reason.loc_val)
-      | ParseError(fname, line_start, line_end, col_start, col_end , tok, reason) -> 
-       print_expr term cur_expr >>=
-         let err_msg = string_of_ParseError (fname, 
-                                             line_start, 
-                                             line_end, 
-                                             col_start, 
-                                             col_end, 
+      | ParseError(start_pos, end_pos, tok, reason) -> 
+         let parse_loc = {
+          ppos_start = start_pos;
+          ppos_end = end_pos;
+         } in
+         print_expr_with_err term cur_expr parse_loc >>=
+         let err_msg = string_of_ParseError (start_pos, end_pos,  
                                              tok, reason) in
        (fun () -> print_err term cur_expr err_msg)
       | Failure msg -> 
@@ -728,7 +728,7 @@ let first_line term shell_env (hist, hist_id) cur_expr =
        | Sys_error _msg 
        | VarError _msg ->
               return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
-       | ParseError (_fname, _line_start, _line_end, _col_start, _col_end, _tok, _reason) ->
+       | ParseError(_start_pos, _end_pos, _tok, _reason) -> 
               return (Some (create_empty_expr (), shell_env, (hist, hist_id)))
 
 
@@ -785,14 +785,10 @@ let new_line_normal_mod term shell_env (hist, hist_id) cur_expr =
               print_err term cur_expr (sprintf "error found :%s\n" msg )
               >>=
               (fun () -> return (Some (create_empty_expr (), shell_env, (hist, hist_id))))
-       | ParseError (fname, line_start, line_end, col_start, col_end , tok,reason) ->
+       | ParseError(start_pos, end_pos, tok, reason) -> 
              print_expr term cur_expr >>=
              (fun () -> 
-               let err_msg = string_of_ParseError (fname, 
-                                                   line_start, 
-                                                   line_end, 
-                                                   col_start,
-                                                   col_end,
+               let err_msg = string_of_ParseError (start_pos, end_pos,
                                                    tok, reason) 
                in
                print_err term cur_expr err_msg >>=
