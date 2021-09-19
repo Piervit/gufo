@@ -1320,7 +1320,7 @@ and apply_binding toplevel arg2valMap mbind =
             | _ -> raise (ExecutionError "This is an internal error from gufo. Please complain.")
           )
   in
-  let res_value = (apply_motype_val false arg2valMap mbind.mobd_value ) in
+  let res_value = (apply_motype_val toplevel arg2valMap mbind.mobd_value ) in
   (*associate the resulting value tuple to the binding tuple*)
   let arg2valMap = 
   List.fold_left
