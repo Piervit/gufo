@@ -630,40 +630,40 @@ let rec apply_opcomp toplevel arg2valMap op leftv rightv =
       (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
-            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left < right)))))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left.loc_val < right.loc_val)))))
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
-            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc(left < right)))))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc(left.loc_val < right.loc_val)))))
         | _ -> assert false
       )
   | LessOrEq ->
       (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
-            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc (left <= right)))))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc (left.loc_val <= right.loc_val)))))
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
-            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left <= right)))))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left.loc_val <= right.loc_val)))))
         | _ -> assert false
       )
   | GreaterThan ->
       (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
-            box_loc(MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left > right)))))
+            box_loc(MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left.loc_val > right.loc_val)))))
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
-            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left > right)))))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left.loc_val > right.loc_val)))))
         | _ -> assert false
       )
   | GreaterOrEq ->
       (match red_leftv, red_rightv with
         | MOSimple_val (MOBase_val (MOTypeIntVal left)), 
           MOSimple_val (MOBase_val (MOTypeIntVal right)) -> 
-            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left >= right)))))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal (box_loc(left.loc_val >= right.loc_val)))))
         | MOSimple_val (MOBase_val (MOTypeFloatVal left)), 
           MOSimple_val (MOBase_val (MOTypeFloatVal right)) -> 
-            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left >= right)))))
+            box_loc (MOSimple_val (MOBase_val (MOTypeBoolVal(box_loc (left.loc_val >= right.loc_val)))))
         | _ -> assert false
       )
 
@@ -1049,6 +1049,7 @@ and play_cmd toplevel to_fork (pip_write, pip_read) arg2valMap cmd =
   let play_cmd_toplevel () = 
     let cmdv = cmd.loc_val in
     let pid = Unix.create_process cmdv.mocm_cmd.loc_val (Array.of_list (cmdv.mocm_cmd.loc_val::red_args)) input_fd output_fd outerr_fd in
+    
     match to_fork with
       | true -> (0, MOSimpleCmd cmd)
       | false -> 
