@@ -1,0 +1,20 @@
+(include_subdirs unqualified)
+(executable
+ (name guforun)
+ (public_name gufo)
+ (package gufo)
+ (preprocess (pps sedlex.ppx))
+ (flags -w -33) 
+ (libraries
+  react
+  lwt
+  zed
+  lambda-term
+  str
+  unix
+  sedlex
+  menhirLib
+  camlp-streams))
+
+(menhir
+ (modules gufo_parser))
