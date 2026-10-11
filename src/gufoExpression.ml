@@ -17,7 +17,7 @@
     Author: Pierre Vittet
 *)
 
-open CamomileLibrary
+
 (******************************* EXPR ****************************************)
 (*expression manipulation: an expression is made from a zed_edit context *)
 
@@ -27,7 +27,7 @@ let get_edit_ expr = Zed_edit.edit expr
 let count_lines_str str = 
   Zed_utf8.fold 
     (fun achar acc -> 
-      match UChar.uint_code achar with
+      match Uchar.to_int achar with
         | 0x000A (* newline *) -> acc + 1
         | _ -> acc
     )
@@ -40,7 +40,7 @@ let count_lines_str str =
 let count_lines_rope str = 
   Zed_rope.fold 
     (fun achar acc -> 
-      match UChar.uint_code (Zed_char.core achar) with
+      match Uchar.to_int (Zed_char.core achar) with
         | 0x000A (* newline *) -> acc + 1
         | _ -> acc
     )
@@ -88,13 +88,13 @@ let insert_newline expr = Zed_edit.newline expr;
 let get_current_word expr = 
   let row, col = get_coord expr in
   let curline =  Zed_edit.get_line (Zed_edit.edit expr) row in
-  let curword = Zed_utf8.init 0 (fun i -> UChar.of_char ' ') in
+  let curword = Zed_utf8.init 0 (fun i -> Uchar.of_char ' ') in
   let rec get_word rop pos curword  = 
     match pos with 
       | -1 -> curword
       | _ -> 
       (let curchar = Zed_rope.get rop pos in
-      match UChar.uint_code (Zed_char.core curchar) with
+      match Uchar.to_int (Zed_char.core curchar) with
         | i when ((i > 47 && i < 123) 
                   || i = 36 
                   || i = 46
@@ -115,7 +115,7 @@ let to_one_line_expr expr =
   let (_,_, new_curs_col) = 
     Zed_rope.fold
       (fun uchar (curs_row, curs_col, new_curs_col) ->
-        (match UChar.uint_code (Zed_char.core uchar) with
+        (match Uchar.to_int (Zed_char.core uchar) with
           | 0x000A
           | 0x000D (*newline *) ->
             (curs_row - 1, curs_col, new_curs_col)

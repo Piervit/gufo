@@ -890,7 +890,7 @@ and apply_fun toplevel arg2valMap funval arglst =
     | MOSimple_val(MOFun_val fv) -> 
       (*apply the code using arg2valMap when needed.*)
       (*we check if it is a partial application *)
-      (match (Pervasives.compare (List.length arglst) (List.length fv.mofv_args_id)) with
+      (match (Stdlib.compare (List.length arglst) (List.length fv.mofv_args_id)) with
         | i when i < 0 -> 
             apply_partial_fun funval arglst
         | 0 -> 

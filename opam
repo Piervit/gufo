@@ -12,22 +12,21 @@ bug-reports: "https://github.com/piervit/gufo/issues"
 license: "GPL"
 dev-repo: "git+https://github.com/Piervit/gufo.git"
 build: [
-  ["./configure" "--prefix=%{prefix}%"]
-  [make]
+  ["dune" "build" "-p" name "-j" jobs]
 ]
-install: [make "install"]
+install: ["dune" "install" "-p" name]
 depends: [
-  "ocaml" {>= "4.07.0"}
-  "ocamlfind" {build}
+  "ocaml" {>= "4.08.0"}
+  "dune" {>= "3.0"}
   "menhir" {build}
-  "zed" {>= "1.6"}
-  "camomile"
-  "react"
-  "lwt"
-  "lambda-term" {>= "2.0.2"}
-  "base-unix"
-  "sedlex" {>= "2.0.0"}
-  "oasis" 
+  "menhirLib"
+  "zed" {>= "3.0"}
+  "camomile" {>= "2.0"}
+  "react" {>= "1.2.2"}
+  "lwt" {>= "5.0"}
+  "lambda-term" {>= "3.0"}
+  "sedlex" {>= "3.0"}
+  "camlp-streams" {>= "5.0"}
 ]
 url {
   src: "https://github.com/Piervit/gufo/archive/0.1.2.tar.gz"

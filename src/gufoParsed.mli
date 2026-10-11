@@ -293,8 +293,6 @@ val dump_mtype : mtype -> unit
 
 val dump_var :mvar -> unit
 
-val mval_to_cmd: mtype_val -> mcmd_seq
-
 val dump_fullprog : fullprog -> unit
 
 (* END FUNCTIONS *)

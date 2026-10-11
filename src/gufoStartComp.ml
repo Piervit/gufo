@@ -29,7 +29,7 @@ open GenUtils
 let parse_shell content = 
   debug_info (debug_title1 "Start converting file to a gufo program.");
   try(
-    let lexbuf = create_lexbuf (Sedlexing.Utf8.from_stream (Stream.of_string content)) in
+    let lexbuf = create_lexbuf (Sedlexing.Utf8.from_string content) in
     let prog = sedlex_with_menhir Gufo_lexer.read Gufo_parser.shell lexbuf in
   
     match prog with

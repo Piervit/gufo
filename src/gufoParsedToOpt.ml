@@ -1766,7 +1766,7 @@ and type_check_val fulloptiprog optiprog typScope v =
                       * outbounds. 
                       * This should be possible only if the ret is itself a fun.
                       * *)
-                    (match (Pervasives.compare (List.length args) (List.length args_type) )
+                    (match (Stdlib.compare (List.length args) (List.length args_type) )
                     with 
                       | i when i > 0 ->  
                           (*TODO*)
@@ -2840,7 +2840,7 @@ function we used it to not lost informations. *)
     let rec do_analyse_funcall_ var_types ftyp args_types allTypeMap = 
       match ftyp with
         | MOFun_type(args_required_type, ret) ->
-          (match (Pervasives.compare (List.length args_types) (List.length args_required_type) )
+          (match (Stdlib.compare (List.length args_types) (List.length args_required_type) )
               with 
                 | i when i > 0 ->  
                   (*This is possible that there are more args than there
