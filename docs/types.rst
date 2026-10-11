@@ -139,14 +139,15 @@ Operators
 Gufo has predefined operators: every operator takes two arguments, here denoted by ‘a’ and ‘b’:
 
   * a + b : with a and b as int (float) represents the addition of two integers(floats).
-  * a + b : with a and b as string represents the string concatenation operation.
+
+  * a ^ b : with a and b as string represents the string concatenation operation.
    
   * a – b : with a and b as int (float) represents the soustraction of two int (float)
    
   * a * b : with a and b as int (float) represents the multiplication of two int (float)
    
   * a / b : with a and b as int (float) represents the division of two int (float)
-   
+
   * a with b : with a and b a list of elements A represent the list concatenation.
    
   * a with b : with a and b a set of elements A represent the set union.
