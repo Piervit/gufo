@@ -34,8 +34,7 @@ let $f $a $b = $a + $b
 ($f 5) 6
 
 #### BUG 18 ####
-(priorité d'opérateur)
 
-1 + 1 ;; 3
-4
+The program does not allow uppercase var, it is ok, but at least error message should be nice
+let $GUFO = "ok"
 
