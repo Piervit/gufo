@@ -1,22 +1,25 @@
 #The syntax of a test program must be the following:
-#a comment line declaring the program number: "#PROGRAM X"
-#a comment line describing the program
-#The effective program
-#and "#END PROGRAM" comment
+# - a comment line declaring the program number: "#PROGRAM X"
+# - a comment line describing the program
+# - the effective program 
+# - and "#END PROGRAM" comment
 
+let $gufo_exe = "_build/default/src/guforun.exe"
 
 #return the string corresponding to the program at pos i in the file $file.
-let $read_program $i $file = 
+let $read_program $i $file =
+  #Return a string
   let $sed_expr = "/#PROGRAM "^$i^"$/,/#END PROGRAM/ p" in
   (
-   sed -n $sed_expr $file
+    sed -n $sed_expr $file
   )
 
-#return the string corresponding to the program at pos i in the file $file.
+#return a program execution command result.
 let $run_test $curTest $file = 
-    let $res = ($read_program ($Int.toString $curTest) $file) in(
-    echo "START TEST" ($Int.toString $curTest) $file ; echo $res.Cmd.print > tmpfile; ./guforun.native tmpfile 
-    )
+    let $res = ($read_program ($Int.toString $curTest) $file) in (
+        echo "START TEST" ($Int.toString $curTest) $file ; echo $res.Cmd.print > tmpfile;
+        ./_build/default/src/guforun.exe tmpfile 
+        )
 
 #Return the number of programs in a file
 let $nb_exemples $file = 
@@ -27,22 +30,21 @@ let $nb_exemples $file =
 #All the tests here, are expected to be valid.
 let $run_valid_tests_ $cur_test $file =
   #function validing (or invaliding the result of a test)
-  let $valid_test $cmd = 
+  let $valid_test $test_number $cmd = 
       if ($cmd.Cmd.res != (Some 0))
       then (echo ($cmd.Cmd.print) ; echo "FAILED"; exit)
-      else (
-        (echo $cmd.Cmd.print; echo "SUCCESS\n" ) )
+      else (echo ("Test " ^ ($Int.toString $test_number) ^ "succeded"))
   in (
     if ($cur_test  == 1 )
     then (
       #termination case: last file
       let $cmd = $run_test 1 $file in
-      ($valid_test $cmd)
+      ($valid_test $cur_test $cmd)
      )
     else(
       #recursive case: still file to valid
       let $prevcmd = $run_test $cur_test $file in (
-      ($valid_test $prevcmd) ;; ($run_valid_tests_ ($cur_test - 1) $file ))
+      ($valid_test $cur_test $prevcmd) ;; ($run_valid_tests_ ($cur_test - 1) $file ))
       )
     )
 
@@ -76,7 +78,8 @@ let $run_valid_tests_ $cur_test $file =
 
   
 let $run_valid_tests $file =
-  $run_valid_tests_ ($nb_exemples $file) $file 
+  (echo ("Running test " ^ $file));;
+  ($run_valid_tests_ ($nb_exemples $file) $file)
 
 **START**
 
