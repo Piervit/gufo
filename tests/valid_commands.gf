@@ -65,7 +65,7 @@ echo "poney" | sed "s/e/a/g"
 #PROGRAM 6
 #file redirection
 **START**
-
+touch tmp;; 
 sed "s/e/a/g" < tmp
 
 
