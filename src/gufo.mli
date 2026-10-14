@@ -60,9 +60,7 @@ sig
    | MOFun_type of motype list * motype (*arguments type, ret type *)
    | MOAll_type of int(*ocaml 'a , the int is only an identifier*)
    | MOUnit_type
-   | MORef_type of int option * int * int * motype list
- (*
-   (module * id_ref * deep *args ) 
+   | MORef_type of int option * int * int * motype list (*(module * id_ref * deep *args ) 
    THIS TYPE IS A TRICKY ONE, because it is
    not always used on the same way: in PART 1 and PART 2 of gufoParsedToOpt it
    is a ref to a composed type which is only used on first step of type

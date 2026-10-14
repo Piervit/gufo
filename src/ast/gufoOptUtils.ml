@@ -24,106 +24,10 @@ open Gufo.MCore
 open GenUtils
 
 
-let fold_over_obinding_val apply_fun acc expr = 
-  let rec fold_over_obinding_val_ acc expr = 
-    let rec fold_over_cmd_val_from_cmdseq acc seq = 
-      let rec over_moStringOrRef acc sor = 
-        match sor with
-          | MOSORString _ -> acc
-          | MOSORExpr expr -> fold_over_obinding_val_ acc expr
-      in
-      let rec over_cmd_output acc out =
-        match out with 
-          | MOCMDOStdOut
-          | MOCMDOStdErr -> acc 
-          | MOCMDOFile sor
-          | MOCMDOFileAppend sor ->
-              over_moStringOrRef acc sor
-      in
-      let rec over_cmd_outputerr acc out =
-        match out with 
-          | MOCMDEStdOut
-          | MOCMDEStdErr -> acc 
-          | MOCMDEFile sor
-          | MOCMDEFileAppend sor ->
-              over_moStringOrRef acc sor
-      in
-      let rec over_cmd_input acc inp =
-        match inp with 
-          | MOCMDIStdIn -> acc 
-          | MOCMDIFile sor -> over_moStringOrRef acc sor 
-      in
-        match seq with 
-        | MOSimpleCmd cmd -> 
-            let acc = List.fold_left over_moStringOrRef acc cmd.mocm_args in
-            let acc = over_cmd_output acc cmd.mocm_output in
-            let acc = over_cmd_outputerr acc cmd.mocm_outputerr in
-            over_cmd_input acc cmd.mocm_input_src 
-        | MOForkedCmd seq -> fold_over_cmd_val_from_cmdseq acc seq 
-        | MOOrCmd (seq1, seq2)
-        | MOSequenceCmd (seq1, seq2)
-        | MOPipedCmd (seq1, seq2)
-        | MOAndCmd (seq1, seq2) -> fold_over_cmd_val_from_cmdseq 
-                                  (fold_over_cmd_val_from_cmdseq acc seq2 ) 
-                                  seq1
-    in
-      match expr with
-      | MOComposed_val ct -> 
-          IntMap.fold (fun _i expr acc -> fold_over_obinding_val_ acc expr) ct.mocv_fields acc
-      | MOSimple_val msimple ->
-        (match msimple with 
-          | MONone_val -> acc
-          | MOBase_val bv -> 
-            (match bv with 
-              | MOTypeCmdVal cseq -> fold_over_cmd_val_from_cmdseq acc cseq 
-              | MOTypeStringVal _ | MOTypeBoolVal _ | MOTypeIntVal _ | MOTypeFloatVal _ -> acc
-            )
-          | MOSet_val set -> MSet.fold (fun el acc -> fold_over_obinding_val_  acc (simple_to_core_val el) ) set acc
-          | MOList_val mtypelst
-          | MOTuple_val mtypelst ->
-              List.fold_left fold_over_obinding_val_ acc mtypelst
-          | MOFun_val fv ->
-              fold_over_obinding_val_ acc fv.mofv_body
-          | MOSome_val mtype -> fold_over_obinding_val_ acc mtype
-          | MOMap_val keyValLst ->
-              MMap.fold(fun key v acc  -> 
-                fold_over_obinding_val_
-                  (fold_over_obinding_val_ acc v) 
-                  (simple_to_core_val key)) 
-              keyValLst acc 
-          | MOEmpty_val -> acc
-        )
-      | MOBasicFunBody_val (_, e1, e2) ->
-          fold_over_obinding_val_ (fold_over_obinding_val_ acc e1) e2
-      | MORef_val (mref, mtyplst) -> 
-          let acc = 
-            match mref.morv_index with  
-              | None -> acc
-              | Some lst -> List.fold_left fold_over_obinding_val_ acc lst
-          in
-            List.fold_left fold_over_obinding_val_ acc mtyplst
-      | MOBind_val mbind -> 
-          let acc = apply_fun acc mbind in 
-          let acc = fold_over_obinding_val_ acc mbind.mobd_value in
-          fold_over_obinding_val_ acc mbind.mobd_body 
-      | MOIf_val (cond, thn , els) ->
-      fold_over_obinding_val_ 
-        (fold_over_obinding_val_
-          (fold_over_obinding_val_ acc cond) 
-        thn) 
-      els
-      | MOComp_val (_, mtyp1, mtyp2) ->
-      fold_over_obinding_val_
-        (fold_over_obinding_val_ acc mtyp2)
-      mtyp1
-      | MOBody_val (lst) ->
-          List.fold_left fold_over_obinding_val_ acc lst
-      | MOEnvRef_val str -> acc
-  in
-    fold_over_obinding_val_ acc expr
-
-
-
+(** [fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr] folds
+    [apply_bind_fun] over all [MOBind_val] nodes and [apply_fun_fun] over all
+    [MOFun_val] nodes in the optimized AST [expr], threading accumulator [acc].
+    Visits bindings and functions before their sub-expressions (pre-order). *)
 let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr = 
   let rec fold_over_obinding_and_ofun_val_ acc expr = 
     let rec fold_over_cmd_val_from_cmdseq acc seq = 
@@ -224,7 +128,9 @@ let fold_over_obinding_and_ofun_val apply_bind_fun apply_fun_fun acc expr =
     fold_over_obinding_and_ofun_val_ acc expr
 
 
-
+(** [fold_over_oref_val apply_fun acc expr] folds [apply_fun] over all
+    [MORef_val] nodes in the optimized AST [expr], threading accumulator [acc].
+    Visits references before their index expressions and arguments (pre-order). *)
 let fold_over_oref_val apply_fun acc expr = 
   let rec fold_over_oref_val_ acc expr = 
     let rec fold_over_cmd_val_from_cmdseq acc seq = 
@@ -445,12 +351,8 @@ let transform_ref_in_funcall transform_fun expr =
 
 
 
-
-
-
-
-
-(*for a funarg type, return the type unfolded list of arguments. *)
+(** [unstack_args arg] will for a funarg type, return the type unfolded list of
+its arguments. *)
 let rec unstack_args arg = 
   match arg with 
     | MOBaseArg i -> [i]  

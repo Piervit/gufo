@@ -18,14 +18,6 @@
 *)
 
 (*
-  fold_over_obinding_val : apply_fun -> accumulator -> expr -> accumulator
-  Recursively apply apply_fun to every mobinding found within expr and add
-  result in accumulator.
-
-*)
-val fold_over_obinding_val : ('a -> Gufo.MCore.mobinding -> 'a) -> 'a -> Gufo.MCore.motype_val -> 'a
-
-(*
   fold_over_obinding_and_ofun_val: apply_fun -> accumulator -> expr ->
   accumulator Recursively apply apply_fun to every mobinding and mofun_val found
   within expr and add result in accumulator.

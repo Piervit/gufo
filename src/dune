@@ -15,6 +15,3 @@
   sedlex
   menhirLib
   camlp-streams))
-
-(menhir
- (modules gufo_parser))

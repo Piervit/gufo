@@ -38,3 +38,6 @@ let $f $a $b = $a + $b
 The program does not allow uppercase var, it is ok, but at least error message should be nice
 let $GUFO = "ok"
 
+#### BUG 19 ####
+badCmd
+Fatal error: exception Unix.Unix_error(Unix.ENOENT, "create_process", "badCmd")
