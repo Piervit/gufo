@@ -930,9 +930,20 @@ and determine_type fulloptiprog optiprog locScope const e =
           (*a comparison can only return a boolean *)
           determine_type_comp fulloptiprog optiprog locScope const op a b
       | MOBody_val bdlst ->
-          (*return the type of the last body*)
-          let lastbd = List.nth bdlst ((List.length bdlst) -1) in
-          determine_type fulloptiprog optiprog locScope const lastbd
+          (*First, manage all expression of MOBody except the last one: they
+          must be traversed to update the local scope.*)
+          let rec analyse_except_last locScope bd_lst = 
+            match bd_lst with
+            | [] -> locScope
+            | [_last] -> locScope (*We do nothing for the last one as it is returned by lastbd*)
+            | hd :: tl ->
+                let _typ, locScope = determine_type fulloptiprog optiprog locScope None hd in
+                analyse_except_last locScope tl
+          in
+          let scope_after_others = analyse_except_last locScope bdlst in
+          (*Finally manage the last body. *)
+          let lastbd = List.nth bdlst ((List.length bdlst) - 1) in
+          determine_type fulloptiprog optiprog scope_after_others const lastbd
     )
   in 
   let typ_res = check_respect_constraint const typ_res in
